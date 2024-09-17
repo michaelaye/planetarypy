@@ -33,7 +33,7 @@ https://michaelaye.github.io/nbplanetary where the documentation for the current
 Installation
 ------------
 
-`pip install git@github.com:planetarypy/planetarypy`
+`pip install planetarypy@git+https://github.com/planetarypy/planetarypy.git`
 
 General scope
 -------------

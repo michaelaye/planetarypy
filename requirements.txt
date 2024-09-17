@@ -1,0 +1,9 @@
+tomlkit
+requests
+tqdm
+pandas
+astropy
+spiceypy
+dask
+yarl
+matplotlib

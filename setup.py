@@ -13,7 +13,10 @@ with open(here / "README.rst") as readme_file:
 with open(here / "HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = ["tomlkit", "requests", "tqdm", "pandas", "astropy", "spiceypy", "dask", "yarl", "matplotlib"]
+with open(here / "requirements.txt") as requirements_file:
+    requirements = requirements_file.read().splitlines()
+
+# requirements = ["tomlkit", "requests", "tqdm", "pandas", "astropy", "spiceypy", "dask", "yarl", "matplotlib"]
 dev_requirements = ["pytest"]
 
 setup(
