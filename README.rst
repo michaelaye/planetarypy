@@ -36,7 +36,28 @@ https://michaelaye.github.io/nbplanetary where the documentation for the current
 Installation
 ------------
 
-`pip install git@github.com:planetarypy/planetarypy`
+From PyPI (once published):
+
+.. code-block:: bash
+
+    pip install planetarypy
+
+From GitHub:
+
+.. code-block:: bash
+
+    pip install git+https://github.com/planetarypy/planetarypy.git
+
+For development installation:
+
+.. code-block:: bash
+
+    # Clone the repository
+    git clone https://github.com/planetarypy/planetarypy.git
+    cd planetarypy
+    
+    # Install in development mode with dev dependencies
+    pip install -e ".[dev]"
 
 General scope
 -------------

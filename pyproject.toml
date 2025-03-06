@@ -9,7 +9,6 @@ description = "Core package for planetary data tools."
 readme = "README.rst"
 requires-python = ">= 3.9, <4"
 license = {text = "BSD license"}
-license-file = "LICENSE"
 authors = [
     {name = "Planetarypy Developers", email = "69774+michaelaye@users.noreply.github.com"}
 ]
@@ -33,8 +32,12 @@ dependencies = [
     "spiceypy",
     "yarl",
     "matplotlib",
+    "planets",
 ]
-repository = "https://github.com/planetarypy/planetarypy"
+
+[project.urls]
+Homepage = "https://github.com/planetarypy/planetarypy"
+Repository = "https://github.com/planetarypy/planetarypy"
 
 [project.optional-dependencies]
 dev = [
@@ -43,7 +46,7 @@ dev = [
     "build",
     "twine",
     "pip-tools",
-    "make"
+    "make",
 ]
 
 [project.scripts]
@@ -51,3 +54,27 @@ planetarypy = "planetarypy.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/planetarypy"]
+
+[tool.hatch.build]
+include = [
+    "src/planetarypy/**/*.py",
+    "src/planetarypy/**/*.pyd",
+    "src/planetarypy/**/*.so",
+    "LICENSE",
+    "README.rst",
+    "HISTORY.rst",
+]
+
+[tool.pytest]
+testpaths = ["tests"]
+addopts = "--ignore=setup.py"
+
+[tool.flake8]
+exclude = ["docs"]
+max-line-length = 88
+extend-ignore = ["E203", "E701"]
+
+[tool.bumpversion]
+current_version = "0.2.0"
+commit = true
+tag = true
