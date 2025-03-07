@@ -1,9 +1,14 @@
-__all__ = ["config", "reset_non_urls", "Config"]
+"""General configuration for the planetarypy package.
+
+This module handles general configuration settings such as storage locations.
+PDS index URLs and timestamps are now managed separately in pds/index_config.py.
+"""
+
+__all__ = ["config", "Config"]
 
 import json
 import os
 import shutil
-from collections.abc import Mapping
 from functools import reduce
 from importlib.resources import files
 from pathlib import Path
@@ -12,30 +17,13 @@ from typing import Union
 import tomlkit
 
 
-def reset_non_urls(
-    source: dict,  # source dictionary
-    reset: str = "",  # value to reset non URLs to
-) -> dict:
-    """Reset all non-URL values in the config file.
-
-    This is useful for copying the private config file with new data items back into the
-    source tree for a clean commit.
-    """
-    for key, value in source.items():
-        if isinstance(value, Mapping) and value:
-            reset_non_urls(value, reset)
-        elif "url" not in key:
-            source[key] = reset
-    return source
-
-
 class Config:
-    """Manage config stuff.
+    """Manage general configuration settings.
 
-    The key, value pairs found in the config file become attributes of the
-    class instance after initialization.
-    At minimum, there should be the `storage_root` attribute for storing data
-    for this package.
+    This class handles general configuration settings for the planetarypy package.
+    At minimum, there should be the `storage_root` attribute for storing data.
+
+    Note: PDS index URLs and timestamps are now managed separately in pds/index_config.py.
     """
 
     # This part enables a config path location override using env PLANETARYPY_CONFIG
@@ -69,13 +57,11 @@ class Config:
 
     @property
     def d(self):
-        """get the Python dic from"""
+        """Get the Python dictionary from the TOML document."""
         return self.tomldoc
 
     def __getitem__(self, key: str):
         """Get sub-dictionary by nested key."""
-        if not key.startswith("missions"):
-            key = "missions." + key
         try:
             return reduce(lambda c, k: c[k], key.split("."), self.d)
         except KeyError:
@@ -83,11 +69,9 @@ class Config:
 
     def get_value(
         self,
-        key: str,  # A nested key in dotted format, e.g. cassini.uvis.indexes
-    ) -> str:  # Returning empty string if not existing, because Path('') is False which is handy (e.g. in ctx mod.)
+        key: str,  # A nested key in dotted format
+    ) -> str:  # Returning empty string if not existing, because Path('') is False which is handy
         """Get sub-dictionary by nested key."""
-        if not key.startswith("missions"):
-            key = "missions." + key
         try:
             return reduce(lambda c, k: c[k], key.split("."), self.d)
         except KeyError:
@@ -95,7 +79,7 @@ class Config:
 
     def set_value(
         self,
-        nested_key: str,  # A nested key in dotted format, e.g. cassini.uvis.ring_summary
+        nested_key: str,  # A nested key in dotted format
         value: Union[float, str],  # Value for the given key to be stored
         save: bool = True,  # Switch to control writing out to disk
     ):
@@ -103,6 +87,9 @@ class Config:
         dic = self.tomldoc
         keys = nested_key.split(".")
         for key in keys[:-1]:
+            # Create the parent dictionaries if they don't exist
+            if key not in dic:
+                dic[key] = {}
             dic = dic[key]
         dic[keys[-1]] = value
         if save:
@@ -110,47 +97,15 @@ class Config:
 
     def __setitem__(self, nested_key: str, value: Union[float, str]):
         """Set value in sub-dic using dotted key."""
-        dic = self.tomldoc
-        keys = nested_key.split(".")
-        for key in keys[:-1]:
-            dic = dic[key]
-        dic[keys[-1]] = value
-        self.save()
+        self.set_value(nested_key, value)
 
     def save(self):
         """Write the TOML doc to file."""
         self.path.write_text(tomlkit.dumps(self.tomldoc))
 
-    @property
-    def missions(self):
-        return list(self.d["missions"].keys())
-
-    def list_instruments(self, mission):
-        if not mission.startswith("missions"):
-            mission = "missions." + mission
-        instruments = self.get_value(mission)
-        return list(instruments.keys())
-
-    def get_datalevels(
-        self,
-        mission_instrument,  # mission.instrument code, e.g. mro.hirise
-    ):
-        """Return configured data levels available for an instrument.
-
-        This currently simply points to the indexes, assuming that everything that has
-        an index is also its own datalevel. In case it ever is not, we can add more here.
-        """
-        return self.list_indexes(mission_instrument)
-
-    def list_indexes(self, instrument):
-        """instrument key needs to be <mission>.<instrument>"""
-        if not instrument.startswith("missions"):
-            instrument = "missions." + instrument
-        indexes = self.get_value(instrument + ".indexes")
-        return list(indexes)
-
     def __repr__(self):
         return json.dumps(self.d, indent=2)
 
 
+# Create a singleton instance
 config = Config()

@@ -23,16 +23,14 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
+# Core dependencies required for basic functionality
 dependencies = [
-    "tomlkit",
-    "requests",
-    "tqdm",
-    "pandas",
-    "astropy",
-    "spiceypy",
-    "yarl",
-    "matplotlib",
-    "planets",
+    "tomlkit",        # For configuration handling
+    "requests",       # For HTTP requests
+    "tqdm",           # For progress bars
+    "pandas",         # For data handling
+    "yarl",           # For URL handling
+    "python-dateutil", # For date parsing
 ]
 
 [project.urls]
@@ -40,6 +38,14 @@ Homepage = "https://github.com/planetarypy/planetarypy"
 Repository = "https://github.com/planetarypy/planetarypy"
 
 [project.optional-dependencies]
+# Optional dependencies for SPICE-related functionality
+spice = [
+    "astropy",        # For astronomy calculations
+    "spiceypy",       # For SPICE kernel handling
+    "matplotlib",     # For plotting
+    "planets",        # For planetary calculations
+]
+# Development dependencies
 dev = [
     "pytest",
     "pytest-cov",
@@ -51,6 +57,7 @@ dev = [
 
 [project.scripts]
 planetarypy = "planetarypy.cli:main"
+planetarypy-migrate-config = "planetarypy.scripts.migrate_pds_config:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/planetarypy"]

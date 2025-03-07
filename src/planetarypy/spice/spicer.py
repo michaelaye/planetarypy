@@ -15,10 +15,10 @@ from astropy import units as u
 from astropy.constants import L_sun
 from astropy.visualization import quantity_support
 from matplotlib import pyplot as plt
-from traitlets import Enum, Float, HasTraits, Unicode
+from traitlets import Enum, HasTraits, Unicode
 
 import planets
-from ..exceptions import MissingParameterError, SpiceError, SPointNotSetError
+from ..exceptions import MissingParameterError, SPointNotSetError
 from .kernels import load_generic_kernels
 
 
@@ -603,6 +603,7 @@ class Spicer(HasTraits):
         return coords.dlon, coords.dlat
 
     def fluxes_around_equator(self, deltalon=10):  # delta between points at equator where flux is calculated
+        quantity_support()
         longitudes = range(0, 360, deltalon)
         fluxes = []
         for lon in longitudes:
