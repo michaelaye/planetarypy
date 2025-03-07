@@ -5,8 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "planetarypy"
 version = "0.2.0"
-description = "Core package for planetary data tools."
-readme = "README.rst"
+description = "Core package for planetary data tools. Includes PDS index utilities, SPICE integrations, and more."
+readme = "README.md"
 requires-python = ">= 3.9, <4"
 license = {text = "BSD license"}
 authors = [
@@ -68,13 +68,12 @@ include = [
     "src/planetarypy/**/*.pyd",
     "src/planetarypy/**/*.so",
     "LICENSE",
-    "README.rst",
+    "README.md",
     "HISTORY.rst",
 ]
 
 [tool.pytest]
 testpaths = ["tests"]
-addopts = "--ignore=setup.py"
 
 [tool.flake8]
 exclude = ["docs"]

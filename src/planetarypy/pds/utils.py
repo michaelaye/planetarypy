@@ -3,6 +3,237 @@
 This module provides common, general-purpose utility functions for the PDS subpackage.
 """
 
-__all__ = []
+__all__ = [
+    "list_missions",
+    "list_instruments",
+    "list_indexes",
+    "print_pds_tree",
+    "get_index",
+]
 
-# Add your general PDS utility functions here
+import os
+from typing import Any, Dict, List, Optional
+
+
+def list_missions() -> List[str]:
+    """List all available missions in the PDS index configuration.
+
+    Returns:
+        List of mission names
+
+    Examples:
+        >>> from planetarypy.pds.utils import list_missions
+        >>> missions = list_missions()
+        >>> print(missions)
+        ['cassini', 'go', 'lro', 'mro']
+    """
+    from .index_config import urls_config
+
+    missions = []
+    if "missions" in urls_config.tomldoc:
+        # Get all keys that are tables (missions) and not comments or metadata
+        missions = [
+            key
+            for key in urls_config.tomldoc["missions"].keys()
+            if hasattr(urls_config.tomldoc["missions"][key], "keys")
+        ]
+
+    return sorted(missions)
+
+
+def list_instruments(mission: str) -> List[str]:
+    """List all instruments for a given mission.
+
+    Args:
+        mission: Mission name (e.g., 'cassini', 'mro')
+
+    Returns:
+        List of instrument names
+
+    Examples:
+        >>> from planetarypy.pds.utils import list_instruments
+        >>> instruments = list_instruments('cassini')
+        >>> print(instruments)
+        ['iss', 'uvis']
+    """
+    from .index_config import urls_config
+
+    instruments = []
+
+    # Check if mission exists in config
+    if (
+        "missions" in urls_config.tomldoc
+        and mission in urls_config.tomldoc["missions"]
+        and hasattr(urls_config.tomldoc["missions"][mission], "keys")
+    ):
+        # Get all keys that are tables (instruments) and not comments or metadata
+        instruments = [
+            key
+            for key in urls_config.tomldoc["missions"][mission].keys()
+            if hasattr(urls_config.tomldoc["missions"][mission][key], "keys")
+        ]
+
+    return sorted(instruments)
+
+
+def list_indexes(mission: str, instrument: str) -> List[str]:
+    """List all indexes for a given mission and instrument.
+
+    Args:
+        mission: Mission name (e.g., 'cassini', 'mro')
+        instrument: Instrument name (e.g., 'iss', 'ctx')
+
+    Returns:
+        List of index names
+
+    Examples:
+        >>> from planetarypy.pds.utils import list_indexes
+        >>> indexes = list_indexes('cassini', 'iss')
+        >>> print(indexes)
+        ['index', 'moon_summary', 'ring_summary', 'saturn_summary']
+    """
+    from .index_config import urls_config
+
+    indexes = []
+    path = ["missions", mission, instrument]
+
+    # Navigate to the instrument section
+    current = urls_config.tomldoc
+    for part in path:
+        if part not in current or not hasattr(current[part], "keys"):
+            return []
+        current = current[part]
+
+    # Extract index names (keys with string values, not nested tables)
+    for key, value in current.items():
+        # Skip comments and check if value is a URL (string) and not a table
+        if not str(key).startswith("#") and isinstance(value, str):
+            indexes.append(key)
+
+    return sorted(indexes)
+
+
+def print_pds_tree(
+    filter_mission: Optional[str] = None, filter_instrument: Optional[str] = None
+) -> None:
+    """Print an ASCII tree diagram of all missions, instruments, and indexes.
+
+    This function displays a hierarchical view of the PDS index configuration,
+    showing missions, instruments, and indexes in a tree structure.
+
+    Args:
+        filter_mission: If provided, only show this mission
+        filter_instrument: If provided, only show this instrument
+            (filter_mission must also be provided)
+
+    Examples:
+        >>> from planetarypy.pds.utils import print_pds_tree
+        >>> # Print all missions, instruments, and indexes
+        >>> print_pds_tree()
+        >>> # Print only information for the 'mro' mission
+        >>> print_pds_tree('mro')
+        >>> # Print only information for the 'mro' mission's 'ctx' instrument
+        >>> print_pds_tree('mro', 'ctx')
+    """
+    missions = list_missions()
+
+    if filter_mission:
+        if filter_mission not in missions:
+            print(f"Mission '{filter_mission}' not found.")
+            return
+        missions = [filter_mission]
+
+    if not missions:
+        print("No missions found in configuration.")
+        return
+
+    print("PDS Indexes Configuration:")
+
+    for m_idx, mission in enumerate(missions):
+        # Mission prefix
+        if m_idx == len(missions) - 1:
+            m_prefix = "└── "
+            m_indent = "    "
+        else:
+            m_prefix = "├── "
+            m_indent = "│   "
+
+        print(f"{m_prefix}{mission}")
+
+        # Get instruments
+        instruments = list_instruments(mission)
+
+        if filter_instrument:
+            if filter_instrument not in instruments:
+                print(
+                    f"{m_indent}Instrument '{filter_instrument}' not found in mission '{mission}'."
+                )
+                continue
+            instruments = [filter_instrument]
+
+        for i_idx, instrument in enumerate(instruments):
+            # Instrument prefix
+            if i_idx == len(instruments) - 1:
+                i_prefix = "└── "
+                i_indent = "    "
+            else:
+                i_prefix = "├── "
+                i_indent = "│   "
+
+            print(f"{m_indent}{i_prefix}{instrument}")
+
+            # Get indexes
+            indexes = list_indexes(mission, instrument)
+
+            for idx_idx, index in enumerate(indexes):
+                # Index prefix
+                if idx_idx == len(indexes) - 1:
+                    idx_prefix = "└── "
+                else:
+                    idx_prefix = "├── "
+
+                print(f"{m_indent}{i_indent}{idx_prefix}{index}")
+
+
+def get_index(mission: str, instrument: str, index: str) -> Dict[str, Any]:
+    """Get information about a specific index.
+
+    Args:
+        mission: Mission name (e.g., 'cassini', 'mro')
+        instrument: Instrument name (e.g., 'iss', 'ctx')
+        index: Index name (e.g., 'ring_summary', 'edr')
+
+    Returns:
+        Dictionary containing information about the index, including:
+        - url: The URL for the index
+        - key: The full key for the index
+        - local_path: The local path where the index would be stored (if downloaded)
+
+    Examples:
+        >>> from planetarypy.pds.utils import get_index
+        >>> index_info = get_index('mro', 'ctx', 'edr')
+        >>> print(index_info['url'])
+        https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_2103/index/cumindex.lbl
+    """
+    from pathlib import Path
+
+    from ..config import config
+    from .index_config import urls_config
+
+    key = f"{mission}.{instrument}.{index}"
+    url = urls_config.get_url(key)
+
+    if not url:
+        return {"url": "", "key": key, "local_path": "", "exists": False}
+
+    # Determine local storage path
+    storage_root = Path(config.storage_root)
+    local_dir = storage_root / mission / instrument / index
+    local_path = local_dir / url.split("/")[-1]
+
+    return {
+        "url": url,
+        "key": key,
+        "local_path": str(local_path),
+        "exists": os.path.exists(local_path) if local_path else False,
+    }

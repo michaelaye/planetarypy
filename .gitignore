@@ -132,4 +132,3 @@ dmypy.json
 .pixi
 *.egg-info
 *.code-workspace
-planetarypy.code-workspace
