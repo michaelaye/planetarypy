@@ -8,9 +8,7 @@ __all__ = ["config", "Config"]
 
 import json
 import os
-import shutil
 from functools import reduce
-from importlib.resources import files
 from pathlib import Path
 from typing import Union
 
@@ -36,9 +34,18 @@ class Config:
         if config_path is not None:
             self.path = Path(config_path)
         if not self.path.exists():
-            p = files("planetarypy.data").joinpath(self.fname)
-            shutil.copy(p, self.path)
+            self._create_default_config()
         self._read_config()
+
+    def _create_default_config(self):
+        """Create a minimal default config file with just storage_root."""
+        doc = tomlkit.document()
+        doc.add(tomlkit.comment("PlanetaryPy Configuration"))
+        doc.add(tomlkit.nl())
+        doc.add(tomlkit.comment("Root directory for storing all planetarypy data"))
+        doc.add(tomlkit.nl())
+        doc["storage_root"] = ""  # Empty string will be updated during _read_config
+        self.path.write_text(tomlkit.dumps(doc))
 
     def _read_config(self):
         """Read the configfile and store config dict.
@@ -46,7 +53,7 @@ class Config:
         `storage_root` will be stored as attribute.
         """
         self.tomldoc = tomlkit.loads(self.path.read_text())
-        if not self.tomldoc["storage_root"]:
+        if not self.tomldoc.get("storage_root"):
             path = Path.home() / "planetarypy_data"
             path.mkdir(exist_ok=True)
             self.tomldoc["storage_root"] = str(path)

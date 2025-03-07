@@ -4,6 +4,8 @@ import datetime  # Use absolute import
 import json
 import logging
 import os
+import shutil
+from importlib.resources import files
 from pathlib import Path
 from typing import Optional, Union
 
@@ -41,26 +43,39 @@ class IndexURLsConfig:
             self.discover_dynamic_urls()
 
     def _create_default_config(self):
-        """Create a default configuration file with empty structure."""
-        doc = tomlkit.document()
-
-        # Add a comment at the top
-        doc.add(tomlkit.comment("PlanetaryPy Index URLs Configuration"))
-        doc.add(tomlkit.nl())
-        doc.add(
-            tomlkit.comment(
-                "This file contains URLs for PDS indices, organized by mission and instrument"
+        """Create a default configuration file by copying the template from package data."""
+        try:
+            # Try to copy the template file from the package's data directory
+            template_path = files("planetarypy.data").joinpath(self.fname)
+            shutil.copy(template_path, self.path)
+            logger.info(
+                f"Created default index URLs config at {self.path} from template"
             )
-        )
-        doc.add(tomlkit.nl())
-        doc.add(tomlkit.nl())
+        except (FileNotFoundError, ImportError, shutil.Error) as e:
+            # If the template file doesn't exist or can't be copied, create a basic structure
+            logger.warning(
+                f"Could not copy template file: {e}. Creating basic structure."
+            )
+            doc = tomlkit.document()
 
-        # Add missions table
-        missions_table = tomlkit.table()
-        doc["missions"] = missions_table
+            # Add a comment at the top
+            doc.add(tomlkit.comment("PlanetaryPy Index URLs Configuration"))
+            doc.add(tomlkit.nl())
+            doc.add(
+                tomlkit.comment(
+                    "This file contains URLs for PDS indices, organized by mission and instrument"
+                )
+            )
+            doc.add(tomlkit.nl())
+            doc.add(tomlkit.nl())
 
-        # Write the document
-        self.path.write_text(tomlkit.dumps(doc))
+            # Add missions table
+            missions_table = tomlkit.table()
+            doc["missions"] = missions_table
+
+            # Write the document
+            self.path.write_text(tomlkit.dumps(doc))
+            logger.info(f"Created basic index URLs config at {self.path}")
 
     def _read_config(self):
         """Read the configuration file."""
