@@ -9,8 +9,13 @@ on:
 
 jobs:
   test:
-    name: Run tests
+    name: Python ${{ matrix.python-version }} tests
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10"]
+      fail-fast: false
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -20,9 +25,9 @@ jobs:
       with:
         miniforge-variant: Miniforge3
         miniforge-version: latest
-        activate-environment: test_env
+        activate-environment: test_env_py${{ matrix.python-version }}
         use-mamba: true
-        python-version: "3.9"
+        python-version: ${{ matrix.python-version }}
         channels: conda-forge
         channel-priority: strict
         auto-activate-base: false
@@ -42,8 +47,8 @@ jobs:
     - name: Install dependencies
       shell: bash -l {0}
       run: |
-        # Install tomlkit and sh first to run the installation script
-        mamba install -y -c conda-forge tomlkit sh
+        # Install tomlkit to run the installation script (other deps will be installed by the script)
+        mamba install -y -c conda-forge tomlkit
         
         # Run the installation script
         python install_dev_deps.py
@@ -64,3 +69,4 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         files: ./coverage.xml
         fail_ci_if_error: true
+        name: codecov-py${{ matrix.python-version }}

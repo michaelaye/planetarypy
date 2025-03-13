@@ -6,7 +6,7 @@ import sh
 import tomlkit
 
 # Define packages that should be installed via pip instead of conda
-PIP_PACKAGES = {"build", "pip-tools"}
+PIP_PACKAGES = {"build", "pip-tools", "planets"}
 
 
 def install_deps():
