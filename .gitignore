@@ -132,3 +132,6 @@ dmypy.json
 .pixi
 *.egg-info
 *.code-workspace
+run_migration.py
+src/planetarypy/pds/migrate_config.py
+src/planetarypy/scripts/migrate_pds_config.py
