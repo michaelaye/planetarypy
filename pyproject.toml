@@ -25,12 +25,16 @@ classifiers = [
 ]
 # Core dependencies required for basic functionality
 dependencies = [
-    "tomlkit",        # For configuration handling
-    "requests",       # For HTTP requests
-    "tqdm",           # For progress bars
-    "pandas",         # For data handling
-    "yarl",           # For URL handling
+    "astropy",         # For astronomy calculations
+    "fastcore",        # For utilities like improved Path
+    "numpy",           # For numerical operations
+    "pandas",          # For data handling
+    "pvl",             # For PDS label parsing
     "python-dateutil", # For date parsing
+    "requests",        # For HTTP requests
+    "tomlkit",         # For configuration handling
+    "tqdm",            # For progress bars
+    "yarl",            # For URL handling
 ]
 
 [project.urls]
@@ -40,7 +44,6 @@ Repository = "https://github.com/planetarypy/planetarypy"
 [project.optional-dependencies]
 # Optional dependencies for SPICE-related functionality
 spice = [
-    "astropy",        # For astronomy calculations
     "spiceypy",       # For SPICE kernel handling
     "matplotlib",     # For plotting
     "planets",        # For planetary calculations
