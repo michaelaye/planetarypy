@@ -1,4 +1,4 @@
-"""SPICE kernels management.
+"""SPICE kernels management for archived datasets.
 
 To access subsets of datasets, wrap the NAIF server's subsetds.pl script.
 The Perl script subsetds.pl (see BASE_URL below) requires as input:
@@ -12,22 +12,13 @@ stop as parameters.
 """
 
 __all__ = [
-    "KERNEL_STORAGE",
-    "NAIF_URL",
-    "BASE_URL",
-    "GENERIC_STORAGE",
-    "GENERIC_URL",
-    "generic_kernel_names",
-    "generic_kernel_paths",
+    "datasets",
     "is_start_valid",
     "is_stop_valid",
     "download_one_url",
     "Subsetter",
     "get_metakernel_and_files",
     "list_kernels_for_day",
-    "download_generic_kernels",
-    "load_generic_kernels",
-    "show_loaded_kernels",
 ]
 
 import zipfile
@@ -39,25 +30,18 @@ from pathlib import Path
 
 import pandas as pd
 import requests
-import spiceypy as spice
 from astropy.time import Time
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 from yarl import URL
 
-from ..config import config
 from ..datetime import fromdoyformat
 from ..utils import url_retrieve
-
-KERNEL_STORAGE = config.storage_root / "spice_kernels"
-KERNEL_STORAGE.mkdir(exist_ok=True, parents=True)
+from .config import BASE_URL, KERNEL_STORAGE
 
 datasets_url = "https://raw.githubusercontent.com/planetarypy/planetarypy_configs/main/archived_spice_kernel_sets.csv"
 
 datasets = pd.read_csv(datasets_url).set_index("shorthand")
-
-NAIF_URL = URL("https://naif.jpl.nasa.gov")
-BASE_URL = NAIF_URL / "cgi-bin/subsetds.pl"
 
 
 ## Validation helpers
@@ -84,12 +68,23 @@ def is_stop_valid(mission: str, stop: Time) -> bool:
     mission : str
         Mission shorthand label of datasets dataframe.
     start : astropy.Time
-        Start time in astropy.Time format.
+        Stop time in astropy.Time format.
     """
     return Time(datasets.at[mission, "Stop Time"]) >= stop
 
 
 def download_one_url(url, local_path, overwrite: bool = False):
+    """Download a single URL to a local path.
+
+    Parameters
+    ----------
+    url : str
+        URL to download
+    local_path : Path
+        Path where to save the file
+    overwrite : bool, optional
+        Whether to overwrite existing files, by default False
+    """
     if local_path.exists() and not overwrite:
         return
     local_path.parent.mkdir(exist_ok=True, parents=True)
@@ -239,8 +234,12 @@ class Subsetter:
         "Use multiprocessing for parallel download."
         paths = [self.get_local_path(url) for url in self.kernel_urls]
         args = zip(self.kernel_urls, paths, repeat(overwrite))
-        _ = process_map(download_one_url, args, max_workers=cpu_count() - 2, 
-                       desc="Kernels downloaded")
+        _ = process_map(
+            download_one_url,
+            args,
+            max_workers=cpu_count() - 2,
+            desc="Kernels downloaded",
+        )
 
     def _concurrent_download(self, overwrite: bool = False):
         paths = [self.get_local_path(url) for url in self.kernel_urls]
@@ -291,9 +290,10 @@ class Subsetter:
             else self.save_location
         )
         savepath = basepath / self.metakernel_file
-        with open(savepath, "w") as outfile, self.z.open(
-            self.metakernel_file
-        ) as infile:
+        with (
+            open(savepath, "w") as outfile,
+            self.z.open(self.metakernel_file) as infile,
+        ):
             for line in infile:
                 linestr = line.decode()
                 if "'./data'" in linestr:
@@ -342,65 +342,3 @@ def list_kernels_for_day(mission: str, start: str, stop: str = "") -> list:
     """
     subset = Subsetter(mission, start, stop)
     return subset.kernel_names
-
-
-## Generic kernel management
-# These are a few generic kernels that are required for basic illumination
-# calculations as supported by this package.
-GENERIC_STORAGE = KERNEL_STORAGE / "generic"
-GENERIC_STORAGE.mkdir(exist_ok=True, parents=True)
-GENERIC_URL = NAIF_URL / "pub/naif/generic_kernels/"
-
-generic_kernel_names = [
-    "lsk/naif0012.tls",
-    "pck/pck00010.tpc",
-    "pck/de-403-masses.tpc",
-    "spk/planets/de430.bsp",
-    "spk/satellites/mar097.bsp",
-]
-generic_kernel_paths = [GENERIC_STORAGE.joinpath(i) for i in generic_kernel_names]
-
-
-def download_generic_kernels(overwrite=False):
-    "Download all kernels as required by generic_kernel_list."
-    dl_urls = [GENERIC_URL / i for i in generic_kernel_names]
-    for dl_url, savepath in zip(dl_urls, generic_kernel_paths):
-        if savepath.exists() and not overwrite:
-            print(
-                savepath.name,
-                "already downloaded. Use `overwrite=True` to download again.",
-            )
-            continue
-        savepath.parent.mkdir(exist_ok=True, parents=True)
-        url_retrieve(dl_url, savepath)
-
-
-def load_generic_kernels():
-    """Load all kernels in generic_kernels list.
-
-    Loads pure planetary bodies meta-kernel without spacecraft data.
-
-    Downloads any missing generic kernels.
-    """
-    if any([not p.exists() for p in generic_kernel_paths]):
-        download_generic_kernels()
-    for kernel in generic_kernel_paths:
-        spice.furnsh(str(kernel))
-
-
-def show_loaded_kernels():
-    "Print overview of loaded kernels."
-    count = spice.ktotal("all")
-    if count == 0:
-        print("No kernels loaded at this time.")
-    else:
-        print("The loaded files are:\n(paths relative to kernels.KERNEL_STORAGE)\n")
-    for which in range(count):
-        out = spice.kdata(which, "all", 100, 100, 100)
-        print("Position:", which)
-        p = Path(out[0])
-        print("Path", p.relative_to(KERNEL_STORAGE))
-        print("Type:", out[1])
-        print("Source:", out[2])
-        print("Handle:", out[3])
-        # print("Found:", out[4])
