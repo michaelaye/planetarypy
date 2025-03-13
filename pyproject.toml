@@ -49,10 +49,10 @@ spice = [
 dev = [
     "pytest",
     "pytest-cov",
+    "pytest-xdist",  # For parallel test execution
     "build",
     "twine",
     "pip-tools",
-    "make",
 ]
 
 [project.scripts]
@@ -72,8 +72,23 @@ include = [
     "HISTORY.rst",
 ]
 
-[tool.pytest]
+[tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-xvs --import-mode=importlib --cov=planetarypy --cov-report=term --cov-report=html -n auto"
+
+[tool.coverage.run]
+source = ["planetarypy"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
 
 [tool.flake8]
 exclude = ["docs"]

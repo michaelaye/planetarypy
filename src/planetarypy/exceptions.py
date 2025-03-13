@@ -1,11 +1,21 @@
 """PlanetarPy exceptions."""
 
-__all__ = ['Error', 'SomethingNotSetError', 'ProjectionNotSetError', 'GeoTransformNotSetError', 'SpicerError',
-           'SPointNotSetError', 'ObserverNotSetError', 'SpiceError', 'MissingParameterError']
+__all__ = [
+    "Error",
+    "SomethingNotSetError",
+    "ProjectionNotSetError",
+    "GeoTransformNotSetError",
+    "SpicerError",
+    "SPointNotSetError",
+    "ObserverNotSetError",
+    "SpiceError",
+    "MissingParameterError",
+]
 
 
 class Error(Exception):
     """Base class for exceptions in this module."""
+
     pass
 
 
@@ -26,20 +36,26 @@ class SomethingNotSetError(Error):
 
 
 class ProjectionNotSetError(SomethingNotSetError):
-    what = "Projection"
+    """Exception raised when a projection is not set."""
+
+    def __init__(self, where):
+        super().__init__(where, "Projection")
 
 
 class GeoTransformNotSetError(SomethingNotSetError):
-    what = "GeoTransform"
+    """Exception raised when a GeoTransform is not set."""
+
+    def __init__(self, where):
+        super().__init__(where, "GeoTransform")
 
 
 class SpicerError(Exception):
     """Base class for exceptions in this module."""
+
     pass
 
 
 class SPointNotSetError(SpicerError):
-
     def __init__(self, txt):
         self.txt = txt
 
@@ -50,14 +66,12 @@ point is defined. The class member is <spoint>. It can be set using the method
 
 
 class ObserverNotSetError(SpicerError):
-
     def __str__(self):
         return """The method you called requires an observer to be set.
                   This operation had no effect."""
 
 
 class SpiceError(SpicerError):
-
     def __init__(self, function):
         self.function = function
 
@@ -66,7 +80,6 @@ class SpiceError(SpicerError):
 
 
 class MissingParameterError(SpicerError):
-
     def __init__(self, txt):
         self.txt = txt
 

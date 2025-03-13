@@ -4,6 +4,12 @@ This module provides classes and functions for working with PDS index labels,
 parsing index files, and converting them to convenient data structures.
 """
 
+# Temporarily suppress PendingDeprecationWarning from pvl.collections.Units
+# This can be removed once pvl version > 1.3.2 is used
+import warnings
+
+warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="pvl")
+
 __all__ = [
     "PVLColumn",
     "IndexLabel",
@@ -13,7 +19,6 @@ __all__ = [
     "find_mixed_type_cols",
 ]
 
-import warnings
 from typing import Union
 
 import pandas as pd
