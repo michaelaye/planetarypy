@@ -47,8 +47,8 @@ jobs:
     - name: Install dependencies
       shell: bash -l {0}
       run: |
-        # Install tomlkit and sh first to run the installation script
-        mamba install -y -c conda-forge tomlkit sh
+        # Install core dependencies via mamba first
+        mamba install -y -c conda-forge tomlkit sh gdal
         
         # Run the installation script
         python install_dev_deps.py

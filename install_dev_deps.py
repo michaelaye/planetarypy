@@ -8,6 +8,9 @@ import tomlkit
 # Define packages that should be installed via pip instead of conda
 PIP_PACKAGES = {"build", "pip-tools", "planets"}
 
+# Define packages that should NEVER be installed via pip
+CONDA_ONLY_PACKAGES = {"gdal"}
+
 
 def install_deps():
     # Read pyproject.toml
@@ -23,7 +26,11 @@ def install_deps():
 
     # Split dependencies into conda and pip packages
     conda_deps = [dep for dep in all_deps if dep not in PIP_PACKAGES]
-    pip_deps = [dep for dep in all_deps if dep in PIP_PACKAGES]
+    pip_deps = [
+        dep
+        for dep in all_deps
+        if dep in PIP_PACKAGES and dep.lower() not in CONDA_ONLY_PACKAGES
+    ]
 
     # Install conda packages
     if conda_deps:
