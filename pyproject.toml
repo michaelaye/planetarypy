@@ -46,7 +46,7 @@ Repository = "https://github.com/planetarypy/planetarypy"
 spice = [
     "spiceypy",       # For SPICE kernel handling
     "matplotlib",     # For plotting
-    "planets",        # For planetary calculations
+    "planets>=0.8",   # For planetary calculations
 ]
 # Development dependencies
 dev = [
