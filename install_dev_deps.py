@@ -13,18 +13,28 @@ CONDA_ONLY_PACKAGES = {"gdal"}
 
 
 def install_deps():
+    print("\n=== Starting install_dev_deps.py ===")
+
     # Read pyproject.toml
+    print("\nReading pyproject.toml...")
     pyproject_path = Path("pyproject.toml")
     with open(pyproject_path) as f:
         pyproject = tomlkit.load(f)
 
     # Get main, spice, and dev dependencies
+    print("\nCollecting dependencies from pyproject.toml...")
     main_deps = pyproject["project"]["dependencies"]
     dev_deps = pyproject["project"]["optional-dependencies"]["dev"]
     spice_deps = pyproject["project"]["optional-dependencies"]["spice"]
     all_deps = main_deps + dev_deps + spice_deps
 
+    print(f"Found {len(main_deps)} main dependencies")
+    print(f"Found {len(dev_deps)} dev dependencies")
+    print(f"Found {len(spice_deps)} spice dependencies")
+    print(f"Total dependencies to process: {len(all_deps)}")
+
     # Split dependencies into conda and pip packages
+    print("\nSplitting dependencies between conda and pip...")
     conda_deps = [dep for dep in all_deps if dep not in PIP_PACKAGES]
     pip_deps = [
         dep
@@ -32,10 +42,14 @@ def install_deps():
         if dep in PIP_PACKAGES and dep.lower() not in CONDA_ONLY_PACKAGES
     ]
 
+    print(f"Packages to install via conda: {len(conda_deps)}")
+    print(f"Packages to install via pip: {len(pip_deps)}")
+
     # Install conda packages
     if conda_deps:
         try:
-            print("Installing with mamba:", " ".join(conda_deps))
+            print("\nInstalling conda packages...")
+            print("Packages:", " ".join(conda_deps))
             sh.mamba(
                 "install",
                 "-y",
@@ -56,7 +70,8 @@ def install_deps():
     # Install pip packages
     if pip_deps:
         try:
-            print("\nInstalling with pip:", " ".join(pip_deps))
+            print("\nInstalling pip packages...")
+            print("Packages:", " ".join(pip_deps))
             sh.pip("install", *pip_deps, _err=sys.stderr, _out=sys.stdout)
             print("Pip installation completed successfully!")
         except sh.ErrorReturnCode as e:
@@ -65,6 +80,8 @@ def install_deps():
             print("Stdout:", e.stdout.decode() if e.stdout else "No stdout")
             print("Stderr:", e.stderr.decode() if e.stderr else "No stderr")
             sys.exit(1)
+
+    print("\n=== install_dev_deps.py completed successfully ===")
 
 
 if __name__ == "__main__":

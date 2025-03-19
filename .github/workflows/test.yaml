@@ -47,16 +47,21 @@ jobs:
     - name: Install dependencies
       shell: bash -l {0}
       run: |
-        # Install core dependencies via mamba first
+        echo "=== Starting dependency installation ==="
+        echo "Installing core dependencies via mamba..."
         mamba install -y -c conda-forge tomlkit sh gdal
+        echo "Core dependencies installed successfully"
         
-        # Run the installation script
+        echo "Running install_dev_deps.py script..."
         python install_dev_deps.py
+        echo "=== Dependency installation completed ==="
 
     - name: Install package
       shell: bash -l {0}
       run: |
+        echo "=== Installing package with spice extras ==="
         pip install -e ".[spice]"
+        echo "Package installation completed"
 
     - name: Run tests
       shell: bash -l {0}
