@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import sh
-import toml
+import tomlkit
 
 # Define packages that should be installed via pip instead of conda
 PIP_PACKAGES = {"build", "pip-tools", "planets"}
@@ -42,7 +42,7 @@ def install_deps():
     print("\nReading pyproject.toml...")
     pyproject_path = Path("pyproject.toml")
     with open(pyproject_path) as f:
-        pyproject = toml.load(f)
+        pyproject = tomlkit.load(f)
 
     # Get main, spice, and dev dependencies
     print("\nCollecting dependencies from pyproject.toml...")
