@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import sh
-import tomlkit
+import toml
 
 # Define packages that should be installed via pip instead of conda
 PIP_PACKAGES = {"build", "pip-tools", "planets"}
@@ -12,7 +12,7 @@ PIP_PACKAGES = {"build", "pip-tools", "planets"}
 CONDA_ONLY_PACKAGES = {"gdal"}
 
 # Core packages that must be installed first
-CORE_PACKAGES = {"tomlkit", "gdal"}
+CORE_PACKAGES = {"gdal"}
 
 
 def install_deps():
@@ -42,7 +42,7 @@ def install_deps():
     print("\nReading pyproject.toml...")
     pyproject_path = Path("pyproject.toml")
     with open(pyproject_path) as f:
-        pyproject = tomlkit.load(f)
+        pyproject = toml.load(f)
 
     # Get main, spice, and dev dependencies
     print("\nCollecting dependencies from pyproject.toml...")
