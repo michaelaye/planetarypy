@@ -12,7 +12,7 @@ PIP_PACKAGES = {"build", "pip-tools", "planets"}
 CONDA_ONLY_PACKAGES = {"gdal"}
 
 # Core packages that must be installed first
-CORE_PACKAGES = {"tomlkit", "sh", "gdal"}
+CORE_PACKAGES = {"tomlkit", "gdal"}
 
 
 def install_deps():

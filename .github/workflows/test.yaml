@@ -48,6 +48,9 @@ jobs:
       shell: bash -l {0}
       run: |
         echo "=== Starting dependency installation ==="
+        echo "Installing sh package first..."
+        mamba install -y -c conda-forge sh
+        echo "Running install_dev_deps.py..."
         python install_dev_deps.py
         echo "=== Dependency installation completed ==="
 
