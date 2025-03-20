@@ -1,9 +1,14 @@
 #!/usr/bin/env python
+import logging
 import sys
 from pathlib import Path
 
 import sh
 import tomlkit
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+logger = logging.getLogger(__name__)
 
 # Define packages that should be installed via pip instead of conda
 PIP_PACKAGES = {"build", "pip-tools", "planets"}
@@ -16,10 +21,10 @@ CORE_PACKAGES = {"gdal"}
 
 
 def install_deps():
-    print("\n=== Starting install_dev_deps.py ===")
+    logger.info("\n=== Starting install_dev_deps.py ===")
 
     # Install core packages first
-    print("\nInstalling core dependencies via mamba...")
+    logger.info("\nInstalling core dependencies via mamba...")
     try:
         sh.mamba(
             "install",
@@ -30,34 +35,34 @@ def install_deps():
             _err=sys.stderr,
             _out=sys.stdout,
         )
-        print("Core dependencies installed successfully!")
+        logger.info("Core dependencies installed successfully!")
     except sh.ErrorReturnCode as e:
-        print("Error installing core packages!")
-        print("Exit code:", e.exit_code)
-        print("Stdout:", e.stdout.decode() if e.stdout else "No stdout")
-        print("Stderr:", e.stderr.decode() if e.stderr else "No stderr")
+        logger.error("Error installing core packages!")
+        logger.error("Exit code: %s", e.exit_code)
+        logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
+        logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
         sys.exit(1)
 
     # Read pyproject.toml
-    print("\nReading pyproject.toml...")
+    logger.info("\nReading pyproject.toml...")
     pyproject_path = Path("pyproject.toml")
     with open(pyproject_path) as f:
         pyproject = tomlkit.load(f)
 
     # Get main, spice, and dev dependencies
-    print("\nCollecting dependencies from pyproject.toml...")
+    logger.info("\nCollecting dependencies from pyproject.toml...")
     main_deps = pyproject["project"]["dependencies"]
     dev_deps = pyproject["project"]["optional-dependencies"]["dev"]
     spice_deps = pyproject["project"]["optional-dependencies"]["spice"]
     all_deps = main_deps + dev_deps + spice_deps
 
-    print(f"Found {len(main_deps)} main dependencies")
-    print(f"Found {len(dev_deps)} dev dependencies")
-    print(f"Found {len(spice_deps)} spice dependencies")
-    print(f"Total dependencies to process: {len(all_deps)}")
+    logger.info("Found %d main dependencies", len(main_deps))
+    logger.info("Found %d dev dependencies", len(dev_deps))
+    logger.info("Found %d spice dependencies", len(spice_deps))
+    logger.info("Total dependencies to process: %d", len(all_deps))
 
     # Split dependencies into conda and pip packages
-    print("\nSplitting dependencies between conda and pip...")
+    logger.info("\nSplitting dependencies between conda and pip...")
     # Remove core packages and pip-only packages from conda installation
     conda_deps = [
         dep for dep in all_deps if dep not in PIP_PACKAGES and dep not in CORE_PACKAGES
@@ -68,14 +73,14 @@ def install_deps():
         if dep in PIP_PACKAGES and dep.lower() not in CONDA_ONLY_PACKAGES
     ]
 
-    print(f"Packages to install via conda: {len(conda_deps)}")
-    print(f"Packages to install via pip: {len(pip_deps)}")
+    logger.info("Packages to install via conda: %d", len(conda_deps))
+    logger.info("Packages to install via pip: %d", len(pip_deps))
 
     # Install conda packages
     if conda_deps:
         try:
-            print("\nInstalling conda packages...")
-            print("Packages:", " ".join(conda_deps))
+            logger.info("\nInstalling conda packages...")
+            logger.info("Packages: %s", " ".join(conda_deps))
             sh.mamba(
                 "install",
                 "-y",
@@ -85,29 +90,29 @@ def install_deps():
                 _err=sys.stderr,
                 _out=sys.stdout,
             )
-            print("Conda installation completed successfully!")
+            logger.info("Conda installation completed successfully!")
         except sh.ErrorReturnCode as e:
-            print("Error installing conda packages!")
-            print("Exit code:", e.exit_code)
-            print("Stdout:", e.stdout.decode() if e.stdout else "No stdout")
-            print("Stderr:", e.stderr.decode() if e.stderr else "No stderr")
+            logger.error("Error installing conda packages!")
+            logger.error("Exit code: %s", e.exit_code)
+            logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
+            logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
             sys.exit(1)
 
     # Install pip packages
     if pip_deps:
         try:
-            print("\nInstalling pip packages...")
-            print("Packages:", " ".join(pip_deps))
+            logger.info("\nInstalling pip packages...")
+            logger.info("Packages: %s", " ".join(pip_deps))
             sh.pip("install", *pip_deps, _err=sys.stderr, _out=sys.stdout)
-            print("Pip installation completed successfully!")
+            logger.info("Pip installation completed successfully!")
         except sh.ErrorReturnCode as e:
-            print("Error installing pip packages!")
-            print("Exit code:", e.exit_code)
-            print("Stdout:", e.stdout.decode() if e.stdout else "No stdout")
-            print("Stderr:", e.stderr.decode() if e.stderr else "No stderr")
+            logger.error("Error installing pip packages!")
+            logger.error("Exit code: %s", e.exit_code)
+            logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
+            logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
             sys.exit(1)
 
-    print("\n=== install_dev_deps.py completed successfully ===")
+    logger.info("\n=== install_dev_deps.py completed successfully ===")
 
 
 if __name__ == "__main__":
