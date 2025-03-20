@@ -48,11 +48,6 @@ jobs:
       shell: bash -l {0}
       run: |
         echo "=== Starting dependency installation ==="
-        echo "Installing core dependencies via mamba..."
-        mamba install -y -c conda-forge tomlkit sh gdal
-        echo "Core dependencies installed successfully"
-        
-        echo "Running install_dev_deps.py script..."
         python install_dev_deps.py
         echo "=== Dependency installation completed ==="
 

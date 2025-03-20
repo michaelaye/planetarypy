@@ -11,9 +11,32 @@ PIP_PACKAGES = {"build", "pip-tools", "planets"}
 # Define packages that should NEVER be installed via pip
 CONDA_ONLY_PACKAGES = {"gdal"}
 
+# Core packages that must be installed first
+CORE_PACKAGES = {"tomlkit", "sh", "gdal"}
+
 
 def install_deps():
     print("\n=== Starting install_dev_deps.py ===")
+
+    # Install core packages first
+    print("\nInstalling core dependencies via mamba...")
+    try:
+        sh.mamba(
+            "install",
+            "-y",
+            "-c",
+            "conda-forge",
+            *CORE_PACKAGES,
+            _err=sys.stderr,
+            _out=sys.stdout,
+        )
+        print("Core dependencies installed successfully!")
+    except sh.ErrorReturnCode as e:
+        print("Error installing core packages!")
+        print("Exit code:", e.exit_code)
+        print("Stdout:", e.stdout.decode() if e.stdout else "No stdout")
+        print("Stderr:", e.stderr.decode() if e.stderr else "No stderr")
+        sys.exit(1)
 
     # Read pyproject.toml
     print("\nReading pyproject.toml...")
@@ -35,7 +58,10 @@ def install_deps():
 
     # Split dependencies into conda and pip packages
     print("\nSplitting dependencies between conda and pip...")
-    conda_deps = [dep for dep in all_deps if dep not in PIP_PACKAGES]
+    # Remove core packages and pip-only packages from conda installation
+    conda_deps = [
+        dep for dep in all_deps if dep not in PIP_PACKAGES and dep not in CORE_PACKAGES
+    ]
     pip_deps = [
         dep
         for dep in all_deps
