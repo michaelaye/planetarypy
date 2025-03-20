@@ -20,6 +20,18 @@ CONDA_ONLY_PACKAGES = {"gdal"}
 CORE_PACKAGES = {"gdal"}
 
 
+def get_package_name(dep):
+    """Extract the package name from a dependency string, removing version specifiers."""
+    return (
+        dep.split(">=")[0]
+        .split("==")[0]
+        .split("<=")[0]
+        .split("~=")[0]
+        .split("!=")[0]
+        .strip()
+    )
+
+
 def install_deps():
     logger.info("\n=== Starting install_dev_deps.py ===")
 
@@ -65,12 +77,16 @@ def install_deps():
     logger.info("\nSplitting dependencies between conda and pip...")
     # Remove core packages and pip-only packages from conda installation
     conda_deps = [
-        dep for dep in all_deps if dep not in PIP_PACKAGES and dep not in CORE_PACKAGES
+        dep
+        for dep in all_deps
+        if get_package_name(dep) not in PIP_PACKAGES
+        and get_package_name(dep) not in CORE_PACKAGES
     ]
     pip_deps = [
         dep
         for dep in all_deps
-        if dep in PIP_PACKAGES and dep.lower() not in CONDA_ONLY_PACKAGES
+        if get_package_name(dep) in PIP_PACKAGES
+        and get_package_name(dep).lower() not in CONDA_ONLY_PACKAGES
     ]
 
     logger.info("Packages to install via conda: %d", len(conda_deps))
