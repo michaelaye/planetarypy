@@ -197,7 +197,7 @@ class Subsetter:
                 "One of start/stop is outside the supported date-range. See `datasets`."
             )
         p = {
-            "dataset": datasets.loc[self.mission, "path"],
+            "dataset": datasets.at[self.mission, "path"],
             "start": self.start.iso,
             "stop": self.stop.iso,
             "action": "Subset",

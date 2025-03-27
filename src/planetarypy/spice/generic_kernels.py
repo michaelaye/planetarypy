@@ -69,8 +69,15 @@ def load_generic_kernels():
 
 
 def show_loaded_kernels():
-    """Print overview of all currently loaded SPICE kernels."""
+    """Show overview of all currently loaded SPICE kernels.
+
+    Returns
+    -------
+    list
+        List of loaded kernel paths relative to KERNEL_STORAGE
+    """
     count = spice.ktotal("all")
+    loaded_kernels = []
     if count == 0:
         print("No kernels loaded at this time.")
     else:
@@ -79,8 +86,10 @@ def show_loaded_kernels():
         out = spice.kdata(which, "all", 100, 100, 100)
         print("Position:", which)
         p = Path(out[0])
-        print("Path", p.relative_to(KERNEL_STORAGE))
+        rel_path = p.relative_to(KERNEL_STORAGE)
+        print("Path", rel_path)
         print("Type:", out[1])
         print("Source:", out[2])
         print("Handle:", out[3])
-        # print("Found:", out[4])
+        loaded_kernels.append(str(rel_path))
+    return loaded_kernels

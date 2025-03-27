@@ -1,7 +1,19 @@
 """SPICE manager to make simple SPICE calculations simple."""
 
-__all__ = ['Radii', 'make_axis_rotation_matrix', 'IllumAngles', 'SurfaceCoords', 'Spicer', 'MarsSpicer', 'TritonSpicer',
-           'EnceladusSpicer', 'PlutoSpicer', 'EarthSpicer', 'MoonSpicer', 'Mars_Ls_now']
+__all__ = [
+    "Radii",
+    "make_axis_rotation_matrix",
+    "IllumAngles",
+    "SurfaceCoords",
+    "Spicer",
+    "MarsSpicer",
+    "TritonSpicer",
+    "EnceladusSpicer",
+    "PlutoSpicer",
+    "EarthSpicer",
+    "MoonSpicer",
+    "Mars_Ls_now",
+]
 
 
 import datetime as dt
@@ -10,6 +22,7 @@ from math import tau
 
 import dateutil.parser as tparser
 import numpy as np
+import planets
 import spiceypy as spice
 from astropy import units as u
 from astropy.constants import L_sun
@@ -17,10 +30,8 @@ from astropy.visualization import quantity_support
 from matplotlib import pyplot as plt
 from traitlets import Enum, HasTraits, Unicode
 
-import planets
 from ..exceptions import MissingParameterError, SPointNotSetError
-from .kernels import load_generic_kernels
-
+from .generic_kernels import load_generic_kernels
 
 load_generic_kernels()
 
@@ -49,7 +60,9 @@ def make_axis_rotation_matrix(direction, angle):
 
     eye = np.eye(3, dtype=np.float64)
     ddt = np.outer(d, d)
-    skew = np.array([[0, d[2], -d[1]], [-d[2], 0, d[0]], [d[1], -d[0], 0]], dtype=np.float64)
+    skew = np.array(
+        [[0, d[2], -d[1]], [-d[2], 0, d[0]], [d[1], -d[0], 0]], dtype=np.float64
+    )
 
     mtx = ddt + np.cos(angle) * (eye - ddt) + np.sin(angle) * skew
     return mtx
@@ -99,8 +112,9 @@ class IllumAngles:
 
     def __str__(self):
         s = "Print-out precision is '.2f'\n"
-        s += "Phase: {0:.2f}\nSolar Incidence: {1:.2f}\nEmission: {2:.2f}".format(self.dphase, self.dsolar,
-                                                                                  self.demission)
+        s += "Phase: {0:.2f}\nSolar Incidence: {1:.2f}\nEmission: {2:.2f}".format(
+            self.dphase, self.dsolar, self.demission
+        )
         return s
 
     def __repr__(self):
@@ -155,7 +169,9 @@ class SurfaceCoords:
 
     def __str__(self):
         "Return string with useful summary."
-        return "Longitude: {0}\nLatitude: {1}\nRadius: {2}".format(self.dlon, self.dlat, self.radius)
+        return "Longitude: {0}\nLatitude: {1}\nRadius: {2}".format(
+            self.dlon, self.dlat, self.radius
+        )
 
     def __repr__(self):
         return self.__str__()
@@ -295,7 +311,7 @@ class Spicer(HasTraits):
     def solar_constant(self):
         "float : With global value L_s, solar constant at coordinates of body center."
         dist = spice.vnorm(self.center_to_sun.value) * u.km
-        return (L_sun / (2 * tau * (dist)**2)).to(u.W / u.m / u.m)
+        return (L_sun / (2 * tau * (dist) ** 2)).to(u.W / u.m / u.m)
 
     @property
     def north_pole(self):
@@ -344,7 +360,9 @@ class Spicer(HasTraits):
 
         """
         if func_str is not None and func_str not in ["subpnt", "sincpt"]:
-            raise NotImplementedError('Only "sincpt" and "subpnt" are supported at this time.')
+            raise NotImplementedError(
+                'Only "sincpt" and "subpnt" are supported at this time.'
+            )
         elif func_str is not None:
             raise NotImplementedError("not yet implemented.")
             # if not self.instrument or not self.obs:
@@ -376,8 +394,7 @@ class Spicer(HasTraits):
 
     @property
     def illum_angles(self):
-        """Ilumin returns (trgepoch, srfvec, phase, solar, emission)
-        """
+        """Ilumin returns (trgepoch, srfvec, phase, solar, emission)"""
         if self.obs is not None:
             output = spice.ilumin(
                 "Ellipsoid",
@@ -408,14 +425,20 @@ class Spicer(HasTraits):
 
     @property
     def local_soltime(self):
-        return spice.et2lst(self.et, self.target_id, self.coords.lon.value, "PLANETOGRAPHIC")[3]
+        return spice.et2lst(
+            self.et, self.target_id, self.coords.lon.value, "PLANETOGRAPHIC"
+        )[3]
 
     def _get_flux(self, vector):
         diff_angle = spice.vsep(vector, self.sun_direction)
         if (self.illum_angles.dsolar > 90 * u.deg) or (np.degrees(diff_angle) > 90):
             return 0 * u.W / (u.m * u.m)
         else:
-            return (self.solar_constant * np.cos(diff_angle) * np.exp(-self.tau / np.cos(self.illum_angles.solar)))
+            return (
+                self.solar_constant
+                * np.cos(diff_angle)
+                * np.exp(-self.tau / np.cos(self.illum_angles.solar))
+            )
 
     @property
     def F_flat(self):
@@ -505,7 +528,9 @@ class Spicer(HasTraits):
             criteria = i < no_of_steps
 
         self.time = saved_time
-        energies = (np.array([e.value for e in energies]) * energies[0].unit).to("J/m**2")
+        energies = (np.array([e.value for e in energies]) * energies[0].unit).to(
+            "J/m**2"
+        )
         fluxes = np.array([f.value for f in fluxes]) * fluxes[0].unit
         if provide_times:
             return np.array(times), energies
@@ -602,7 +627,9 @@ class Spicer(HasTraits):
         coords = SurfaceCoords.fromtuple(spice.reclat(nB))
         return coords.dlon, coords.dlat
 
-    def fluxes_around_equator(self, deltalon=10):  # delta between points at equator where flux is calculated
+    def fluxes_around_equator(
+        self, deltalon=10
+    ):  # delta between points at equator where flux is calculated
         quantity_support()
         longitudes = range(0, 360, deltalon)
         fluxes = []
@@ -621,10 +648,12 @@ class MarsSpicer(Spicer):
     obs = Enum([None, "MRO", "MGS", "MEX"])
     instrument = Enum([None, "MRO_HIRISE", "MRO_CRISM", "MRO_CTX"])
     # Coords dictionary to store often used coords
-    location_coords = dict(inca=(220.09830399469547, -440.60853011059214, -3340.5081261541495))
+    location_coords = dict(
+        inca=(220.09830399469547, -440.60853011059214, -3340.5081261541495)
+    )
 
     def __init__(self, time=None, obs=None, inst=None, **kwargs):
-        """ Initialising MarsSpicer class.
+        """Initialising MarsSpicer class.
 
         Demo:
         >>> mspicer = MarsSpicer(time='2007-02-16T17:45:48.642')
@@ -707,7 +736,7 @@ class MoonSpicer(Spicer):
         a, b = self.constants.albedoCoef
         A0 = self.constants.albedo
         i = self.illum_angles.solar.value
-        return A0 + a * (i / (np.pi / 4))**3 + b * (i / (np.pi / 2))**8
+        return A0 + a * (i / (np.pi / 4)) ** 3 + b * (i / (np.pi / 2)) ** 8
 
     @property
     def Qs(self):
@@ -758,7 +787,9 @@ class MoonSpicer(Spicer):
             criteria = i < no_of_steps
 
         self.time = saved_time
-        energies = (np.array([e.value for e in energies]) * energies[0].unit).to("J/m**2")
+        energies = (np.array([e.value for e in energies]) * energies[0].unit).to(
+            "J/m**2"
+        )
         fluxes = np.array([f.value for f in fluxes]) * fluxes[0].unit
         if provide_times:
             return np.array(times), energies
