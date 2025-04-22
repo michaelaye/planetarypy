@@ -78,11 +78,25 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-xvs --import-mode=importlib --cov=planetarypy --cov-report=term --cov-report=html -n auto"
+addopts = """
+    -xvs 
+    --import-mode=importlib 
+    --cov=planetarypy 
+    --cov-report=term 
+    --cov-report=html 
+    -n auto
+"""
 
 [tool.coverage.run]
 source = ["planetarypy"]
-omit = ["*/tests/*"]
+omit = [
+    "*/tests/*", 
+    "*/scripts/*", 
+    "*/__init__.py", 
+    "*/__main__.py", 
+    "*/spicer.py",
+    "*/pds/migrate_config.py"
+]
 
 [tool.coverage.report]
 exclude_lines = [

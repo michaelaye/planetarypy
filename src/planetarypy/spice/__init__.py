@@ -7,7 +7,6 @@ SPICE-related calculations for planetary science.
 from .archived_kernels import *
 from .config import *
 from .generic_kernels import *
-from .spicer import *
 
 __all__ = (
     # From archived_kernels
@@ -18,7 +17,4 @@ __all__ = (
     +
     # From generic_kernels
     generic_kernels.__all__
-    +
-    # From spicer
-    spicer.__all__
 )

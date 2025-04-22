@@ -1,6 +1,7 @@
 import pandas as pd
 from astropy.time import Time
-from planetarypy.spice import kernels
+
+from planetarypy.spice import archived_kernels as kernels
 
 
 def test_receive_datasets_dataframe():

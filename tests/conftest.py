@@ -1,5 +1,6 @@
 import pytest
 
+collect_ignore = ["_*.py"]
 
 def pytest_addoption(parser):
     """Add command line options."""
