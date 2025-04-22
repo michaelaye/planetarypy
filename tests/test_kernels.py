@@ -5,11 +5,7 @@ import pytest
 import requests
 
 from planetarypy.spice import generic_kernels
-from planetarypy.spice.archived_kernels import (
-    BASE_URL,
-    Subsetter,
-    datasets,
-)
+from planetarypy.spice.archived_kernels import BASE_URL, Subsetter, datasets
 from planetarypy.spice.config import KERNEL_STORAGE
 from planetarypy.spice.generic_kernels import (
     GENERIC_STORAGE,

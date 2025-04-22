@@ -233,10 +233,14 @@ class Subsetter:
     def _non_blocking_download(self, overwrite: bool = False):
         "Use multiprocessing for parallel download."
         paths = [self.get_local_path(url) for url in self.kernel_urls]
-        args = zip(self.kernel_urls, paths, repeat(overwrite))
+        # Create individual argument lists for each parameter
+        urls = self.kernel_urls
+        overwrites = [overwrite] * len(urls)
         _ = process_map(
             download_one_url,
-            args,
+            urls,  # First argument (url)
+            paths,  # Second argument (local_path)
+            overwrites,  # Third argument (overwrite)
             max_workers=cpu_count() - 2,
             desc="Kernels downloaded",
         )
