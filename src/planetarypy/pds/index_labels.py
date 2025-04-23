@@ -26,7 +26,7 @@ import pvl
 from fastcore.utils import Path
 from tqdm.auto import tqdm
 
-from .. import utils
+from .. import datetime as mydatetime
 
 
 class PVLColumn:
@@ -172,9 +172,10 @@ def convert_times(df):
         try:
             df[column] = pd.to_datetime(df[column])
         except ValueError:
-            df[column] = pd.to_datetime(
-                df[column], format=utils.nasa_dt_format_with_ms, errors="coerce"
-            )
+            # df[column] = pd.to_datetime(
+            #     df[column], format=utils.nasa_dt_format_with_ms, errors="coerce"
+            # )
+            df[column] = df[column].apply(mydatetime.fromdoyformat)
     print("Convert time strings to datetime objects.")
     return df
 

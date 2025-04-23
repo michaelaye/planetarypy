@@ -11,8 +11,9 @@ __all__ = [
     "get_index",
 ]
 
-import os
 from typing import Any, Dict, List, Optional
+
+from .indexes import Index
 
 
 def list_missions() -> List[str]:
@@ -195,45 +196,20 @@ def print_pds_tree(
                 print(f"{m_indent}{i_indent}{idx_prefix}{index}")
 
 
-def get_index(mission: str, instrument: str, index: str) -> Dict[str, Any]:
+def get_index(dotted_index_key, refresh=False) -> Dict[str, Any]:
     """Get information about a specific index.
 
     Args:
-        mission: Mission name (e.g., 'cassini', 'mro')
-        instrument: Instrument name (e.g., 'iss', 'ctx')
-        index: Index name (e.g., 'ring_summary', 'edr')
+        dotted_index_key (e.g. "mro.ctx.edr")
 
     Returns:
-        Dictionary containing information about the index, including:
-        - url: The URL for the index
-        - key: The full key for the index
-        - local_path: The local path where the index would be stored (if downloaded)
+        pd.DataFrame
 
     Examples:
         >>> from planetarypy.pds.utils import get_index
-        >>> index_info = get_index('mro', 'ctx', 'edr')
-        >>> print(index_info['url'])
-        https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_2103/index/cumindex.lbl
+        >>> df = get_index('mro.ctx.edr')
     """
-    from pathlib import Path
-
-    from ..config import config
-    from .index_config import urls_config
-
-    key = f"{mission}.{instrument}.{index}"
-    url = urls_config.get_url(key)
-
-    if not url:
-        return {"url": "", "key": key, "local_path": "", "exists": False}
-
-    # Determine local storage path
-    storage_root = Path(config.storage_root)
-    local_dir = storage_root / mission / instrument / index
-    local_path = local_dir / url.split("/")[-1]
-
-    return {
-        "url": url,
-        "key": key,
-        "local_path": str(local_path),
-        "exists": os.path.exists(local_path) if local_path else False,
-    }
+    index = Index(dotted_index_key)
+    if index.update_available or refresh:
+        index.download()
+    return index.parquet
