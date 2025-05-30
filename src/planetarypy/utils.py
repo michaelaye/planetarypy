@@ -19,17 +19,17 @@ from pathlib import Path
 from typing import Union
 from urllib.request import urlopen
 
+import pandas as pd
 import requests
 from requests.auth import HTTPBasicAuth
 from tqdm.auto import tqdm
 
-import pandas as pd
 from planetarypy.datetime import fromdoyformat
 
 logger = logging.getLogger(__name__)
 
 
-def replace_all_doy_times(df: pd.DataFrame, timecol: str = "TIME"):
+def replace_all_doy_times(df: pd.DataFrame, timecol: str = "TIME") -> pd.DataFrame:
     """
     Convert all detected DOY time columns in df to datetimes in place.
 
@@ -129,7 +129,7 @@ def have_internet():
         conn.close()
 
 
-def file_variations(filename: Union[str, Path], extensions: list) -> list:
+def file_variations(filename: Union[str, Path], extensions: list[str]) -> list[Path]:
     """
     Return list of variations of a file name based on possible extensions.
 
