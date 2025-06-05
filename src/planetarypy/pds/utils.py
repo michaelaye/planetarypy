@@ -11,12 +11,14 @@ __all__ = [
     "get_index",
 ]
 
-from typing import Any, Dict, List, Optional
+from typing import Optional
+
+import pandas as pd
 
 from .indexes import Index
 
 
-def list_missions() -> List[str]:
+def list_missions() -> list[str]:
     """List all available missions in the PDS index configuration.
 
     Returns:
@@ -42,7 +44,7 @@ def list_missions() -> List[str]:
     return sorted(missions)
 
 
-def list_instruments(mission: str) -> List[str]:
+def list_instruments(mission: str) -> list[str]:
     """List all instruments for a given mission.
 
     Args:
@@ -77,12 +79,11 @@ def list_instruments(mission: str) -> List[str]:
     return sorted(instruments)
 
 
-def list_indexes(mission: str, instrument: str) -> List[str]:
+def list_indexes(mission_instrument: str) -> list[str]:
     """List all indexes for a given mission and instrument.
 
     Args:
-        mission: Mission name (e.g., 'cassini', 'mro')
-        instrument: Instrument name (e.g., 'iss', 'ctx')
+        mission_instrument: Dotted index key (e.g., 'cassini.iss')
 
     Returns:
         List of index names
@@ -95,6 +96,7 @@ def list_indexes(mission: str, instrument: str) -> List[str]:
     """
     from .index_config import urls_config
 
+    mission, instrument = mission_instrument.split(".")
     indexes = []
     path = ["missions", mission, instrument]
 
@@ -184,7 +186,7 @@ def print_pds_tree(
             print(f"{m_indent}{i_prefix}{instrument}")
 
             # Get indexes
-            indexes = list_indexes(mission, instrument)
+            indexes = list_indexes(f"{mission}.{instrument}")
 
             for idx_idx, index in enumerate(indexes):
                 # Index prefix
@@ -196,11 +198,25 @@ def print_pds_tree(
                 print(f"{m_indent}{i_indent}{idx_prefix}{index}")
 
 
-def get_index(dotted_index_key, refresh=False) -> Dict[str, Any]:
-    """Get information about a specific index.
+def get_index(
+    dotted_index_key: str, refresh: bool = False, force: bool = False
+) -> "pd.DataFrame":
+    """Retrieve a specific index file .
+
+    If the file is not yet downloaded, it will be, its time strings will be
+    converted to datetime objects to enable proper time-based filtering, and the
+    resulting DataFrame will be written to disk as a Parquet file for future use.
 
     Args:
         dotted_index_key (e.g. "mro.ctx.edr")
+        refresh (bool): If True, check for updates and download the latest index file.
+                        Setting this to False will increase performance as it will not
+                        check for updated files on the PDS server.
+                        Default is False.
+        force (bool): If True, force download even if the index is already the newest,
+                      useful if the index file broke for some reason, like interrupted
+                      download or processing.
+                      Default is False.
 
     Returns:
         pd.DataFrame
@@ -210,6 +226,8 @@ def get_index(dotted_index_key, refresh=False) -> Dict[str, Any]:
         >>> df = get_index('mro.ctx.edr')
     """
     index = Index(dotted_index_key)
-    if index.update_available or refresh:
-        index.download()
+    # only do time-consuming update check if refresh is True
+    if refresh:
+        if index.update_available:
+            index.download()
     return index.parquet
