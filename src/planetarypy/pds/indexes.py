@@ -132,7 +132,10 @@ class Index:
 
     @property
     def local_dir(self):
-        p = storage_root / str(self.key).replace(".", "/")
+        # squeeze in an indexes subfolder
+        key_path = Path(str(self.key).replace(".", "/"))
+        indexes_path = key_path.parent / Path("indexes") / key_path.name
+        p = storage_root / indexes_path
         p.mkdir(parents=True, exist_ok=True)
         return p
 

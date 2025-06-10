@@ -7,7 +7,7 @@ __all__ = [
     "list_missions",
     "list_instruments",
     "list_indexes",
-    "print_pds_tree",
+    "list_available_indexes",
     "get_index",
 ]
 
@@ -15,7 +15,7 @@ from typing import Optional
 
 import pandas as pd
 
-from .indexes import Index
+from planetarypy.pds.indexes import Index
 
 
 def list_missions() -> list[str]:
@@ -116,7 +116,7 @@ def list_indexes(mission_instrument: str) -> list[str]:
     return sorted(indexes)
 
 
-def print_pds_tree(
+def list_available_indexes(
     filter_mission: Optional[str] = None, filter_instrument: Optional[str] = None
 ) -> None:
     """Print an ASCII tree diagram of all missions, instruments, and indexes.
@@ -226,8 +226,9 @@ def get_index(
         >>> df = get_index('mro.ctx.edr')
     """
     index = Index(dotted_index_key)
+    if not index.local_label_path.is_file():
+        index.download()
     # only do time-consuming update check if refresh is True
-    if refresh:
-        if index.update_available:
-            index.download()
+    if (refresh and index.update_available) or force:
+        index.download()
     return index.parquet

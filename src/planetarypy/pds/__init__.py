@@ -7,13 +7,7 @@ Includes tools specifically designed for PDS3 label parsing and data format unde
 from .index_config import access_log, urls_config
 from .index_labels import IndexLabel
 from .indexes import Index
-from .utils import (
-    get_index,
-    list_indexes,
-    list_instruments,
-    list_missions,
-    print_pds_tree,
-)
+from .utils import *
 
 __all__ = [
     "Index",
@@ -23,6 +17,6 @@ __all__ = [
     "list_missions",
     "list_instruments",
     "list_indexes",
-    "print_pds_tree",
+    "list_available_indexes",
     "get_index",
 ]
