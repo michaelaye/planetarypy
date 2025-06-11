@@ -23,7 +23,7 @@ import pandas as pd
 import requests
 from requests.auth import HTTPBasicAuth
 from tqdm.auto import tqdm
-
+from kalasiris.pysis import ProcessError
 from planetarypy.datetime import fromdoyformat
 
 logger = logging.getLogger(__name__)
@@ -156,3 +156,18 @@ def file_variations(filename: Union[str, Path], extensions: list[str]) -> list[P
         raise TypeError("extensions must be a list")
     
     return [Path(filename).with_suffix(extension) for extension in extensions]
+
+
+def catch_isis_error(func):
+    """can be used as decorator for any ISIS function"""
+
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except ProcessError as err:
+            print("Had ISIS error:")
+            print(" ".join(err.cmd))
+            print(err.stdout)
+            print(err.stderr)
+
+    return inner
