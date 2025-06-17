@@ -1,7 +1,6 @@
 """General utility functions for planetarypy."""
 
 __all__ = [
-    "logger",
     "replace_all_doy_times",
     "parse_http_date",
     "get_remote_timestamp",
@@ -9,24 +8,25 @@ __all__ = [
     "url_retrieve",
     "have_internet",
     "file_variations",
+    "catch_isis_errors",
+    "read_config_carefully",
 ]
 
 import datetime as dt
 import email.utils as eut
 import http.client as httplib
-import logging
 from pathlib import Path
 from typing import Union
 from urllib.request import urlopen
 
 import pandas as pd
 import requests
+import tomlkit
+from kalasiris.pysis import ProcessError
 from requests.auth import HTTPBasicAuth
 from tqdm.auto import tqdm
-from kalasiris.pysis import ProcessError
-from planetarypy.datetime import fromdoyformat
 
-logger = logging.getLogger(__name__)
+from planetarypy.datetime import fromdoyformat
 
 
 def replace_all_doy_times(df: pd.DataFrame, timecol: str = "TIME") -> pd.DataFrame:
@@ -154,7 +154,7 @@ def file_variations(filename: Union[str, Path], extensions: list[str]) -> list[P
     """
     if not isinstance(extensions, list):
         raise TypeError("extensions must be a list")
-    
+
     return [Path(filename).with_suffix(extension) for extension in extensions]
 
 
@@ -171,3 +171,16 @@ def catch_isis_error(func):
             print(err.stderr)
 
     return inner
+
+
+def read_config_carefully(path):
+    "every module that uses toml config files should use this function to read them."
+    try:
+        config = tomlkit.loads(path.read_text())
+    except tomlkit.exceptions.TOMLKitError as e:
+        print(f"Error parsing TOML file: {e}")
+        config = None
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Configuration file not found at {configpath}")
+    else:
+        return config        return config
