@@ -181,6 +181,6 @@ def read_config_carefully(path):
         print(f"Error parsing TOML file: {e}")
         config = None
     except FileNotFoundError:
-        raise FileNotFoundError(f"Configuration file not found at {configpath}")
+        raise FileNotFoundError(f"Configuration file not found at {path}")
     else:
-        return config        return config
+        return config
