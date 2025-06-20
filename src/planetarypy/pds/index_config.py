@@ -2,7 +2,6 @@
 
 import datetime  # Use absolute import
 import json
-import logging
 import os
 import shutil
 from importlib.resources import files
@@ -12,9 +11,9 @@ from typing import Optional, Union
 import tomlkit
 from dateutil import parser
 from dateutil.parser import ParserError
+from loguru import logger  # Use loguru for logging
 
-logger = logging.getLogger(__name__)
-
+index_urls_url = "https://raw.githubusercontent.com/planetarypy/planetarypy_configs/refs/heads/main/planetarypy_index_urls.toml"
 
 class IndexURLsConfig:
     """Manage PDS index URLs configuration.
