@@ -87,6 +87,21 @@ def get_edr_index(refresh=False):
         return edrindex
 
 
+def product_id_from_serial_number(serial_number, refresh=False):
+    """
+    Given a serial_number like 'MRO/CTX/1234567890.123', return the matching PRODUCT_ID.
+    """
+    prefix = "MRO/CTX/"
+    if not serial_number.startswith(prefix):
+        raise ValueError("serial_number must start with 'MRO/CTX/'")
+    count = serial_number[len(prefix) :]
+    edrindex = get_edr_index(refresh=refresh)
+    matches = edrindex[edrindex["SPACECRAFT_CLOCK_START_COUNT"].str.strip() == count]
+    if matches.empty:
+        raise ValueError(f"No PRODUCT_ID found for serial_number: {serial_number}")
+    return matches.iloc[0]["PRODUCT_ID"]
+
+
 class Raw:
     def __init__(self, pid: str, refresh_index=False, prefer_mirror=True):
         self.pid = pid  # product_id
@@ -434,7 +449,9 @@ class CTXCollection:
         newlist = [pid for pid in self.pids if Raw(pid).data_ok]
         if (diff := len(self.pids) - len(newlist)) > 0:
             removed = set(self.pids) - set(newlist)
-            logger.info(f"Removed {diff} pids for being marked as bad data: {removed}")
+            logger.warning(
+                f"Removed {diff} pids for being marked as bad data: {removed}"
+            )
             self.pids = newlist
 
     @cached_property
