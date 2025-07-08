@@ -9,6 +9,9 @@ from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
+import geopandas as gpd
+import hvplot.pandas  # noqa: F401
+import pandas as pd
 import pooch
 from loguru import logger
 from tqdm.auto import tqdm
@@ -29,6 +32,7 @@ try:
         fromlist,
         getkey,
         getkey_k,
+        isis2gml,
         mroctx2isis,
         spiceinit,
     )
@@ -266,6 +270,10 @@ class Calib:
     def map_path(self):
         return self.storage_folder / self.map_name
 
+    @property
+    def shape_path(self):
+        return self.cal_path.with_suffix(".gml")
+
     @catch_isis_error
     def isis_import(self, refresh=False) -> None:
         "Import EDR data into ISIS cube."
@@ -349,10 +357,17 @@ class Calib:
                 )
                 return False
 
+    @catch_isis_error
     def footprintinit(self, refresh=False) -> None:
-        if self.has_footprint and not refresh:
-            return
-        footprintinit(from_=self.cal_path, _cwd=self.cub_path.parent)
+        if not self.has_footprint or refresh:
+            footprintinit(from_=self.cal_path, _cwd=self.cub_path.parent)
+            logger.info("")
+        if not self.shape_path.is_file() or refresh:
+            isis2gml(
+                from_=self.cal_path,
+                to=self.shape_path,
+                _cwd=self.cub_path.parent,
+            )
 
     def plot_any(self, path):
         "returns re-usable holoviews plot object"
@@ -430,7 +445,17 @@ def process_parallel(Executor, task, pids, refresh=None):
 
 
 class CTXCollection:
-    "These are common ISIS tasks required to coregister CTX data."
+    """These are common ISIS tasks required to coregister CTX data.
+
+    Args:
+        list_of_pids (list):
+            List of CTX product IDs to process.
+        workdir (str or Path, optional):
+            Working directory for output files. Defaults to current directory (".").
+        remove_bad (bool, optional):
+            If True, remove product IDs marked as bad data based on metadata, warning will be
+            given. Defaults to True.
+    """
 
     level_to_name = {
         0: "cubpaths",
@@ -460,7 +485,7 @@ class CTXCollection:
 
     @property
     def cubpaths(self):
-        "get raw importe cubes"
+        "get raw import cubes"
         return [cal.cub_path for cal in self.calibs]
 
     @property
@@ -470,6 +495,11 @@ class CTXCollection:
     @property
     def mappaths(self):
         return [cal.map_path for cal in self.calibs]
+
+    @property
+    def geodataframe_path(self):
+        "get the path to the GeoDataFrame with all footprints"
+        return self.workdir / "footprints.gdf"
 
     def check_paths(self, level=1):
         paths = getattr(self, self.level_to_name[level])
@@ -505,7 +535,7 @@ class CTXCollection:
         """
         todo = self.pids if sample is None else random.sample(self.pids, sample)
         return process_parallel(
-            ProcessPoolExecutor, calibrate_pid, self.pids, refresh=refresh
+            ProcessPoolExecutor, calibrate_pid, todo, refresh=refresh
         )
 
     def footprintinit(self, refresh=False):
@@ -520,7 +550,27 @@ class CTXCollection:
             findimageoverlaps(fromlist=f, overlaplist=savepath)
         return savepath
 
+    def read_gml_to_gdf(self, refresh=False):
+        """Read the GML files from the collection and return a GeoDataFrame."""
+
+        if self.geodataframe_path.is_file() and not refresh:
+            logger.info(
+                f"Found existing geodf at {self.geodataframe_path}, refresh with `refresh=True`."
+            )
+            return gpd.read_parquet(self.geodataframe_path)
+        gdfs = []
+        for cal in tqdm(self.calibs):
+            if cal.shape_path.is_file():
+                gdf = gpd.read_file(cal.shape_path, columns=[])  # read only geometry
+                gdf["pid"] = cal.pid
+                gdfs.append(gdf)
+        gdf = gpd.GeoDataFrame(pd.concat(gdfs, ignore_index=True))
+        gdf.to_parquet(self.geodataframe_path, index=False)
+        return gdf
+
     def autoseed(self, algo="strip"):
+        # there's a module for it in my nbcoreg package
+        # also covering pointreg and jigsaw
         pass
 
     def __str__(self):
