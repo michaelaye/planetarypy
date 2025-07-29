@@ -34,6 +34,7 @@ try:
         getkey_k,
         isis2gml,
         mroctx2isis,
+        overlapstats,
         spiceinit,
     )
 except KeyError:
@@ -358,9 +359,13 @@ class Calib:
                 return False
 
     @catch_isis_error
-    def footprintinit(self, refresh=False) -> None:
+    def footprintinit(self, refresh=False, **kwargs) -> None:
+        """Initialize footprint for the calibrated cube.
+
+        If map is None, mapping data will be taken
+        """
         if not self.has_footprint or refresh:
-            footprintinit(from_=self.cal_path, _cwd=self.cub_path.parent)
+            footprintinit(from_=self.cal_path, _cwd=self.cub_path.parent, **kwargs)
             logger.info("")
         if not self.shape_path.is_file() or refresh:
             isis2gml(
@@ -429,14 +434,19 @@ def do_footprintinit(pid, refresh=False):
     return d
 
 
-def process_parallel(Executor, task, pids, refresh=None):
+def process_parallel(Executor, task, pids, map=None, refresh=None):
     "Use ProcessPoolExecutor for CPU-bound tasks, and ThreadPoolExecutor for I/O-bound"
-    if refresh is None:
-        argslist = [(pid,) for pid in pids]
-    else:
-        argslist = [(pid, refresh) for pid in pids]
+    argslist = []
+    for pid in pids:
+        args = [pid]
+        kwargs = {}
+        if map is not None:
+            kwargs["map"] = map
+        if refresh is not None:
+            kwargs["refresh"] = refresh
+        argslist.append((args, kwargs))
     with Executor() as executor:
-        futures = [executor.submit(task, *args) for args in argslist]
+        futures = [executor.submit(task, *args, **kwargs) for args, kwargs in argslist]
 
         results = []
         for future in tqdm(as_completed(futures), total=len(futures)):
@@ -507,9 +517,19 @@ class CTXCollection:
             if not path.exists():
                 logger.info(f"{path} does not exist.")
 
+    @property
+    def image_list_lev1_path(self):
+        "get the path to the image list file"
+        return self.workdir / "image_list_lev1.lis"
+
+    @property
+    def image_list_lev2_path(self):
+        "get the path to the image list file"
+        return self.workdir / "image_list_lev2.lis"
+
     def create_image_list(self, workdir=None, level=1):
         workdir = self.workdir if workdir is None else Path(workdir)
-        savepath = workdir / f"image_list_lev{level}.lis"
+        savepath = workdir / getattr(self, f"image_list_lev{level}_path").name
         match level:
             case 0:
                 paths = self.cubpaths
@@ -538,17 +558,49 @@ class CTXCollection:
             ProcessPoolExecutor, calibrate_pid, todo, refresh=refresh
         )
 
-    def footprintinit(self, refresh=False):
+    def footprintinit(self, map=None, refresh=False):
         "perform ISIS footprint init on the list of files"
         return process_parallel(
-            ProcessPoolExecutor, do_footprintinit, self.pids, refresh=refresh
+            ProcessPoolExecutor, do_footprintinit, self.pids, map=None, refresh=refresh
         )
 
+    @property
+    def overlap_list_path(self):
+        return self.workdir / "overlap_list.lis"
+
     def findimageoverlaps(self):
-        savepath = self.workdir / "overlap_list.lis"
         with fromlist.temp(self.calpaths) as f:
-            findimageoverlaps(fromlist=f, overlaplist=savepath)
-        return savepath
+            findimageoverlaps(fromlist=f, overlaplist=self.overlap_list_path)
+        return self.overlap_list_path
+
+    @property
+    def overlap_stats_path(self):
+        return self.workdir / "overlap_stats.csv"
+
+    def overlap_stats(self):
+        """Calculate overlap statistics for the collection."""
+        if not self.overlap_list_path.is_file():
+            logger.warning(
+                "Overlap list not found. Run `findimageoverlaps()` first to create it."
+            )
+            return None
+        overlapstats(
+            fromlist=self.image_list_lev1_path,
+            overlaplist=self.overlap_list_path,
+            to=self.overlap_stats_path,
+            table="csv",
+            detail="full",
+            singleline=False,
+            _cwd=self.workdir,
+        )
+        df = pd.read_csv(self.overlap_stats_path)
+        df.ffill(inplace=True)
+        cols_to_int = [
+            "Overlap ID",
+            "Image Count",
+        ]
+        df[cols_to_int] = df[cols_to_int].astype(int)
+        return df
 
     def read_gml_to_gdf(self, refresh=False):
         """Read the GML files from the collection and return a GeoDataFrame."""
