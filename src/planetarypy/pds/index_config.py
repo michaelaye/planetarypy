@@ -2,7 +2,6 @@
 
 import datetime  # Use absolute import
 import json
-import logging
 import os
 import shutil
 from importlib.resources import files
@@ -12,9 +11,9 @@ from typing import Optional, Union
 import tomlkit
 from dateutil import parser
 from dateutil.parser import ParserError
+from loguru import logger  # Use loguru for logging
 
-logger = logging.getLogger(__name__)
-
+index_urls_url = "https://raw.githubusercontent.com/planetarypy/planetarypy_configs/refs/heads/main/planetarypy_index_urls.toml"
 
 class IndexURLsConfig:
     """Manage PDS index URLs configuration.
@@ -211,7 +210,7 @@ class IndexURLsConfig:
                         self.set_url(key, str(latest_url))
 
                         # Also store metadata about when this URL was discovered
-                        comment = f"# Latest URL discovered on {datetime.datetime.now().strftime('%Y-%m-%d')}"
+                        comment = f"Latest URL discovered on {datetime.datetime.now().strftime('%Y-%m-%d')}"
                         parts = key.split(".")
                         if len(parts) >= 3:
                             mission, instrument, index = parts

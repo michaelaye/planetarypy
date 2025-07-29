@@ -7,7 +7,7 @@ name = "planetarypy"
 version = "0.2.1"
 description = "Core package for planetary data tools. Includes PDS index utilities, SPICE integrations, and more."
 readme = "README.md"
-requires-python = ">= 3.9, <4"
+requires-python = ">= 3.10, <4"
 license = {text = "BSD license"}
 authors = [
     {name = "Planetarypy Developers", email = "69774+michaelaye@users.noreply.github.com"}
@@ -18,10 +18,10 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
     "Natural Language :: English",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 # Core dependencies required for basic functionality
 dependencies = [
@@ -35,6 +35,7 @@ dependencies = [
     "tomlkit",         # For configuration handling
     "tqdm",            # For progress bars
     "yarl",            # For URL handling
+    "loguru",          # For logging
 ]
 
 [project.urls]
