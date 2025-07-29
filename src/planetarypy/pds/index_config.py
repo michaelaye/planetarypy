@@ -8,10 +8,13 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Optional, Union
 
+import requests
 import tomlkit
 from dateutil import parser
 from dateutil.parser import ParserError
 from loguru import logger  # Use loguru for logging
+
+from ..utils import compare_remote_content
 
 index_urls_url = "https://raw.githubusercontent.com/planetarypy/planetarypy_configs/refs/heads/main/planetarypy_index_urls.toml"
 
@@ -34,6 +37,9 @@ class IndexURLsConfig:
         is_new = not self.path.exists()
         if is_new:
             self._create_default_config()
+        else:
+            # Check if existing config needs updating
+            self._check_and_update_config()
 
         self._read_config()
 
@@ -42,45 +48,194 @@ class IndexURLsConfig:
             self.discover_dynamic_urls()
 
     def _create_default_config(self):
-        """Create a default configuration file by copying the template from package data."""
+        """Create a default configuration file by downloading from the remote URL."""
         try:
-            # Try to copy the template file from the package's data directory
-            template_path = files("planetarypy.data").joinpath(self.fname)
-            shutil.copy(template_path, self.path)
+            # Try to download the configuration from the remote URL
+            logger.info(f"Downloading index URLs config from {index_urls_url}")
+            response = requests.get(index_urls_url, timeout=30)
+            response.raise_for_status()
+
+            # Parse the downloaded TOML to validate it
+            config_doc = tomlkit.loads(response.text)
+
+            # Add metadata about when this was downloaded
+            if "metadata" not in config_doc:
+                config_doc["metadata"] = tomlkit.table()
+            config_doc["metadata"]["last_updated"] = datetime.datetime.now().isoformat()
+            config_doc["metadata"]["source_url"] = index_urls_url
+
+            # Write the config with metadata to the local file
+            self.path.write_text(tomlkit.dumps(config_doc))
             logger.info(
-                f"Created default index URLs config at {self.path} from template"
+                f"Created default index URLs config at {self.path} from remote source"
             )
-        except (FileNotFoundError, ImportError, shutil.Error) as e:
-            # If the template file doesn't exist or can't be copied, create a basic structure
+
+        except (
+            requests.RequestException,
+            requests.Timeout,
+            tomlkit.exceptions.TOMLKitError,
+        ) as e:
+            # If download fails, try to copy the template file from the package's data directory
             logger.warning(
-                f"Could not copy template file: {e}. Creating basic structure."
+                f"Could not download config from {index_urls_url}: {e}. Trying local template."
             )
-            doc = tomlkit.document()
+            try:
+                template_path = files("planetarypy.data").joinpath(self.fname)
+                shutil.copy(template_path, self.path)
 
-            # Add a comment at the top
-            doc.add(tomlkit.comment("PlanetaryPy Index URLs Configuration"))
-            doc.add(tomlkit.nl())
-            doc.add(
-                tomlkit.comment(
-                    "This file contains URLs for PDS indices, organized by mission and instrument"
+                # Add metadata to the copied template
+                try:
+                    template_doc = tomlkit.loads(self.path.read_text())
+                    if "metadata" not in template_doc:
+                        template_doc["metadata"] = tomlkit.table()
+                    template_doc["metadata"]["last_updated"] = (
+                        datetime.datetime.now().isoformat()
+                    )
+                    template_doc["metadata"]["source"] = "local_template"
+                    self.path.write_text(tomlkit.dumps(template_doc))
+                except Exception:
+                    pass  # If we can't add metadata to template, that's okay
+
+                logger.info(
+                    f"Created default index URLs config at {self.path} from local template"
                 )
+            except (FileNotFoundError, ImportError, shutil.Error) as template_error:
+                # If the template file doesn't exist or can't be copied, create a basic structure
+                logger.warning(
+                    f"Could not copy template file: {template_error}. Creating basic structure."
+                )
+                doc = tomlkit.document()
+
+                # Add a comment at the top
+                doc.add(tomlkit.comment("PlanetaryPy Index URLs Configuration"))
+                doc.add(tomlkit.nl())
+                doc.add(
+                    tomlkit.comment(
+                        "This file contains URLs for PDS indices, organized by mission and instrument"
+                    )
+                )
+                doc.add(tomlkit.nl())
+                doc.add(tomlkit.nl())
+
+                # Add metadata
+                metadata_table = tomlkit.table()
+                metadata_table["last_updated"] = datetime.datetime.now().isoformat()
+                metadata_table["source"] = "basic_structure"
+                doc["metadata"] = metadata_table
+                doc.add(tomlkit.nl())
+
+                # Add missions table
+                missions_table = tomlkit.table()
+                doc["missions"] = missions_table
+
+                # Write the document
+                self.path.write_text(tomlkit.dumps(doc))
+                logger.info(f"Created basic index URLs config at {self.path}")
+
+    def _check_and_update_config(self):
+        """Check if the config is older than one day and update if needed."""
+        try:
+            # Read the current config to check metadata
+            current_doc = tomlkit.loads(self.path.read_text())
+
+            # Check if metadata exists and has last_updated timestamp
+            if (
+                "metadata" not in current_doc
+                or "last_updated" not in current_doc["metadata"]
+            ):
+                logger.info("No update timestamp found in config, checking for updates")
+                self._update_config_from_remote()
+                return
+
+            # Parse the last updated timestamp
+            try:
+                last_updated = parser.parse(current_doc["metadata"]["last_updated"])
+                now = datetime.datetime.now()
+
+                # If timezone-naive, assume UTC
+                if last_updated.tzinfo is None:
+                    last_updated = last_updated.replace(tzinfo=datetime.timezone.utc)
+                if now.tzinfo is None:
+                    now = now.replace(tzinfo=datetime.timezone.utc)
+
+                # Check if it's been more than one day
+                time_diff = now - last_updated
+                if time_diff.total_seconds() > 24 * 60 * 60:  # 24 hours in seconds
+                    logger.info(
+                        f"Config is {time_diff.days} days old, checking for updates"
+                    )
+                    self._update_config_from_remote()
+                else:
+                    logger.debug(f"Config is up to date (last updated: {last_updated})")
+
+            except (ParserError, ValueError) as e:
+                logger.warning(
+                    f"Could not parse last_updated timestamp: {e}, checking for updates"
+                )
+                self._update_config_from_remote()
+
+        except Exception as e:
+            logger.warning(f"Error checking config age: {e}")
+
+    def _update_config_from_remote(self):
+        """Update the config by downloading from the remote URL."""
+        try:
+            logger.info(f"Checking for config updates from {index_urls_url}")
+
+            # Read current config content
+            current_content = self.path.read_text()
+
+            # Compare with remote content
+            comparison = compare_remote_content(
+                index_urls_url, current_content, timeout=30
             )
-            doc.add(tomlkit.nl())
-            doc.add(tomlkit.nl())
 
-            # Add missions table
-            missions_table = tomlkit.table()
-            doc["missions"] = missions_table
+            if comparison["error"]:
+                logger.warning(
+                    f"Could not update config from remote: {comparison['error']}"
+                )
+                return
 
-            # Write the document
-            self.path.write_text(tomlkit.dumps(doc))
-            logger.info(f"Created basic index URLs config at {self.path}")
+            if comparison["has_updates"]:
+                logger.info("Remote config has updates, downloading new version")
+
+                # Parse the remote config and add metadata
+                remote_doc = tomlkit.loads(comparison["remote_content"])
+
+                # Add metadata about when this was updated
+                if "metadata" not in remote_doc:
+                    remote_doc["metadata"] = tomlkit.table()
+                remote_doc["metadata"]["last_updated"] = (
+                    datetime.datetime.now().isoformat()
+                )
+                remote_doc["metadata"]["source_url"] = index_urls_url
+
+                # Write the updated config
+                self.path.write_text(tomlkit.dumps(remote_doc))
+                logger.info("Config updated successfully")
+            else:
+                logger.info("Remote config is identical to local config")
+
+                # Update just the timestamp to avoid checking again for another day
+                current_doc = tomlkit.loads(current_content)
+                if "metadata" not in current_doc:
+                    current_doc["metadata"] = tomlkit.table()
+                current_doc["metadata"]["last_updated"] = (
+                    datetime.datetime.now().isoformat()
+                )
+                self.path.write_text(tomlkit.dumps(current_doc))
+
+        except tomlkit.exceptions.TOMLKitError as e:
+            logger.warning(f"Could not parse TOML content: {e}")
 
     def _read_config(self):
         """Read the configuration file."""
         self.tomldoc = tomlkit.loads(self.path.read_text())
         if "missions" not in self.tomldoc:
             self.tomldoc["missions"] = tomlkit.table()
+            self.save()
+        if "metadata" not in self.tomldoc:
+            self.tomldoc["metadata"] = tomlkit.table()
             self.save()
 
     def save(self):
@@ -139,7 +294,7 @@ class IndexURLsConfig:
                 current["missions"].add(tomlkit.nl())
 
             current["missions"].add(
-                tomlkit.comment(f"# {mission_key.capitalize()} Mission")
+                tomlkit.comment(f"{mission_key.capitalize()} Mission")
             )
             current["missions"].add(tomlkit.nl())
             current["missions"][mission_key] = tomlkit.table()
@@ -150,7 +305,7 @@ class IndexURLsConfig:
             if instrument_key not in current["missions"][mission_key]:
                 # Add a section comment and the instrument table
                 current["missions"][mission_key].add(
-                    tomlkit.comment(f"# {instrument_key.upper()} Instrument")
+                    tomlkit.comment(f"{instrument_key.upper()} Instrument")
                 )
                 current["missions"][mission_key].add(tomlkit.nl())
                 current["missions"][mission_key][instrument_key] = tomlkit.table()

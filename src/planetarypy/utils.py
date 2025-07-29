@@ -8,8 +8,9 @@ __all__ = [
     "url_retrieve",
     "have_internet",
     "file_variations",
-    "catch_isis_errors",
+    "catch_isis_error",
     "read_config_carefully",
+    "compare_remote_content",
 ]
 
 import datetime as dt
@@ -62,6 +63,38 @@ def check_url_exists(url):
     """Check if a URL exists."""
     response = requests.head(url)
     return response.status_code < 400
+
+
+def compare_remote_content(
+    remote_url: str, local_content: str, timeout: int = 30
+) -> dict:
+    """
+    Compare content from a remote URL with local content.
+
+    Args:
+        remote_url: URL to fetch remote content from
+        local_content: Local content to compare against
+        timeout: Timeout in seconds for the HTTP request
+
+    Returns:
+        dict: Contains 'has_updates' (bool), 'remote_content' (str or None),
+              and 'error' (str or None)
+    """
+    try:
+        response = requests.get(remote_url, timeout=timeout)
+        response.raise_for_status()
+
+        remote_content = response.text
+        has_updates = remote_content != local_content
+
+        return {
+            "has_updates": has_updates,
+            "remote_content": remote_content,
+            "error": None,
+        }
+
+    except (requests.RequestException, requests.Timeout) as e:
+        return {"has_updates": False, "remote_content": None, "error": str(e)}
 
 
 def url_retrieve(
