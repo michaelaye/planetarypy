@@ -210,7 +210,7 @@ class IndexURLsConfig:
                         self.set_url(key, str(latest_url))
 
                         # Also store metadata about when this URL was discovered
-                        comment = f"# Latest URL discovered on {datetime.datetime.now().strftime('%Y-%m-%d')}"
+                        comment = f"Latest URL discovered on {datetime.datetime.now().strftime('%Y-%m-%d')}"
                         parts = key.split(".")
                         if len(parts) >= 3:
                             mission, instrument, index = parts
