@@ -14,6 +14,41 @@ from .index_logging import access_log
 
 index_urls_url = "https://raw.githubusercontent.com/planetarypy/planetarypy_configs/refs/heads/main/planetarypy_index_urls.toml"
 
+
+def _calculate_hours_since_timestamp(timestamp: datetime.datetime) -> float:
+    """Calculate hours elapsed since a given timestamp.
+
+    Args:
+        timestamp: The timestamp to compare against current time
+
+    Returns:
+        Hours elapsed as a float
+    """
+    now = datetime.datetime.now()
+
+    # Ensure both timestamps have timezone info for accurate comparison
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=datetime.timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=datetime.timezone.utc)
+
+    time_diff = now - timestamp
+    return time_diff.total_seconds() / 3600
+
+
+def _is_older_than_hours(timestamp: datetime.datetime, hours: float) -> bool:
+    """Check if a timestamp is older than the specified number of hours.
+
+    Args:
+        timestamp: The timestamp to check
+        hours: Number of hours threshold
+
+    Returns:
+        True if timestamp is older than the specified hours
+    """
+    return _calculate_hours_since_timestamp(timestamp) > hours
+
+
 class IndexURLsConfig:
     """Manage PDS index URLs configuration.
 
@@ -96,19 +131,11 @@ class IndexURLsConfig:
 
             # Get the most recent timestamp
             last_activity = max(timestamps)
-            now = datetime.datetime.now()
 
-            # If timezone-naive, assume UTC
-            if last_activity.tzinfo is None:
-                last_activity = last_activity.replace(tzinfo=datetime.timezone.utc)
-            if now.tzinfo is None:
-                now = now.replace(tzinfo=datetime.timezone.utc)
-
-            # Check if it's been more than one day
-            time_diff = now - last_activity
-            if time_diff.total_seconds() > 24 * 60 * 60:  # 24 hours in seconds
+            # Check if it's been more than one day (24 hours)
+            if _is_older_than_hours(last_activity, 24):
                 logger.info(
-                    f"Config is {time_diff.days} days old, checking for updates"
+                    "Last config check older than one day, checking for updates"
                 )
                 self._update_config_from_remote()
             else:
@@ -165,8 +192,6 @@ class IndexURLsConfig:
         # Dictionary of dynamic indices that should be checked
         dynamic_indices = ["mro.ctx.edr", "lro.lroc.edr"]
 
-        now = datetime.datetime.now()
-
         for key in dynamic_indices:
             try:
                 # Get the last discovery timestamp for this dynamic URL
@@ -177,20 +202,10 @@ class IndexURLsConfig:
                     self._discover_single_dynamic_url(key)
                     continue
 
-                # If timezone-naive, assume UTC
-                if last_timestamp.tzinfo is None:
-                    last_timestamp = last_timestamp.replace(
-                        tzinfo=datetime.timezone.utc
-                    )
-                if now.tzinfo is None:
-                    now = now.replace(tzinfo=datetime.timezone.utc)
-
                 # Check if it's been more than 24 hours
-                time_diff = now - last_timestamp
-                if time_diff.total_seconds() > 24 * 60 * 60:  # 24 hours in seconds
-                    hours_old = time_diff.total_seconds() / 3600
+                if _is_older_than_hours(last_timestamp, 24):
                     logger.info(
-                        f"Dynamic URL for {key} is {hours_old:.1f} hours old, checking for updates"
+                        f"Dynamic URL for {key} was last checked over 24 h ago, checking for updates"
                     )
                     self._discover_single_dynamic_url(key)
                 else:
@@ -201,11 +216,15 @@ class IndexURLsConfig:
             except Exception as e:
                 logger.warning(f"Error checking dynamic URL age for {key}: {e}")
 
-    def _discover_single_dynamic_url(self, key: str):
+    def _discover_single_dynamic_url(self, key: str, return_info: bool = False):
         """Discover and update a single dynamic URL.
 
         Args:
             key: The dotted key format for the dynamic index (e.g., 'mro.ctx.edr')
+            return_info: If True, return dictionary with discovery information
+
+        Returns:
+            dict or None: Discovery information if return_info=True, otherwise None
         """
         try:
             # Import here to avoid circular imports
@@ -217,7 +236,7 @@ class IndexURLsConfig:
 
             if key not in index_classes:
                 logger.warning(f"Unknown dynamic index key: {key}")
-                return
+                return None if return_info else None
 
             # Create instance and get latest URL
             index_class = index_classes[key]
@@ -246,11 +265,25 @@ class IndexURLsConfig:
                     is_update=is_update,
                     previous_url=current_url if is_update else None,
                 )
+
+                # Return info if requested
+                if return_info:
+                    return {
+                        "url": str(latest_url),
+                        "is_update": is_update,
+                        "previous_url": current_url if is_update else None,
+                    }
             else:
                 logger.warning(f"Could not determine latest URL for {key}")
+                if return_info:
+                    return {"error": f"Could not determine latest URL for {key}"}
 
         except Exception as e:
             logger.warning(f"Failed to discover latest URL for {key}: {e}")
+            if return_info:
+                return {"error": str(e)}
+
+        return None
 
     def _read_config(self):
         """Read the configuration file."""
@@ -348,56 +381,25 @@ class IndexURLsConfig:
         Returns:
             dict: A dictionary of discovered URLs with information about updates
         """
+        # Dictionary of dynamic indices that should be discovered
+        dynamic_indices = ["mro.ctx.edr", "lro.lroc.edr"]
         updates_found = {}
-        try:
-            # Import here to avoid circular imports
-            from .ctx_index import CTXIndex
-            from .lroc_index import LROCIndex
 
-            # Dictionary of dynamic index classes
-            dynamic_indices = {"mro.ctx.edr": CTXIndex, "lro.lroc.edr": LROCIndex}
+        for key in dynamic_indices:
+            try:
+                result = self._discover_single_dynamic_url(key, return_info=True)
+                if result:
+                    updates_found[key] = result
 
-            # For each dynamic index, get and store its latest URL
-            for key, index_class in dynamic_indices.items():
-                try:
-                    # Create instance and get latest URL
-                    index_instance = index_class()
-                    latest_url = index_instance.latest_index_label_url
+                    # Print user-friendly notification if it's a new URL
+                    if result.get("is_update"):
+                        print(f"Update available: New {key} index found!")
+                        print(f"  Previous: {result.get('previous_url')}")
+                        print(f"  New: {result.get('url')}")
 
-                    if latest_url:
-                        # Check if this URL is different from what we already have
-                        current_url = self.get_url(key)
-                        is_update = current_url != str(latest_url)
-
-                        # Store information about this update
-                        updates_found[key] = {
-                            "url": str(latest_url),
-                            "is_update": is_update,
-                            "previous_url": current_url if is_update else None,
-                        }
-
-                        # Print user-friendly notification if it's a new URL
-                        if is_update:
-                            print(f"Update available: New {key} index found!")
-                            print(f"  Previous: {current_url}")
-                            print(f"  New: {latest_url}")
-
-                        # Store the URL in the config
-                        self.set_url(key, str(latest_url))
-
-                        # Log the discovery in the access log
-                        access_log.log_url_discovery(
-                            key,
-                            str(latest_url),
-                            is_update=is_update,
-                            previous_url=current_url if is_update else None,
-                        )
-                except Exception as e:
-                    logger.warning(f"Failed to discover latest URL for {key}: {e}")
-                    updates_found[key] = {"error": str(e)}
-
-        except Exception as e:
-            logger.warning(f"Error discovering dynamic URLs: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to discover latest URL for {key}: {e}")
+                updates_found[key] = {"error": str(e)}
 
         return updates_found
 

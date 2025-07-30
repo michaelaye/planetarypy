@@ -37,20 +37,16 @@ class IndexAccessLog:
         doc = tomlkit.document()
         doc.add(tomlkit.comment("PlanetaryPy Index Access Log"))
         doc.add(tomlkit.nl())
+        doc.add(tomlkit.comment("Config-related timestamps are stored at root level"))
         doc.add(
-            tomlkit.comment("This file tracks access timestamps and URL discoveries")
+            tomlkit.comment("Dynamic URL info is stored in [dynamic_urls] sections")
         )
         doc.add(tomlkit.nl())
         doc.add(tomlkit.nl())
 
-        # Add empty timestamps section
-        timestamps_table = tomlkit.table()
-        doc["timestamps"] = timestamps_table
-        doc.add(tomlkit.nl())
-
-        # Add empty discoveries section
-        discoveries_table = tomlkit.table()
-        doc["discoveries"] = discoveries_table
+        # Add empty dynamic_urls section
+        dynamic_urls_table = tomlkit.table()
+        doc["dynamic_urls"] = dynamic_urls_table
 
         self.path.write_text(tomlkit.dumps(doc))
 
@@ -60,16 +56,13 @@ class IndexAccessLog:
             self.tomldoc = tomlkit.loads(self.path.read_text())
 
             # Ensure required sections exist
-            if "timestamps" not in self.tomldoc:
-                self.tomldoc["timestamps"] = tomlkit.table()
-            if "discoveries" not in self.tomldoc:
-                self.tomldoc["discoveries"] = tomlkit.table()
+            if "dynamic_urls" not in self.tomldoc:
+                self.tomldoc["dynamic_urls"] = tomlkit.table()
 
         except tomlkit.exceptions.TOMLKitError:
             logger.warning(f"Could not parse log file {self.path}. Creating a new one.")
             self.tomldoc = tomlkit.document()
-            self.tomldoc["timestamps"] = tomlkit.table()
-            self.tomldoc["discoveries"] = tomlkit.table()
+            self.tomldoc["dynamic_urls"] = tomlkit.table()
             self.save()
 
     def save(self):
@@ -77,26 +70,42 @@ class IndexAccessLog:
         self.path.write_text(tomlkit.dumps(self.tomldoc))
 
     def get_timestamp(self, key: str) -> Optional[datetime.datetime]:
-        """Get timestamp for a specific index.
+        """Get timestamp for a specific key.
 
         Args:
-            key: A dotted key format, e.g., 'cassini.iss.ring_summary'
+            key: For config keys (config_download, config_update, config_check),
+                 looks at root level. For dynamic URLs, looks at last_checked.
 
         Returns:
             Datetime object or None if no timestamp exists
         """
-        if key in self.tomldoc["timestamps"]:
-            try:
-                return parser.parse(self.tomldoc["timestamps"][key])
-            except ParserError:
-                return None
+        config_keys = ["config_download", "config_update", "config_check"]
+
+        if key in config_keys:
+            # Config timestamps are stored at root level
+            if key in self.tomldoc:
+                try:
+                    return parser.parse(self.tomldoc[key])
+                except ParserError:
+                    return None
+        else:
+            # Dynamic URL timestamps are in their specific sections
+            if key in self.tomldoc["dynamic_urls"]:
+                entry = self.tomldoc["dynamic_urls"][key]
+                if "last_checked" in entry:
+                    try:
+                        return parser.parse(entry["last_checked"])
+                    except ParserError:
+                        return None
+
         return None
 
     def set_timestamp(self, key: str, timestamp: Union[datetime.datetime, str]):
-        """Set timestamp for a specific index.
+        """Set timestamp for a specific key.
 
         Args:
-            key: A dotted key format, e.g., 'cassini.iss.ring_summary'
+            key: For config keys, stored at root level.
+                 For dynamic URLs, updates last_checked in their section.
             timestamp: Datetime object or ISO format string
         """
         if isinstance(timestamp, datetime.datetime):
@@ -105,7 +114,19 @@ class IndexAccessLog:
         else:
             timestamp_str = timestamp
 
-        self.tomldoc["timestamps"][key] = timestamp_str
+        config_keys = ["config_download", "config_update", "config_check"]
+
+        if key in config_keys:
+            # Store config timestamps at root level
+            self.tomldoc[key] = timestamp_str
+        else:
+            # For dynamic URLs, update last_checked in their section
+            if key not in self.tomldoc["dynamic_urls"]:
+                # Create new entry if it doesn't exist
+                self.tomldoc["dynamic_urls"][key] = tomlkit.table()
+
+            self.tomldoc["dynamic_urls"][key]["last_checked"] = timestamp_str
+
         self.save()
 
     def log_url_discovery(
@@ -119,20 +140,28 @@ class IndexAccessLog:
             is_update: Whether this is an update to an existing URL
             previous_url: The previous URL if this is an update
         """
-        discovery_data = tomlkit.table()
-        discovery_data["url"] = url
-        # Truncate to seconds precision (remove microseconds)
-        discovery_data["discovered_at"] = (
-            datetime.datetime.now().replace(microsecond=0).isoformat()
-        )
-        discovery_data["is_update"] = is_update
+        now_str = datetime.datetime.now().replace(microsecond=0).isoformat()
+
+        # Create or update the dynamic URL entry
+        if key not in self.tomldoc["dynamic_urls"]:
+            self.tomldoc["dynamic_urls"][key] = tomlkit.table()
+
+        entry = self.tomldoc["dynamic_urls"][key]
+        entry["url"] = url
+        entry["last_checked"] = now_str
+        entry["is_update"] = is_update
+
+        # Set discovered_at only if this is a new entry or an actual update
+        if "discovered_at" not in entry or is_update:
+            entry["discovered_at"] = now_str
+
         if previous_url:
-            discovery_data["previous_url"] = previous_url
+            entry["previous_url"] = previous_url
+        elif "previous_url" in entry and not is_update:
+            # Remove previous_url if this is not an update
+            del entry["previous_url"]
 
-        self.tomldoc["discoveries"][key] = discovery_data
-
-        # Also update the regular access timestamp
-        self.set_timestamp(key, datetime.datetime.now())
+        self.save()
 
         # Log the discovery
         if is_update:
@@ -140,10 +169,10 @@ class IndexAccessLog:
                 f"Updated URL discovered for {key}: {url} (was: {previous_url})"
             )
         else:
-            logger.info(f"New URL discovered for {key}: {url}")
+            logger.info(f"URL checked for {key}: {url}")
 
     def get_discovery_info(self, key: str) -> Optional[dict]:
-        """Get discovery information for a specific index.
+        """Get discovery information for a specific dynamic URL.
 
         Args:
             key: A dotted key format, e.g., 'mro.ctx.edr'
@@ -151,17 +180,17 @@ class IndexAccessLog:
         Returns:
             Dictionary with discovery info or None if not found
         """
-        if key in self.tomldoc["discoveries"]:
-            return dict(self.tomldoc["discoveries"][key])
+        if key in self.tomldoc["dynamic_urls"]:
+            return dict(self.tomldoc["dynamic_urls"][key])
         return None
 
     def get_all_discoveries(self) -> dict:
-        """Get all discovery information.
+        """Get all dynamic URL information.
 
         Returns:
-            Dictionary of all discovery entries
+            Dictionary of all dynamic URL entries
         """
-        return dict(self.tomldoc["discoveries"])
+        return dict(self.tomldoc["dynamic_urls"])
 
     def __repr__(self):
         return tomlkit.dumps(self.tomldoc)
