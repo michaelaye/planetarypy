@@ -33,4 +33,4 @@ class LROCIndex:
 
     @property
     def latest_index_label_url(self):
-        return URL(self.edr_url) / f"{self.latest_release_folder}/INDEX/CUMINDEX.LBL"
+        return URL(self.edr_url) / f"{self.latest_release_folder}INDEX/CUMINDEX.LBL"
