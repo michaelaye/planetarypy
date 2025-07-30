@@ -4,8 +4,9 @@ PDS Tools, to work with Planetary Data System datasets.
 Includes tools specifically designed for PDS3 label parsing and data format understanding.
 """
 
-from .index_config import access_log, urls_config
+from .index_config import urls_config
 from .index_labels import IndexLabel
+from .index_logging import access_log
 from .indexes import Index
 from .utils import *
 
