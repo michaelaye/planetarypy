@@ -7,71 +7,78 @@ from pathlib import Path
 import pytest
 
 from planetarypy.pds.index_config import (
-    IndexAccessLog,
-    IndexURLsConfig,
-    access_log,
-    urls_config,
+    discover_dynamic_urls,
+    get_url,
+    load_config,
+    set_url,
 )
+from planetarypy.pds.index_logging import IndexAccessLog, access_log
 
 
-def test_urls_config_loading():
-    """Test that the URLs config is properly loaded."""
-    assert hasattr(urls_config, "tomldoc")
-    assert "missions" in urls_config.tomldoc
+def test_config_loading():
+    """Test that the configuration is properly loaded."""
+    config_doc = load_config()
+    assert isinstance(config_doc, dict)
+    assert "missions" in config_doc
 
 
 def test_get_url():
     """Test retrieving URLs with mission, instrument, index structure."""
     # Test with a known index
-    url = urls_config.get_url("cassini.iss.index")
+    url = get_url("cassini.iss.index")
     assert isinstance(url, str)
     assert (
         "pds-rings.seti.org" in url or url == ""
     )  # Either contains URL or empty if not in config
 
     # Test with an invalid index
-    url = urls_config.get_url("nonexistent.missing.index")
+    url = get_url("nonexistent.missing.index")
     assert url == ""
 
 
 def test_set_url():
     """Test setting URLs with appropriate structure."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        temp_config = IndexURLsConfig(Path(tmpdir) / "test_index_urls.toml")
+        # Load config with custom path
+        test_config_path = Path(tmpdir) / "test_index_urls.toml"
+        load_config(str(test_config_path))
 
         # Test setting a new URL
         test_url = "https://example.org/test/index.lbl"
-        temp_config.set_url("test.instrument.index", test_url)
-        assert temp_config.get_url("test.instrument.index") == test_url
+        set_url("test.instrument.index", test_url)
+        assert get_url("test.instrument.index") == test_url
 
         # Test that mission structure was created properly
-        assert "test" in temp_config.tomldoc["missions"]
-        assert "instrument" in temp_config.tomldoc["missions"]["test"]
+        config_doc = load_config()
+        assert "test" in config_doc["missions"]
+        assert "instrument" in config_doc["missions"]["test"]
 
 
 def test_mission_structure():
     """Test that the mission structure is properly organized."""
-    for mission in urls_config.tomldoc["missions"]:
-        assert isinstance(urls_config.tomldoc["missions"][mission], dict)
-        for instrument in urls_config.tomldoc["missions"][mission]:
-            assert isinstance(
-                urls_config.tomldoc["missions"][mission][instrument], dict
-            )
+    config_doc = load_config()
+    for mission in config_doc["missions"]:
+        assert isinstance(config_doc["missions"][mission], dict)
+        for instrument in config_doc["missions"][mission]:
+            assert isinstance(config_doc["missions"][mission][instrument], dict)
 
 
 def test_discover_dynamic_urls():
     """Test that dynamic URL discovery doesn't error (actual discovery depends on network)."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        temp_config = IndexURLsConfig(Path(tmpdir) / "test_index_urls.toml")
+        # Load config with custom path
+        test_config_path = Path(tmpdir) / "test_index_urls.toml"
+        load_config(str(test_config_path))
+
         # Just ensure it runs without error (actual URLs depend on network connectivity)
-        results = temp_config.discover_dynamic_urls()
+        results = discover_dynamic_urls()
         assert isinstance(results, dict)
 
 
 def test_access_log_loading():
     """Test that the access log is loaded properly."""
-    assert hasattr(access_log, "log_data")
-    assert isinstance(access_log.log_data, dict)
+    assert hasattr(access_log, "tomldoc")
+    assert "dynamic_urls" in access_log.tomldoc
 
 
 def test_timestamp_operations():
@@ -117,9 +124,11 @@ def test_nonexistent_timestamp():
 )
 def test_mission_instrument_structure(mission, expected_instrument):
     """Test that expected missions have the expected instruments."""
+    config_doc = load_config()
+
     # Skip if mission isn't in the config
-    if mission not in urls_config.tomldoc["missions"]:
+    if mission not in config_doc["missions"]:
         pytest.skip(f"Mission {mission} not in config")
 
     # Check that the expected instrument exists for this mission
-    assert expected_instrument in urls_config.tomldoc["missions"][mission]
+    assert expected_instrument in config_doc["missions"][mission]

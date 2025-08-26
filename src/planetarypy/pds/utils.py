@@ -30,15 +30,16 @@ def list_missions() -> list[str]:
         >>> print(missions)
         ['cassini', 'go', 'lro', 'mro']
     """
-    from .index_config import urls_config
+    from .index_config import load_config
 
     missions = []
-    if "missions" in urls_config.tomldoc:
+    config_doc = load_config()
+    if "missions" in config_doc:
         # Get all keys that are tables (missions) and not comments or metadata
         missions = [
             key
-            for key in urls_config.tomldoc["missions"].keys()
-            if hasattr(urls_config.tomldoc["missions"][key], "keys")
+            for key in config_doc["missions"].keys()
+            if hasattr(config_doc["missions"][key], "keys")
         ]
 
     return sorted(missions)
@@ -59,21 +60,22 @@ def list_instruments(mission: str) -> list[str]:
         >>> print(instruments)
         ['iss', 'uvis']
     """
-    from .index_config import urls_config
+    from .index_config import load_config
 
     instruments = []
+    config_doc = load_config()
 
     # Check if mission exists in config
     if (
-        "missions" in urls_config.tomldoc
-        and mission in urls_config.tomldoc["missions"]
-        and hasattr(urls_config.tomldoc["missions"][mission], "keys")
+        "missions" in config_doc
+        and mission in config_doc["missions"]
+        and hasattr(config_doc["missions"][mission], "keys")
     ):
         # Get all keys that are tables (instruments) and not comments or metadata
         instruments = [
             key
-            for key in urls_config.tomldoc["missions"][mission].keys()
-            if hasattr(urls_config.tomldoc["missions"][mission][key], "keys")
+            for key in config_doc["missions"][mission].keys()
+            if hasattr(config_doc["missions"][mission][key], "keys")
         ]
 
     return sorted(instruments)
@@ -94,14 +96,15 @@ def list_indexes(mission_instrument: str) -> list[str]:
         >>> print(indexes)
         ['index', 'moon_summary', 'ring_summary', 'saturn_summary']
     """
-    from .index_config import urls_config
+    from .index_config import load_config
 
     mission, instrument = mission_instrument.split(".")
     indexes = []
     path = ["missions", mission, instrument]
 
     # Navigate to the instrument section
-    current = urls_config.tomldoc
+    config_doc = load_config()
+    current = config_doc
     for part in path:
         if part not in current or not hasattr(current[part], "keys"):
             return []

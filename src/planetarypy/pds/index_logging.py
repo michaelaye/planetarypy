@@ -74,7 +74,7 @@ class IndexAccessLog:
 
         Args:
             key: For config keys (config_download, config_update, config_check),
-                 looks at root level. For dynamic URLs, looks at last_checked.
+                looks at root level. For dynamic URLs, looks at last_checked.
 
         Returns:
             Datetime object or None if no timestamp exists
@@ -140,6 +140,10 @@ class IndexAccessLog:
             is_update: Whether this is an update to an existing URL
             previous_url: The previous URL if this is an update
         """
+        # Normalize key to use "missions." prefix for consistency with Index class
+        if not key.startswith("missions."):
+            key = "missions." + key
+
         now_str = datetime.datetime.now().replace(microsecond=0).isoformat()
 
         # Create or update the dynamic URL entry

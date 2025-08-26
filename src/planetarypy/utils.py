@@ -23,7 +23,15 @@ from urllib.request import urlopen
 import pandas as pd
 import requests
 import tomlkit
-from kalasiris.pysis import ProcessError
+from loguru import logger
+
+try:
+    from kalasiris.pysis import ProcessError
+except KeyError:
+    ISIS_AVAILABLE = False
+else:
+    ISIS_AVAILABLE = True
+
 from requests.auth import HTTPBasicAuth
 from tqdm.auto import tqdm
 
@@ -193,7 +201,9 @@ def file_variations(filename: Union[str, Path], extensions: list[str]) -> list[P
 
 def catch_isis_error(func):
     """can be used as decorator for any ISIS function"""
-
+    if not ISIS_AVAILABLE:
+        logger.warning("ISIS not available.")
+        return
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)

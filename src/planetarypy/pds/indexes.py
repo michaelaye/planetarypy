@@ -14,7 +14,7 @@ from yarl import URL
 from .. import utils
 from ..config import config
 from .ctx_index import CTXIndex
-from .index_config import access_log, urls_config
+from .index_config import access_log, discover_dynamic_urls, get_url
 from .index_labels import IndexLabel
 from .lroc_index import LROCIndex
 
@@ -56,12 +56,14 @@ class Index:
 
     def set_url(self, url):  # URL to index.
         """Set URL from having it dynamically determined (for non-static index URLs)."""
-        self.url = urls_config.get_url(self.key) if url is None else url
+        self.url = get_url(self.key) if url is None else url
         if not self.url and self.check_update:  # empty ''
             self.url = dynamic_urls[self.instrument_key]().latest_index_label_url
             # Store the dynamically determined URL in the config
             if self.url:
-                urls_config.set_url(self.key, self.url)
+                from .index_config import set_url as config_set_url
+
+                config_set_url(self.key, self.url)
 
     @property
     def isotimestamp(self):
@@ -258,7 +260,7 @@ def check_for_updates(
     # Check if this is a dynamic URL that might have a newer index location
     if self.instrument_key in dynamic_urls:
         # Discover the latest URLs
-        updates = urls_config.discover_dynamic_urls()
+        updates = discover_dynamic_urls()
 
         # Find if this index has an update
         key = f"{self.instrument_key}.{self.index_name}"

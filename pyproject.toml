@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "planetarypy"
-version = "0.2.1"
+version = "0.3.0"
 description = "Core package for planetary data tools. Includes PDS index utilities, SPICE integrations, and more."
 readme = "README.md"
 requires-python = ">= 3.10, <4"
@@ -26,6 +26,7 @@ classifiers = [
 # Core dependencies required for basic functionality
 dependencies = [
     "astropy",         # For astronomy calculations
+    "click",           # For command-line interfaces
     "fastcore",        # For utilities like improved Path
     "numpy",           # For numerical operations
     "pandas",          # For data handling
@@ -63,6 +64,7 @@ dev = [
 [project.scripts]
 planetarypy = "planetarypy.cli:main"
 planetarypy-migrate-config = "planetarypy.scripts.migrate_pds_config:main"
+plp_update_indexes = "planetarypy.pds.cli:plp_update_indexes"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/planetarypy"]
@@ -115,6 +117,6 @@ max-line-length = 88
 extend-ignore = ["E203", "E701"]
 
 [tool.bumpversion]
-current_version = "0.2.0"
+current_version = "0.3.0"
 commit = true
 tag = true
