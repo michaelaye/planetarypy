@@ -1,23 +1,9 @@
+
 """General utility functions for planetarypy."""
-
-__all__ = [
-    "replace_all_doy_times",
-    "parse_http_date",
-    "get_remote_timestamp",
-    "check_url_exists",
-    "url_retrieve",
-    "have_internet",
-    "file_variations",
-    "catch_isis_error",
-    "read_config_carefully",
-    "compare_remote_content",
-]
-
 import datetime as dt
 import email.utils as eut
 import http.client as httplib
 from pathlib import Path
-from typing import Union
 from urllib.request import urlopen
 
 import pandas as pd
@@ -36,6 +22,33 @@ from requests.auth import HTTPBasicAuth
 from tqdm.auto import tqdm
 
 from planetarypy.datetime import fromdoyformat
+
+__all__ = [
+    "replace_all_doy_times",
+    "parse_http_date",
+    "get_remote_timestamp",
+    "check_url_exists",
+    "url_retrieve",
+    "have_internet",
+    "file_variations",
+    "catch_isis_error",
+    "read_config_carefully",
+    "compare_remote_content",
+    "calculate_hours_since_timestamp",
+]
+
+
+def calculate_hours_since_timestamp(timestamp: dt.datetime) -> float:
+    """
+    Calculate the number of hours since the given timestamp.
+    """
+    now = dt.datetime.now()
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=dt.timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=dt.timezone.utc)
+    time_diff = now - timestamp
+    return time_diff.total_seconds() / 3600
 
 
 def replace_all_doy_times(df: pd.DataFrame, timecol: str = "TIME") -> pd.DataFrame:
@@ -86,7 +99,7 @@ def compare_remote_content(
 
     Returns:
         dict: Contains 'has_updates' (bool), 'remote_content' (str or None),
-              and 'error' (str or None)
+            and 'error' (str or None)
     """
     try:
         response = requests.get(remote_url, timeout=timeout)
@@ -170,7 +183,7 @@ def have_internet():
         conn.close()
 
 
-def file_variations(filename: Union[str, Path], extensions: list[str]) -> list[Path]:
+def file_variations(filename: str | Path, extensions: list[str]) -> list[Path]:
     """
     Return list of variations of a file name based on possible extensions.
 
