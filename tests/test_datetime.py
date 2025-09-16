@@ -17,7 +17,7 @@
 import datetime
 import unittest
 
-from planetarypy import datetime as ppydt
+from planetarypy import dt_fmt_converters as ppydt
 
 
 class TestDOY(unittest.TestCase):

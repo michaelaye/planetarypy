@@ -21,7 +21,7 @@ else:
 from requests.auth import HTTPBasicAuth
 from tqdm.auto import tqdm
 
-from planetarypy.datetime import fromdoyformat
+from planetarypy.dt_fmt_converters import fromdoyformat
 
 __all__ = [
     "replace_all_doy_times",
