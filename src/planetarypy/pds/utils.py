@@ -11,7 +11,6 @@ __all__ = [
     "get_index",
 ]
 
-from typing import Optional
 
 import pandas as pd
 
@@ -32,17 +31,15 @@ def list_missions() -> list[str]:
     """
     from .index_config import load_config
 
-    missions = []
     config_doc = load_config()
-    if "missions" in config_doc:
-        # Get all keys that are tables (missions) and not comments or metadata
-        missions = [
-            key
-            for key in config_doc["missions"].keys()
-            if hasattr(config_doc["missions"][key], "keys")
-        ]
+    # Extract mission names from dotted keys (e.g., "cassini.iss.index" -> "cassini")
+    missions = set()
+    for key in config_doc.keys():
+        if "." in key:  # Skip metadata and other non-dotted keys
+            mission = key.split(".")[0]
+            missions.add(mission)
 
-    return sorted(missions)
+    return sorted(list(missions))
 
 
 def list_instruments(mission: str) -> list[str]:
@@ -62,65 +59,55 @@ def list_instruments(mission: str) -> list[str]:
     """
     from .index_config import load_config
 
-    instruments = []
     config_doc = load_config()
+    # Extract instruments from dotted keys that start with the given mission
+    instruments = set()
+    mission_prefix = f"{mission}."
 
-    # Check if mission exists in config
-    if (
-        "missions" in config_doc
-        and mission in config_doc["missions"]
-        and hasattr(config_doc["missions"][mission], "keys")
-    ):
-        # Get all keys that are tables (instruments) and not comments or metadata
-        instruments = [
-            key
-            for key in config_doc["missions"][mission].keys()
-            if hasattr(config_doc["missions"][mission][key], "keys")
-        ]
+    for key in config_doc.keys():
+        if key.startswith(mission_prefix):
+            parts = key.split(".")
+            if len(parts) >= 2:
+                instrument = parts[1]
+                instruments.add(instrument)
 
-    return sorted(instruments)
+    return sorted(list(instruments))
 
 
 def list_indexes(mission_instrument: str) -> list[str]:
     """List all indexes for a given mission and instrument.
 
     Args:
-        mission_instrument: Dotted index key (e.g., 'cassini.iss')
+        mission_instrument: Dotted mission.instrument key (e.g., 'cassini.iss')
 
     Returns:
         List of index names
 
     Examples:
         >>> from planetarypy.pds.utils import list_indexes
-        >>> indexes = list_indexes('cassini', 'iss')
+        >>> indexes = list_indexes('cassini.iss')
         >>> print(indexes)
         ['index', 'moon_summary', 'ring_summary', 'saturn_summary']
     """
     from .index_config import load_config
 
-    mission, instrument = mission_instrument.split(".")
-    indexes = []
-    path = ["missions", mission, instrument]
-
-    # Navigate to the instrument section
     config_doc = load_config()
-    current = config_doc
-    for part in path:
-        if part not in current or not hasattr(current[part], "keys"):
-            return []
-        current = current[part]
+    # Extract index names from dotted keys that start with the given mission.instrument
+    indexes = set()
+    mission_instrument_prefix = f"{mission_instrument}."
 
-    # Extract index names (keys with string values, not nested tables)
-    for key, value in current.items():
-        # Skip comments and check if value is a URL (string) and not a table
-        if not str(key).startswith("#") and isinstance(value, str):
-            indexes.append(key)
+    for key in config_doc.keys():
+        if key.startswith(mission_instrument_prefix):
+            parts = key.split(".")
+            if len(parts) >= 3:
+                index = parts[2]
+                indexes.add(index)
 
-    return sorted(indexes)
+    return sorted(list(indexes))
 
 
 def list_available_indexes(
-    filter_mission: Optional[str] = None, filter_instrument: Optional[str] = None
+    filter_mission: str | None = None, filter_instrument: str | None = None
 ) -> None:
     """Print an ASCII tree diagram of all missions, instruments, and indexes.
 
@@ -133,13 +120,13 @@ def list_available_indexes(
             (filter_mission must also be provided)
 
     Examples:
-        >>> from planetarypy.pds.utils import print_pds_tree
+        >>> from planetarypy.pds.utils import list_available_indexes
         >>> # Print all missions, instruments, and indexes
-        >>> print_pds_tree()
+        >>> list_available_indexes()
         >>> # Print only information for the 'mro' mission
-        >>> print_pds_tree('mro')
+        >>> list_available_indexes('mro')
         >>> # Print only information for the 'mro' mission's 'ctx' instrument
-        >>> print_pds_tree('mro', 'ctx')
+        >>> list_available_indexes('mro', 'ctx')
     """
     missions = list_missions()
 
@@ -217,9 +204,9 @@ def get_index(
                         check for updated files on the PDS server.
                         Default is False.
         force (bool): If True, force download even if the index is already the newest,
-                      useful if the index file broke for some reason, like interrupted
-                      download or processing.
-                      Default is False.
+                    useful if the index file broke for some reason, like interrupted
+                    download or processing.
+                    Default is False.
 
     Returns:
         pd.DataFrame
