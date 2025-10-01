@@ -17,93 +17,73 @@ import pandas as pd
 from planetarypy.pds.indexes import Index
 
 
-def list_missions() -> list[str]:
+def list_missions(config_doc: dict = None) -> list[str]:
     """List all available missions in the PDS index configuration.
+
+    Args:
+        config_doc: Optional pre-loaded config dict to avoid re-loading
 
     Returns:
         List of mission names
 
     Examples:
         >>> from planetarypy.pds.utils import list_missions
-        >>> missions = list_missions()
-        >>> print(missions)
+        >>> list_missions()
         ['cassini', 'go', 'lro', 'mro']
     """
-    from .index_config import load_config
+    if config_doc is None:
+        from .index_config import load_config
 
-    config_doc = load_config()
-    # Extract mission names from dotted keys (e.g., "cassini.iss.index" -> "cassini")
-    missions = set()
-    for key in config_doc.keys():
-        if "." in key:  # Skip metadata and other non-dotted keys
-            mission = key.split(".")[0]
-            missions.add(mission)
+        config_doc = load_config()
 
-    return sorted(list(missions))
+    return list(config_doc.keys())
 
 
-def list_instruments(mission: str) -> list[str]:
+def list_instruments(mission: str, config_doc: dict = None) -> list[str]:
     """List all instruments for a given mission.
 
     Args:
         mission: Mission name (e.g., 'cassini', 'mro')
+        config_doc: Optional pre-loaded config dict to avoid re-loading
 
     Returns:
         List of instrument names
 
     Examples:
         >>> from planetarypy.pds.utils import list_instruments
-        >>> instruments = list_instruments('cassini')
-        >>> print(instruments)
+        >>> list_instruments('cassini')
         ['iss', 'uvis']
     """
-    from .index_config import load_config
+    if config_doc is None:
+        from .index_config import load_config
 
-    config_doc = load_config()
-    # Extract instruments from dotted keys that start with the given mission
-    instruments = set()
-    mission_prefix = f"{mission}."
+        config_doc = load_config()
 
-    for key in config_doc.keys():
-        if key.startswith(mission_prefix):
-            parts = key.split(".")
-            if len(parts) >= 2:
-                instrument = parts[1]
-                instruments.add(instrument)
-
-    return sorted(list(instruments))
+    return list(config_doc[mission].keys())
 
 
-def list_indexes(mission_instrument: str) -> list[str]:
+def list_indexes(mission_instrument: str, config_doc: dict = None) -> list[str]:
     """List all indexes for a given mission and instrument.
 
     Args:
         mission_instrument: Dotted mission.instrument key (e.g., 'cassini.iss')
+        config_doc: Optional pre-loaded config dict to avoid re-loading
 
     Returns:
         List of index names
 
     Examples:
         >>> from planetarypy.pds.utils import list_indexes
-        >>> indexes = list_indexes('cassini.iss')
-        >>> print(indexes)
+        >>> list_indexes('cassini.iss')
         ['index', 'moon_summary', 'ring_summary', 'saturn_summary']
     """
-    from .index_config import load_config
+    if config_doc is None:
+        from .index_config import load_config
 
-    config_doc = load_config()
-    # Extract index names from dotted keys that start with the given mission.instrument
-    indexes = set()
-    mission_instrument_prefix = f"{mission_instrument}."
+        config_doc = load_config()
 
-    for key in config_doc.keys():
-        if key.startswith(mission_instrument_prefix):
-            parts = key.split(".")
-            if len(parts) >= 3:
-                index = parts[2]
-                indexes.add(index)
-
-    return sorted(list(indexes))
+    mission, instrument = mission_instrument.split(".")
+    return list(config_doc[mission][instrument].keys())
 
 
 def list_available_indexes(
@@ -128,7 +108,12 @@ def list_available_indexes(
         >>> # Print only information for the 'mro' mission's 'ctx' instrument
         >>> list_available_indexes('mro', 'ctx')
     """
-    missions = list_missions()
+    # Load config once and pass it to all functions
+    from .index_config import load_config
+
+    config_doc = load_config()
+
+    missions = list_missions(config_doc)
 
     if filter_mission:
         if filter_mission not in missions:
@@ -154,7 +139,7 @@ def list_available_indexes(
         print(f"{m_prefix}{mission}")
 
         # Get instruments
-        instruments = list_instruments(mission)
+        instruments = list_instruments(mission, config_doc)
 
         if filter_instrument:
             if filter_instrument not in instruments:
@@ -176,7 +161,7 @@ def list_available_indexes(
             print(f"{m_indent}{i_prefix}{instrument}")
 
             # Get indexes
-            indexes = list_indexes(f"{mission}.{instrument}")
+            indexes = list_indexes(f"{mission}.{instrument}", config_doc)
 
             for idx_idx, index in enumerate(indexes):
                 # Index prefix
