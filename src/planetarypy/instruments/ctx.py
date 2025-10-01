@@ -518,6 +518,11 @@ class CTXCollection:
                 logger.info(f"{path} does not exist.")
 
     @property
+    def image_list_lev0_path(self):
+        "get the path to the image list file"
+        return self.workdir / "image_list_lev0.lis"
+
+    @property
     def image_list_lev1_path(self):
         "get the path to the image list file"
         return self.workdir / "image_list_lev1.lis"
@@ -529,7 +534,7 @@ class CTXCollection:
 
     def create_image_list(self, workdir=None, level=1):
         workdir = self.workdir if workdir is None else Path(workdir)
-        savepath = workdir / getattr(self, f"image_list_lev{level}_path").name
+        savepath = workdir / f"image_list_lev{level}.lis"
         match level:
             case 0:
                 paths = self.cubpaths
@@ -540,6 +545,7 @@ class CTXCollection:
         text = "\n".join([str(p) for p in paths])
         text += "\n"
         savepath.write_text(text)
+        logger.info(f"Created image list at {savepath}")
         return savepath
 
     def download(self, refresh=False):
