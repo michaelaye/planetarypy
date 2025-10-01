@@ -10,7 +10,6 @@ import json
 import os
 from functools import reduce
 from pathlib import Path
-from typing import Union
 
 import tomlkit
 
@@ -87,7 +86,7 @@ class Config:
     def set_value(
         self,
         nested_key: str,  # A nested key in dotted format
-        value: Union[float, str],  # Value for the given key to be stored
+        value: float | str,  # Value for the given key to be stored
         save: bool = True,  # Switch to control writing out to disk
     ):
         """Set value in sub-dic using dotted key."""
@@ -102,7 +101,7 @@ class Config:
         if save:
             self.save()
 
-    def __setitem__(self, nested_key: str, value: Union[float, str]):
+    def __setitem__(self, nested_key: str, value: float | str):
         """Set value in sub-dic using dotted key."""
         self.set_value(nested_key, value)
 
