@@ -19,14 +19,13 @@ __all__ = [
     "find_mixed_type_cols",
 ]
 
-from typing import Union
 
 import pandas as pd
 import pvl
 from fastcore.utils import Path
 from tqdm.auto import tqdm
 
-from .. import datetime as mydatetime
+from .. import dt_fmt_converters as mydatetime
 
 
 class PVLColumn:
@@ -103,7 +102,7 @@ class IndexLabel:
         # Path to the labelfile for a PDS Indexfile.
         # The actual table should reside in the same folder to be automatically parsed
         # when calling the `read_index_data` method.
-        labelpath: Union[str, Path],
+        labelpath: str | Path,
     ):
         self.path = Path(labelpath)
         "search for table name pointer and store key and fpath."
@@ -182,7 +181,7 @@ def convert_times(df):
 
 def index_to_df(
     # Path to the index TAB file
-    indexpath: Union[str, Path],
+    indexpath: str | Path,
     # Label object that has both the column names and the columns widths as attributes
     # 'colnames' and 'colspecs'
     label: IndexLabel,
@@ -223,9 +222,7 @@ def index_to_df(
 
 def decode_line(
     linedata: str,  # One line of a .tab data file
-    labelpath: Union[
-        str, Path
-    ],  # Path to the appropriate label that describes the data.
+    labelpath: str | Path,  # Path to the appropriate label that describes the data.
 ):
     "Decode one line of tabbed data with the appropriate label file."
     label = IndexLabel(labelpath)
