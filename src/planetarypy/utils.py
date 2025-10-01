@@ -1,4 +1,3 @@
-
 """General utility functions for planetarypy."""
 import datetime as dt
 import email.utils as eut
@@ -36,6 +35,13 @@ __all__ = [
     "compare_remote_content",
     "calculate_hours_since_timestamp",
 ]
+
+
+def is_older_than_hours(timestamp: dt.datetime, hours: float) -> bool:
+    """
+    Return True if the timestamp is older than the given number of hours.
+    """
+    return calculate_hours_since_timestamp(timestamp) > hours
 
 
 def calculate_hours_since_timestamp(timestamp: dt.datetime) -> float:
