@@ -19,6 +19,7 @@ else:
 
 from requests.auth import HTTPBasicAuth
 from tqdm.auto import tqdm
+from yarl import URL
 
 from planetarypy.dt_fmt_converters import fromdoyformat
 
@@ -125,7 +126,7 @@ def compare_remote_content(
 
 
 def url_retrieve(
-    url: str,
+    url: str | URL,
     outfile: str,
     chunk_size: int = 4096,
     user: str = None,
@@ -144,7 +145,7 @@ def url_retrieve(
 
     Parameters
     ----------
-    url : str
+    url : str | yarl.URL
         The URL to download
     outfile : str
         The path where to store the downloaded file.
@@ -155,6 +156,8 @@ def url_retrieve(
     passwd : str
         if provided, create HTTPBasicAuth object
     """
+    url = str(url)
+
     if user:
         auth = HTTPBasicAuth(user, passwd)
     else:
