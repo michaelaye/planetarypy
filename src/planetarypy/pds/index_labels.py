@@ -4,12 +4,6 @@ This module provides classes and functions for working with PDS index labels,
 parsing index files, and converting them to convenient data structures.
 """
 
-# Temporarily suppress PendingDeprecationWarning from pvl.collections.Units
-# This can be removed once pvl version > 1.3.2 is used
-import warnings
-
-warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="pvl")
-
 __all__ = [
     "PVLColumn",
     "IndexLabel",
@@ -18,14 +12,20 @@ __all__ = [
     "decode_line",
     "find_mixed_type_cols",
 ]
+# Temporarily suppress PendingDeprecationWarning from pvl.collections.Units
+# This can be removed once pvl version > 1.3.2 is used
+import warnings
 
-
+import numpy as np
 import pandas as pd
 import pvl
 from fastcore.utils import Path
+from loguru import logger
 from tqdm.auto import tqdm
 
 from .. import dt_fmt_converters as mydatetime
+
+warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="pvl")
 
 
 class PVLColumn:
@@ -113,11 +113,13 @@ class IndexLabel:
     @property
     def index_path(self):
         p = self.path.parent / self.index_name
+        logger.info(f"Looking for index table file at {p}")
         if not p.exists():
             # Fudging path name to lower case, opposing label value. (PDS data inconsistency)"
             p = self.path.parent / self.index_name.lower()
+            logger.warning(f"Index table file not found, now trying {p}")
         if not p.exists():
-            warnings.warn("`index_path` still doesn't exist.")
+            logger.error("Index table file not found.")
         return p
 
     @property
@@ -166,10 +168,14 @@ class IndexLabel:
 
 def convert_times(df):
     for column in [col for col in df.columns if "TIME" in col]:
-        if column in ["LOCAL_TIME", "DWELL_TIME"]:
+        if column in ["LOCAL_TIME", "DWELL_TIME"] or column.startswith(
+            "NTV"
+        ):  # 2nd for GO.SSI.EDR
             continue
         try:
-            df[column] = pd.to_datetime(df[column])
+            df[column] = pd.to_datetime(
+                df[column].replace(r"^UNK\s*$", np.nan, regex=True)
+            )
         except ValueError:
             # df[column] = pd.to_datetime(
             #     df[column], format=utils.nasa_dt_format_with_ms, errors="coerce"
@@ -215,6 +221,11 @@ def index_to_df(
             )
         ]
     )
+    logger.info(f"Collected {len(df)} rows from {indexpath}")
+    df = df.convert_dtypes()
+    for col in df.select_dtypes(include=["string"]).columns:
+        logger.debug(f"Stripping whitespace from string column {col}")
+        df[col] = df[col].str.strip()
     if do_convert_times:
         df = convert_times(df)
     return df
@@ -244,11 +255,11 @@ def find_mixed_type_cols(
     """
     result = []
     for col in df.columns:
-        weird = (df[[col]].applymap(type) != df[[col]].iloc[0].apply(type)).any(axis=1)
+        weird = (df[[col]].map(type) != df[[col]].iloc[0].apply(type)).any(axis=1)
         if len(df[weird]) > 0:
             result.append(col)
             print(col)
-            for i, t in df[weird][col].iteritems():
+            for i, t in df[weird][col].items():
                 print(i, type(t))
     if fix:
         for col in result:
