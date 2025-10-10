@@ -9,12 +9,27 @@ __all__ = [
     "list_indexes",
     "list_available_indexes",
     "get_index",
+    "simple_replace_in_file",
 ]
 
 
 import pandas as pd
 
-from planetarypy.pds.indexes import Index
+from planetarypy.pds.indexes_remotes import Index
+
+
+def simple_replace_in_file(filename, old_text, new_text):
+    """Simple replacement of text in a file."""
+    with open(filename, "r") as file:
+        content = file.read()
+
+    # Simple string replacement
+    content = content.replace(old_text, new_text)
+
+    with open(filename, "w") as file:
+        file.write(content)
+
+    print(f"Replaced '{old_text}' with '{new_text}' in {filename}")
 
 
 def list_missions(config_doc: dict = None) -> list[str]:
