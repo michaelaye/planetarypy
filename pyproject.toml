@@ -30,6 +30,7 @@ dependencies = [
     "numpy",           # For numerical operations
     "pandas",          # For data handling
     "pvl",             # For PDS label parsing
+    "lxml",            # For XML handling
     "python-dateutil", # For date parsing
     "requests",        # For HTTP requests
     "tomlkit",         # For configuration handling
