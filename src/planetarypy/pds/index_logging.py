@@ -1,204 +1,130 @@
 """Logging handlers for PDS index access timestamps and URL discoveries."""
 
-import datetime
-import os
+from datetime import datetime as dt
+from datetime import timedelta
 from pathlib import Path
-from typing import Optional, Union
 
-import tomlkit
-from dateutil import parser
-from dateutil.parser import ParserError
 from loguru import logger
 
+from planetarypy.utils import NestedTomlDict
 
-class IndexAccessLog:
-    """Manage access timestamps for PDS indices.
 
-    This class handles storing and retrieving timestamps of when PDS indices
-    were last accessed or updated.
+class AccessLog(NestedTomlDict):
+    """Handler for index log operations.
+
+    The key should be a dotted key representing the index or configuration being logged, e.g. "config.indexes.static"
+    or "mro.ctx.edr"
     """
 
-    fname = "planetarypy_index_log.toml"
-    path = Path(os.getenv("PLANETARYPY_INDEX_LOG", Path.home() / f".{fname}"))
+    ONEDAY = timedelta(days=1)
+    FILE_PATH = Path.home() / ".planetarypy_index_log.toml"
 
-    def __init__(self, log_path: str = None):
-        """Initialize with optional custom log path."""
-        if log_path is not None:
-            self.path = Path(log_path)
+    def __init__(self, key: str | None = None):
+        super().__init__(self.FILE_PATH)
+        self.key = key
 
-        # Create empty log file if it doesn't exist
-        if not self.path.exists():
-            self._create_empty_log()
-
-        self._read_log()
-
-    def _create_empty_log(self):
-        """Create an empty log file."""
-        doc = tomlkit.document()
-        doc.add(tomlkit.comment("PlanetaryPy Index Access Log"))
-        doc.add(tomlkit.nl())
-        doc.add(tomlkit.comment("Config-related timestamps are stored at root level"))
-        doc.add(
-            tomlkit.comment("Dynamic URL info is stored in [dynamic_urls] sections")
+    def _log_time(self, time_type):
+        """Log a timestamp for a given key and time type."""
+        self.set(self.key, time_type, dt.now().replace(microsecond=0))
+        self.save()
+        logger.debug(
+            f"Logged {time_type} for {self.key} at {self.get(self.key, time_type)}"
         )
-        doc.add(tomlkit.nl())
-        doc.add(tomlkit.nl())
 
-        # Add empty dynamic_urls section
-        dynamic_urls_table = tomlkit.table()
-        doc["dynamic_urls"] = dynamic_urls_table
+    def log_check_time(self):
+        self._log_time("last_checked")
 
-        self.path.write_text(tomlkit.dumps(doc))
+    def log_update_time(self):
+        self._log_time("last_updated")
 
-    def _read_log(self):
-        """Read the log file into memory."""
-        try:
-            self.tomldoc = tomlkit.loads(self.path.read_text())
+    def log_current_url(self, url: str):
+        """Log the URL of the currently cached/downloaded index."""
+        self.set(self.key, "current_url", str(url))
+        logger.debug(f"Logged current URL for {self.key}: {url}")
 
-            # Ensure required sections exist
-            if "dynamic_urls" not in self.tomldoc:
-                self.tomldoc["dynamic_urls"] = tomlkit.table()
+    def log_available_url(self, url: str):
+        """Log the URL of an available update."""
+        self.set(self.key, "available_url", str(url))
+        self.log_update_available(True)
+        self.log_check_time()
+        logger.debug(f"Logged available update URL for {self.key}: {url}")
 
-        except tomlkit.exceptions.TOMLKitError:
-            logger.warning(f"Could not parse log file {self.path}. Creating a new one.")
-            self.tomldoc = tomlkit.document()
-            self.tomldoc["dynamic_urls"] = tomlkit.table()
-            self.save()
+    def log_remote_timestamp(self, timestamp: dt):
+        self.set(self.key, "remote_timestamp", timestamp.replace(microsecond=0))
+        self.log_check_time()
 
-    def save(self):
-        """Write log data to file."""
-        self.path.write_text(tomlkit.dumps(self.tomldoc))
-
-    def get_timestamp(self, key: str) -> Optional[datetime.datetime]:
-        """Get timestamp for a specific key.
-
-        Args:
-            key: For config keys (config_download, config_update, config_check),
-                looks at root level. For dynamic URLs, looks at last_checked.
-
-        Returns:
-            Datetime object or None if no timestamp exists
-        """
-        config_keys = ["config_download", "config_update", "config_check"]
-
-        if key in config_keys:
-            # Config timestamps are stored at root level
-            if key in self.tomldoc:
-                try:
-                    return parser.parse(self.tomldoc[key])
-                except ParserError:
-                    return None
-        else:
-            # Dynamic URL timestamps are in their specific sections
-            if key in self.tomldoc["dynamic_urls"]:
-                entry = self.tomldoc["dynamic_urls"][key]
-                if "last_checked" in entry:
-                    try:
-                        return parser.parse(entry["last_checked"])
-                    except ParserError:
-                        return None
-
-        return None
-
-    def set_timestamp(self, key: str, timestamp: Union[datetime.datetime, str]):
-        """Set timestamp for a specific key.
-
-        Args:
-            key: For config keys, stored at root level.
-                 For dynamic URLs, updates last_checked in their section.
-            timestamp: Datetime object or ISO format string
-        """
-        if isinstance(timestamp, datetime.datetime):
-            # Truncate to seconds precision (remove microseconds)
-            timestamp_str = timestamp.replace(microsecond=0).isoformat()
-        else:
-            timestamp_str = timestamp
-
-        config_keys = ["config_download", "config_update", "config_check"]
-
-        if key in config_keys:
-            # Store config timestamps at root level
-            self.tomldoc[key] = timestamp_str
-        else:
-            # For dynamic URLs, update last_checked in their section
-            if key not in self.tomldoc["dynamic_urls"]:
-                # Create new entry if it doesn't exist
-                self.tomldoc["dynamic_urls"][key] = tomlkit.table()
-
-            self.tomldoc["dynamic_urls"][key]["last_checked"] = timestamp_str
-
+    def _log_yesterday_check(self):
+        """Set the last check time to yesterday to force a check on next access."""
+        yesterday = dt.now() - self.ONEDAY - timedelta(minutes=1)
+        self.set(self.key, "last_checked", yesterday.replace(microsecond=0))
+        self.save()
+    
+    @property
+    def current_url(self) -> str | None:
+        """Get the URL of the currently cached index."""
+        return self.get(self.key, "current_url")
+    
+    @property
+    def available_url(self) -> str | None:
+        """Get the URL of an available update, if any."""
+        return self.get(self.key, "available_url")
+    
+    def log_update_available(self, available: bool):
+        """Log whether an update is available for this key."""
+        self.set(self.key, "update_available", available)
+        # Persist immediately so flags don't linger after successful downloads
         self.save()
 
-    def log_url_discovery(
-        self, key: str, url: str, is_update: bool = False, previous_url: str = None
-    ):
-        """Log the discovery of a URL for a dynamic index.
+    @property
+    def update_available(self) -> bool | None:
+        """Get whether an update is available for this key."""
+        return self.get(self.key, "update_available")
+    
+    @property
+    def last_check(self):
+        return self.get(self.key, "last_checked")
 
-        Args:
-            key: A dotted key format, e.g., 'mro.ctx.edr'
-            url: The discovered URL
-            is_update: Whether this is an update to an existing URL
-            previous_url: The previous URL if this is an update
-        """
-        # Normalize key to use "missions." prefix for consistency with Index class
-        if not key.startswith("missions."):
-            key = "missions." + key
+    @property
+    def last_update(self):
+        return self.get(self.key, "last_updated")
 
-        now_str = datetime.datetime.now().replace(microsecond=0).isoformat()
-
-        # Create or update the dynamic URL entry
-        if key not in self.tomldoc["dynamic_urls"]:
-            self.tomldoc["dynamic_urls"][key] = tomlkit.table()
-
-        entry = self.tomldoc["dynamic_urls"][key]
-        entry["url"] = url
-        entry["last_checked"] = now_str
-        entry["is_update"] = is_update
-
-        # Set discovered_at only if this is a new entry or an actual update
-        if "discovered_at" not in entry or is_update:
-            entry["discovered_at"] = now_str
-
-        if previous_url:
-            entry["previous_url"] = previous_url
-        elif "previous_url" in entry and not is_update:
-            # Remove previous_url if this is not an update
-            del entry["previous_url"]
-
-        self.save()
-
-        # Log the discovery
-        if is_update:
-            logger.info(
-                f"Updated URL discovered for {key}: {url} (was: {previous_url})"
-            )
-        else:
-            logger.info(f"URL checked for {key}: {url}")
-
-    def get_discovery_info(self, key: str) -> Optional[dict]:
-        """Get discovery information for a specific dynamic URL.
-
-        Args:
-            key: A dotted key format, e.g., 'mro.ctx.edr'
-
-        Returns:
-            Dictionary with discovery info or None if not found
-        """
-        if key in self.tomldoc["dynamic_urls"]:
-            return dict(self.tomldoc["dynamic_urls"][key])
+    @property
+    def time_since_last_check(self) -> dt | None:
+        """Return time delta since last check, or None if never checked."""
+        last = self.last_check
+        if last:
+            return dt.now() - last
         return None
 
-    def get_all_discoveries(self) -> dict:
-        """Get all dynamic URL information.
+    @property
+    def should_check(self) -> bool:
+        """Determine if a check should be performed (if last check was over one day ago)."""
+        last = self.last_check
+        if last is None:
+            return True
+        return self.time_since_last_check > self.ONEDAY
 
-        Returns:
-            Dictionary of all dynamic URL entries
-        """
-        return dict(self.tomldoc["dynamic_urls"])
+    @property
+    def _should_check_minute(self) -> bool:
+        """Determine if a check should be performed (if last check was over one minute ago)."""
+        last = self.last_check
+        if last is None:
+            return True
+        return self.time_since_last_check > timedelta(minutes=1)
+
+    def delete(self):
+        """Delete the index log file."""
+        if self.FILE_PATH.is_file():
+            self.FILE_PATH.unlink()
+            logger.info(f"Deleted index log file: {self.FILE_PATH}")
+        else:
+            logger.warning(f"Index log file does not exist: {self.FILE_PATH}")
+
+    def __str__(self):
+        if self.key is None:
+            return f"{self.FILE_PATH.read_text()}"
+        else:
+            return self.dumps()
 
     def __repr__(self):
-        return tomlkit.dumps(self.tomldoc)
-
-
-# Create singleton instance
-access_log = IndexAccessLog()
+        return self.__str__()

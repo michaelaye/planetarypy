@@ -5,11 +5,9 @@ Update logic focuses on checking for newer file timestamps at known stable URLs.
 """
 
 import datetime
-import os
 from pathlib import Path
 from urllib.request import URLError
-
-import tomlkit
+from functools import cached_property
 from loguru import logger
 from yarl import URL
 
@@ -35,11 +33,59 @@ class ConfigHandler(utils.NestedTomlDict):
     def __init__(self, local_path: str | None = None):
         self.path = Path(local_path) if local_path else self.CONFIG_PATH
         self.log = AccessLog("indexes.static.config")
-        if not self.path.is_file() or self.should_update:
+        
+        if not self.path.is_file():
             logger.info(f"Downloading fresh static config from {self.CONFIG_URL}.")
             utils.url_retrieve(str(self.CONFIG_URL), self.path, disable_tqdm=True)
             self.log.log_update_time()
+        elif self.should_update:
+            self._check_and_update_config()
+            
         super().__init__(self.path)
+
+    def _check_and_update_config(self):
+        """Check for config updates and notify about new entries."""
+        result = utils.compare_remote_file(str(self.CONFIG_URL), self.path)
+        
+        if result["error"]:
+            logger.warning(f"Could not check for config updates: {result['error']}")
+            return
+            
+        if result["has_updates"]:
+            # Load old and new configs to compare entries
+            old_config = utils.NestedTomlDict(self.path)
+            new_config = utils.NestedTomlDict(result["remote_tmp_path"])
+            
+            # Find new entries by comparing the flattened key sets
+            old_keys = self._get_all_keys(old_config.to_dict())
+            new_keys = self._get_all_keys(new_config.to_dict())
+            added_keys = new_keys - old_keys
+            
+            if added_keys:
+                logger.info(f"New index entries available: {', '.join(sorted(added_keys))}")
+            
+            # Replace the local config with the updated one
+            result["remote_tmp_path"].replace(self.path)
+            logger.info(f"Updated static config from {self.CONFIG_URL}")
+            self.log.log_update_time()
+            
+            # Clean up temp file if it still exists
+            if result["remote_tmp_path"].exists():
+                result["remote_tmp_path"].unlink()
+        else:
+            logger.debug("Static config is up to date")
+            self.log.log_check_time()
+
+    def _get_all_keys(self, d, parent_key=""):
+        """Recursively get all dotted keys from a nested dictionary."""
+        keys = set()
+        for k, v in d.items():
+            key = f"{parent_key}.{k}" if parent_key else k
+            if isinstance(v, dict):
+                keys.update(self._get_all_keys(v, key))
+            else:
+                keys.add(key)
+        return keys
 
     @property
     def should_update(self) -> bool:
@@ -82,109 +128,61 @@ class StaticRemoteHandler:
         self.config = ConfigHandler()
         self.log = AccessLog(key=index_key)
 
+        self._remote_timestamp = None
+        if self.should_check:
+            self.get_remote_timestamp()
+
     @property
     def url(self) -> URL:
         """Get the URL of the static index."""
         return self.config.get_url(self.index_key)
     
     @property
-    def should_check_for_update(self) -> bool:
+    def should_check(self) -> bool:
         """Determine if an update check should be performed."""
         return self.log.should_check
 
-    @property
-    def remote_timestamp(self) -> datetime.datetime | None:
+    def get_remote_timestamp(self) -> datetime.datetime | None:
         """Get the last modified timestamp of the remote index file."""
         try:
-            return utils.get_remote_timestamp(self.url)
+            tstamp = utils.get_remote_timestamp(self.url)
         except URLError as e:
             logger.warning(f"Could not retrieve remote timestamp for {self.url}: {e}")
             return None
-        
+        else:
+            self.log.log_remote_timestamp(tstamp)
+            self._remote_timestamp = tstamp
+        return tstamp
+    
     @property
-    def is_update_available(self) -> bool:
+    def update_available(self) -> bool:
         """Check if an update is available based on remote timestamp."""
-        remote_time = self.remote_timestamp
+        if self.log.update_available:  # no need to check further if we logged this.
+            return True
+        elif not self.should_check:
+            logger.debug(f"Skipping update check for {self.index_key}, checked recently.")
+            return False
+        
+        logged_timestamp = self.log.get(self.index_key, "remote_timestamp")
+        if logged_timestamp is not None:
+            remote_time = logged_timestamp
+        else:
+            remote_time = self.remote_timestamp
+        
         if remote_time is None:
             return False
         
         last_update = self.log.last_update
         if last_update is None:
             logger.info(f"No previous update logged for {self.index_key}, update available")
+            self.log.log_update_available(True)
             return True
         
         if remote_time > last_update:
-            logger.info(f"Update available for {self.index_key}: remote time {remote_time} > last update {last_update}")
+            logger.info(f"Update available for {self.index_key}: remote timestamp {remote_time} > last update {last_update}")
+            self.log.log_update_available(True)
             return True
         else:
             logger.debug(f"No update available for {self.index_key}: remote time {remote_time} <= last update {last_update}")
             return False
-        
-
-
-class StaticIndex:
-    """Manages static index URLs and their updates."""
-
-    def __init__(self, config_path: str | None = None):
-        self.config_path = self._get_config_path(config_path)
-        self.config_doc = None
-        self.load_config()
-
-
-    def check_for_updates(self) -> bool:
-        """Check if static configuration needs updating (once per day)."""
-        last_check = access_log.get_timestamp("static_config_check")
-        last_download = access_log.get_timestamp("static_config_download")
-
-        # Determine when we last had activity
-        timestamps = [t for t in [last_check, last_download] if t is not None]
-        if not timestamps:
-            logger.info("No static config check timestamp found, checking for updates")
-            return self._update_from_remote()
-
-        last_activity = max(timestamps)
-        if utils.is_older_than_hours(last_activity, 24):
-            logger.info(
-                "Last static config check older than one day, checking for updates"
-            )
-            return self._update_from_remote()
-        else:
-            logger.debug(
-                f"Static config is up to date (last activity: {last_activity})"
-            )
-            return False
-
-    def _update_from_remote(self) -> bool:
-        """Update static configuration from remote source."""
-        try:
-            logger.info(f"Checking for static config updates from {STATIC_CONFIG_URL}")
-            current_content = self.config_path.read_text()
-            comparison = utils.compare_remote_content(
-                STATIC_CONFIG_URL, current_content, timeout=30
-            )
-
-            if comparison["error"]:
-                logger.warning(f"Could not update static config: {comparison['error']}")
-                access_log.set_timestamp("static_config_check", datetime.datetime.now())
-                return False
-
-            if comparison["has_updates"]:
-                logger.info("Remote static config has updates, downloading new version")
-                self.config_path.write_text(comparison["remote_content"])
-                self.load_config(auto_create=False)
-                access_log.set_timestamp(
-                    "static_config_update", datetime.datetime.now()
-                )
-                logger.info("Static config updated successfully from remote")
-                return True
-            else:
-                logger.info("Remote static config is identical to local config")
-                access_log.set_timestamp("static_config_check", datetime.datetime.now())
-                return False
-
-        except Exception as e:
-            logger.warning(f"Could not check static config updates: {e}")
-            access_log.set_timestamp("static_config_check", datetime.datetime.now())
-            return False
-
 

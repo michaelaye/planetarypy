@@ -8,14 +8,11 @@ __all__ = [
     "list_instruments",
     "list_indexes",
     "list_available_indexes",
-    "get_index",
     "simple_replace_in_file",
 ]
 
 
 import pandas as pd
-
-from planetarypy.pds.indexes_remotes import Index
 
 
 def simple_replace_in_file(filename, old_text, new_text):
@@ -187,38 +184,3 @@ def list_available_indexes(
 
                 print(f"{m_indent}{i_indent}{idx_prefix}{index}")
 
-
-def get_index(
-    dotted_index_key: str, refresh: bool = False, force: bool = False
-) -> "pd.DataFrame":
-    """Retrieve a specific index file .
-
-    If the file is not yet downloaded, it will be, its time strings will be
-    converted to datetime objects to enable proper time-based filtering, and the
-    resulting DataFrame will be written to disk as a Parquet file for future use.
-
-    Args:
-        dotted_index_key (e.g. "mro.ctx.edr")
-        refresh (bool): If True, check for updates and download the latest index file.
-                        Setting this to False will increase performance as it will not
-                        check for updated files on the PDS server.
-                        Default is False.
-        force (bool): If True, force download even if the index is already the newest,
-                    useful if the index file broke for some reason, like interrupted
-                    download or processing.
-                    Default is False.
-
-    Returns:
-        pd.DataFrame
-
-    Examples:
-        >>> from planetarypy.pds.utils import get_index
-        >>> df = get_index('mro.ctx.edr')
-    """
-    index = Index(dotted_index_key)
-    if not index.local_label_path.is_file():
-        index.download()
-    # only do time-consuming update check if refresh is True
-    if (refresh and index.update_available) or force:
-        index.download()
-    return index.parquet
