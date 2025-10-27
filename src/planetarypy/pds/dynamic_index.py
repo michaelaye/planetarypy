@@ -18,8 +18,8 @@ from .index_logging import AccessLog
 
 # Dynamic URL handlers registry
 DYNAMIC_URL_HANDLERS = {
-    "mro.ctx": CTXIndex,
-    "lro.lroc": LROCIndex,
+    "mro.ctx.edr": CTXIndex,
+    "lro.lroc.edr": LROCIndex,
 }
 
 

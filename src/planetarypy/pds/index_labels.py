@@ -162,26 +162,25 @@ class IndexLabel:
                 colspecs.extend(pvlcol.colspecs)
         return colspecs
 
-    def read_index_data(self, do_convert_times=True):
-        return index_to_df(self.index_path, self, do_convert_times=do_convert_times)
+    def read_index_data(self, convert_times=True):
+        return index_to_df(self.index_path, self, convert_times=convert_times)
 
 
-def convert_times(df):
+def _convert_times(df):
+    missing_strings = [r"^UNK\s*$", r"^NULL\s*$", r"^N/A\s*$", r"^NA\s*$", r"^NONE\s*$"]
     for column in [col for col in df.columns if "TIME" in col]:
-        if column in ["LOCAL_TIME", "DWELL_TIME"] or column.startswith(
-            "NTV"
-        ):  # 2nd for GO.SSI.EDR
+        if column in ["LOCAL_TIME", "DWELL_TIME"] or column.startswith("NTV"):
             continue
+        logger.debug(f"Trying to convert {column} column to datetime type.")
         try:
-            df[column] = pd.to_datetime(
-                df[column].replace(r"^UNK\s*$", np.nan, regex=True)
-            )
+            # Replace all known missing value strings with np.nan
+            col_data = df[column]
+            for miss in missing_strings:
+                col_data = col_data.replace(miss, np.nan, regex=True)
+            df[column] = pd.to_datetime(col_data)
         except ValueError:
-            # df[column] = pd.to_datetime(
-            #     df[column], format=utils.nasa_dt_format_with_ms, errors="coerce"
-            # )
             df[column] = df[column].apply(mydatetime.fromdoyformat)
-    print("Convert time strings to datetime objects.")
+    logger.info("Converted time strings to datetime objects.")
     return df
 
 
@@ -192,7 +191,7 @@ def index_to_df(
     # 'colnames' and 'colspecs'
     label: IndexLabel,
     # Switch to control if to convert columns with "TIME" in name (unless COUNT is as well in name) to datetime
-    do_convert_times=True,
+    convert_times=True,
 ):
     """The main reader function for PDS Indexfiles.
 
@@ -226,8 +225,8 @@ def index_to_df(
     for col in df.select_dtypes(include=["string"]).columns:
         logger.debug(f"Stripping whitespace from string column {col}")
         df[col] = df[col].str.strip()
-    if do_convert_times:
-        df = convert_times(df)
+    if convert_times:
+        df = _convert_times(df)
     return df
 
 

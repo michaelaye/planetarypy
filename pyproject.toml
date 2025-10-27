@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "planetarypy"
-version = "0.3.0"
+version = "0.40.0"
 description = "Core package for planetary data tools. Includes PDS index utilities, SPICE integrations, and more."
 readme = "README.md"
 requires-python = ">= 3.10, <4"

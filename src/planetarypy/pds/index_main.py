@@ -11,8 +11,6 @@ from loguru import logger
 from yarl import URL
 import pandas as pd
 
-from planetarypy.pds import utils
-
 from ..config import config
 from ..utils import url_retrieve
 
@@ -22,6 +20,7 @@ from .dynamic_index import (
     DynamicRemoteHandler,
 )
 from .static_index import StaticRemoteHandler
+from .index_fixes import INDEX_FIXES
 
 
 class Index:
@@ -224,10 +223,11 @@ class Index:
         """Convert the downloaded index files to parquet format."""
         logger.info(f"Converting {self.index_key} to parquet format.")
 
-        # check if any cleanup is required before parsting and conversion:
-        if self.index_key == "go.ssi.index":
-            logger.debug("Fixing known formatting issue in GO SSI index.")
-            utils.simple_replace_in_file(self.local_table_path, '-23.629"', "-23.629,")
+        # Apply any required table fixes before parsing
+        if self.index_key in INDEX_FIXES:
+            fix_function = INDEX_FIXES[self.index_key]
+            fix_function(self.local_table_path)
+        
         try:
             df = self.read_index_data()
             logger.debug(f"Storing {self.index_key} as parquet")
@@ -236,7 +236,7 @@ class Index:
         except Exception as e:
             logger.error(f"Error converting {self.index_key} to parquet: {e}")
 
-    def read_index_data(self, do_convert_times: bool = True):
+    def read_index_data(self, convert_times: bool = True):
         """Read the index data from label and table files."""
         if not self.local_label_path.exists():
             raise FileNotFoundError(f"Label file not found: {self.local_label_path}")
@@ -244,7 +244,7 @@ class Index:
             raise FileNotFoundError(f"Table file not found: {self.local_table_path}")
 
         label = IndexLabel(self.local_label_path)
-        return label.read_index_data(do_convert_times=do_convert_times)
+        return label.read_index_data(convert_times=convert_times)
 
     @property
     def dataframe(self):
