@@ -6,7 +6,7 @@ characters instead of +00:00 to indicate UTC.
 # Copyright 2022, United States Government as represented by the
 #     Administrator of the National Aeronautics and Space Administration.
 #     All rights reserved.
-# Copyright 2024, PlanetaryPy developers
+# Copyright 2024,2025 PlanetaryPy developers
 #
 # Reuse is permitted under the terms of the license.
 # The AUTHORS file and the LICENSE file are at the
