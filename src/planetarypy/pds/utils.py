@@ -8,179 +8,152 @@ __all__ = [
     "list_instruments",
     "list_indexes",
     "list_available_indexes",
-    "simple_replace_in_file",
 ]
 
 
-import pandas as pd
+# (no external imports needed here)
 
 
-def simple_replace_in_file(filename, old_text, new_text):
-    """Simple replacement of text in a file."""
-    with open(filename, "r") as file:
-        content = file.read()
+def _all_dotted_index_keys() -> list[str]:
+    """Return all dotted index keys mission.instrument.index from static and dynamic sources.
 
-    # Simple string replacement
-    content = content.replace(old_text, new_text)
-
-    with open(filename, "w") as file:
-        file.write(content)
-
-    print(f"Replaced '{old_text}' with '{new_text}' in {filename}")
-
-
-def list_missions(config_doc: dict = None) -> list[str]:
-    """List all available missions in the PDS index configuration.
-
-    Args:
-        config_doc: Optional pre-loaded config dict to avoid re-loading
-
-    Returns:
-        List of mission names
-
-    Examples:
-        >>> from planetarypy.pds.utils import list_missions
-        >>> list_missions()
-        ['cassini', 'go', 'lro', 'mro']
+    This centralizes how available keys are computed so that other list functions
+    remain consistent and avoid repeated config loading/flattening logic.
     """
-    if config_doc is None:
-        from .index_config import load_config
+    from .static_index import ConfigHandler
+    from .dynamic_index import DYNAMIC_URL_HANDLERS
 
-        config_doc = load_config()
+    # Static: flatten nested config to dotted keys
+    config = ConfigHandler()
+    config_doc = config.to_dict()
 
-    return list(config_doc.keys())
+    static_keys: set[str] = set()
 
+    def _collect_keys(d: dict, parent: str = ""):
+        for k, v in d.items():
+            new_parent = f"{parent}.{k}" if parent else k
+            if isinstance(v, dict):
+                _collect_keys(v, new_parent)
+            else:
+                static_keys.add(new_parent)
 
-def list_instruments(mission: str, config_doc: dict = None) -> list[str]:
-    """List all instruments for a given mission.
+    _collect_keys(config_doc)
 
-    Args:
-        mission: Mission name (e.g., 'cassini', 'mro')
-        config_doc: Optional pre-loaded config dict to avoid re-loading
+    # Dynamic keys are already dotted
+    dynamic_keys = set(DYNAMIC_URL_HANDLERS.keys())
 
-    Returns:
-        List of instrument names
-
-    Examples:
-        >>> from planetarypy.pds.utils import list_instruments
-        >>> list_instruments('cassini')
-        ['iss', 'uvis']
-    """
-    if config_doc is None:
-        from .index_config import load_config
-
-        config_doc = load_config()
-
-    return list(config_doc[mission].keys())
+    return sorted(static_keys | dynamic_keys)
 
 
-def list_indexes(mission_instrument: str, config_doc: dict = None) -> list[str]:
-    """List all indexes for a given mission and instrument.
+def list_missions() -> list[str]:
+    """Return a sorted list of all available missions (from static and dynamic configs)."""
+    keys = _all_dotted_index_keys()
+    missions = {k.split(".")[0] for k in keys if k}
+    return sorted(missions)
 
-    Args:
-        mission_instrument: Dotted mission.instrument key (e.g., 'cassini.iss')
-        config_doc: Optional pre-loaded config dict to avoid re-loading
 
-    Returns:
-        List of index names
 
-    Examples:
-        >>> from planetarypy.pds.utils import list_indexes
-        >>> list_indexes('cassini.iss')
-        ['index', 'moon_summary', 'ring_summary', 'saturn_summary']
-    """
-    if config_doc is None:
-        from .index_config import load_config
+def list_instruments(mission: str) -> list[str]:
+    """Return a sorted list of all instruments for a given mission (from static and dynamic configs)."""
+    keys = _all_dotted_index_keys()
+    instruments = set()
+    for k in keys:
+        parts = k.split(".")
+        if len(parts) >= 2 and parts[0] == mission:
+            instruments.add(parts[1])
+    return sorted(instruments)
 
-        config_doc = load_config()
 
+
+def list_indexes(mission_instrument: str) -> list[str]:
+    """Return a sorted list of all index names for a given mission and instrument (from static and dynamic configs)."""
     mission, instrument = mission_instrument.split(".")
-    return list(config_doc[mission][instrument].keys())
+    keys = _all_dotted_index_keys()
+    indexes = set()
+    for k in keys:
+        parts = k.split(".")
+        if len(parts) >= 3 and parts[0] == mission and parts[1] == instrument:
+            indexes.add(".".join(parts[2:]))
+    return sorted(indexes)
 
 
 def list_available_indexes(
-    filter_mission: str | None = None, filter_instrument: str | None = None
-) -> None:
-    """Print an ASCII tree diagram of all missions, instruments, and indexes.
+    filter_mission: str | None = None,
+    filter_instrument: str | None = None,
+    *,
+    keys_only: bool = False,
+) -> list[str] | None:
+    """List available index keys from static config plus dynamic handlers.
 
-    This function displays a hierarchical view of the PDS index configuration,
-    showing missions, instruments, and indexes in a tree structure.
+    Combines all dotted index keys found in the remote static configuration
+    with the dynamic indexes registered in ``DYNAMIC_URL_HANDLERS``.
+
+    When ``keys_only`` is False (default), prints a tree of missions → instruments → indexes,
+    optionally filtered by mission/instrument. When ``keys_only`` is True, returns a sorted
+    list of dotted index keys instead of printing.
 
     Args:
-        filter_mission: If provided, only show this mission
-        filter_instrument: If provided, only show this instrument
-            (filter_mission must also be provided)
+        filter_mission: If provided, only include this mission
+        filter_instrument: If provided, only include this instrument (requires filter_mission)
+        keys_only: When True, return a list of keys instead of printing a tree
+
+    Returns:
+        - list[str] when ``keys_only`` is True
+        - None when printing a tree (``keys_only`` is False)
 
     Examples:
         >>> from planetarypy.pds.utils import list_available_indexes
-        >>> # Print all missions, instruments, and indexes
-        >>> list_available_indexes()
-        >>> # Print only information for the 'mro' mission
-        >>> list_available_indexes('mro')
-        >>> # Print only information for the 'mro' mission's 'ctx' instrument
-        >>> list_available_indexes('mro', 'ctx')
+        >>> list_available_indexes(keys_only=True)  # returns ["cassini.iss.index", ...]
+        >>> list_available_indexes('mro')           # prints tree for mro only
+        >>> list_available_indexes('mro', 'ctx')    # prints tree for mro.ctx only
     """
-    # Load config once and pass it to all functions
-    from .index_config import load_config
+    # Gather all keys once, then filter
+    all_keys = set(_all_dotted_index_keys())
 
-    config_doc = load_config()
+    def _passes_filters(key: str) -> bool:
+        if filter_mission and not key.startswith(filter_mission + "."):
+            return False
+        if filter_instrument:
+            parts = key.split(".")
+            if len(parts) < 2:
+                return False
+            if not (parts[0] == filter_mission and parts[1] == filter_instrument):
+                return False
+        return True
 
-    missions = list_missions(config_doc)
+    filtered_keys = sorted(k for k in all_keys if _passes_filters(k))
 
-    if filter_mission:
-        if filter_mission not in missions:
-            print(f"Mission '{filter_mission}' not found.")
-            return
-        missions = [filter_mission]
+    if keys_only:
+        return filtered_keys
 
-    if not missions:
-        print("No missions found in configuration.")
-        return
+    # 4) Print tree structure
+    if not filtered_keys:
+        print("No indexes found for the given filters.")
+        return None
 
     print("PDS Indexes Configuration:")
+    # Build nested dict for printing
+    tree: dict[str, dict[str, list[str]]] = {}
+    for key in filtered_keys:
+        m, i, idx = key.split(".", 2)
+        tree.setdefault(m, {}).setdefault(i, []).append(idx)
 
+    missions = sorted(tree.keys())
     for m_idx, mission in enumerate(missions):
-        # Mission prefix
-        if m_idx == len(missions) - 1:
-            m_prefix = "└── "
-            m_indent = "    "
-        else:
-            m_prefix = "├── "
-            m_indent = "│   "
-
+        m_prefix = "└── " if m_idx == len(missions) - 1 else "├── "
+        m_indent = "    " if m_idx == len(missions) - 1 else "│   "
         print(f"{m_prefix}{mission}")
 
-        # Get instruments
-        instruments = list_instruments(mission, config_doc)
-
-        if filter_instrument:
-            if filter_instrument not in instruments:
-                print(
-                    f"{m_indent}Instrument '{filter_instrument}' not found in mission '{mission}'."
-                )
-                continue
-            instruments = [filter_instrument]
-
+        instruments = sorted(tree[mission].keys())
         for i_idx, instrument in enumerate(instruments):
-            # Instrument prefix
-            if i_idx == len(instruments) - 1:
-                i_prefix = "└── "
-                i_indent = "    "
-            else:
-                i_prefix = "├── "
-                i_indent = "│   "
-
+            i_prefix = "└── " if i_idx == len(instruments) - 1 else "├── "
+            i_indent = "    " if i_idx == len(instruments) - 1 else "│   "
             print(f"{m_indent}{i_prefix}{instrument}")
 
-            # Get indexes
-            indexes = list_indexes(f"{mission}.{instrument}", config_doc)
-
+            indexes = sorted(tree[mission][instrument])
             for idx_idx, index in enumerate(indexes):
-                # Index prefix
-                if idx_idx == len(indexes) - 1:
-                    idx_prefix = "└── "
-                else:
-                    idx_prefix = "├── "
-
+                idx_prefix = "└── " if idx_idx == len(indexes) - 1 else "├── "
                 print(f"{m_indent}{i_indent}{idx_prefix}{index}")
+
+    return None
 

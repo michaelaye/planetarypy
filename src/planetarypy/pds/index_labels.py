@@ -7,7 +7,6 @@ parsing index files, and converting them to convenient data structures.
 __all__ = [
     "PVLColumn",
     "IndexLabel",
-    "convert_times",
     "index_to_df",
     "decode_line",
     "find_mixed_type_cols",
@@ -103,8 +102,10 @@ class IndexLabel:
         # The actual table should reside in the same folder to be automatically parsed
         # when calling the `read_index_data` method.
         labelpath: str | Path,
+        index_key: str | None = None,
     ):
         self.path = Path(labelpath)
+        self.index_key = index_key
         "search for table name pointer and store key and fpath."
         tuple = [i for i in self.pvl_lbl if i[0].startswith("^")][0]
         self.tablename = tuple[0][1:]
@@ -184,6 +185,9 @@ def _convert_times(df):
     return df
 
 
+    
+
+
 def index_to_df(
     # Path to the index TAB file
     indexpath: str | Path,
@@ -198,7 +202,12 @@ def index_to_df(
     In conjunction with an IndexLabel object that figures out the column widths,
     this reader should work for all PDS TAB files.
     """
+    from .index_fixes import apply_file_fixer, apply_pre_time_df_fixer
+
     indexpath = Path(indexpath)
+    # Apply any file-level fixers before parsing (if index_key known)
+    if getattr(label, "index_key", None):
+        apply_file_fixer(label.index_key, indexpath)
     # get n_lines fast for progress bar
     with open(indexpath, "rb") as f:  # courtesy of https://stackoverflow.com/a/1019572
         num_lines = sum(1 for _ in f)
@@ -225,6 +234,9 @@ def index_to_df(
     for col in df.select_dtypes(include=["string"]).columns:
         logger.debug(f"Stripping whitespace from string column {col}")
         df[col] = df[col].str.strip()
+    # Apply any DataFrame-level pre-time fixers before converting times (if index_key known)
+    if getattr(label, "index_key", None):
+        df = apply_pre_time_df_fixer(label.index_key, df)
     if convert_times:
         df = _convert_times(df)
     return df

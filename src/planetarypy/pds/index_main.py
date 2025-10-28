@@ -20,7 +20,6 @@ from .dynamic_index import (
     DynamicRemoteHandler,
 )
 from .static_index import StaticRemoteHandler
-from .index_fixes import INDEX_FIXES
 
 
 class Index:
@@ -222,11 +221,6 @@ class Index:
     def convert_to_parquet(self):
         """Convert the downloaded index files to parquet format."""
         logger.info(f"Converting {self.index_key} to parquet format.")
-
-        # Apply any required table fixes before parsing
-        if self.index_key in INDEX_FIXES:
-            fix_function = INDEX_FIXES[self.index_key]
-            fix_function(self.local_table_path)
         
         try:
             df = self.read_index_data()
@@ -243,7 +237,7 @@ class Index:
         if not self.local_table_path.exists():
             raise FileNotFoundError(f"Table file not found: {self.local_table_path}")
 
-        label = IndexLabel(self.local_label_path)
+        label = IndexLabel(self.local_label_path, index_key=self.index_key)
         return label.read_index_data(convert_times=convert_times)
 
     @property
