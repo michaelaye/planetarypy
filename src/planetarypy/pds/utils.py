@@ -4,10 +4,10 @@ This module provides common, general-purpose utility functions for the PDS subpa
 """
 
 __all__ = [
-    "list_missions",
-    "list_instruments",
-    "list_indexes",
-    "list_available_indexes",
+    "get_mission_names",
+    "get_instrument_names",
+    "get_index_names",
+    "print_available_indexes",
 ]
 
 
@@ -45,7 +45,7 @@ def _all_dotted_index_keys() -> list[str]:
     return sorted(static_keys | dynamic_keys)
 
 
-def list_missions() -> list[str]:
+def get_mission_names() -> list[str]:
     """Return a sorted list of all available missions (from static and dynamic configs)."""
     keys = _all_dotted_index_keys()
     missions = {k.split(".")[0] for k in keys if k}
@@ -53,7 +53,7 @@ def list_missions() -> list[str]:
 
 
 
-def list_instruments(mission: str) -> list[str]:
+def get_instrument_names(mission: str) -> list[str]:
     """Return a sorted list of all instruments for a given mission (from static and dynamic configs)."""
     keys = _all_dotted_index_keys()
     instruments = set()
@@ -65,7 +65,7 @@ def list_instruments(mission: str) -> list[str]:
 
 
 
-def list_indexes(mission_instrument: str) -> list[str]:
+def get_index_names(mission_instrument: str) -> list[str]:
     """Return a sorted list of all index names for a given mission and instrument (from static and dynamic configs)."""
     mission, instrument = mission_instrument.split(".")
     keys = _all_dotted_index_keys()
@@ -77,7 +77,7 @@ def list_indexes(mission_instrument: str) -> list[str]:
     return sorted(indexes)
 
 
-def list_available_indexes(
+def print_available_indexes(
     filter_mission: str | None = None,
     filter_instrument: str | None = None,
     *,
@@ -102,10 +102,10 @@ def list_available_indexes(
         - None when printing a tree (``keys_only`` is False)
 
     Examples:
-        >>> from planetarypy.pds.utils import list_available_indexes
-        >>> list_available_indexes(keys_only=True)  # returns ["cassini.iss.index", ...]
-        >>> list_available_indexes('mro')           # prints tree for mro only
-        >>> list_available_indexes('mro', 'ctx')    # prints tree for mro.ctx only
+        >>> from planetarypy.pds.utils import print_available_indexes
+        >>> print_available_indexes(keys_only=True)  # returns ["cassini.iss.index", ...]
+        >>> print_available_indexes('mro')           # prints tree for mro only
+        >>> print_available_indexes('mro', 'ctx')    # prints tree for mro.ctx only
     """
     # Gather all keys once, then filter
     all_keys = set(_all_dotted_index_keys())

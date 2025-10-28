@@ -8,19 +8,19 @@ from loguru import logger
 from pandas import DataFrame
 from planetarypy.pds.index_main import Index
 from planetarypy.pds.utils import (
-    list_available_indexes,
-    list_indexes,
-    list_instruments,
-    list_missions,
+    print_available_indexes,
+    get_index_names,
+    get_instrument_names,
+    get_mission_names,
 )
 
 __all__ = [
     "Index",
     "get_index",
-    "list_available_indexes",
-    "list_missions",
-    "list_instruments",
-    "list_indexes",
+    "print_available_indexes",
+    "get_mission_names",
+    "get_instrument_names",
+    "get_index_names",
 ]
 
 

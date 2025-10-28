@@ -58,19 +58,19 @@ The package includes robust tools for working with PDS (Planetary Data System) i
 - **Index Browsing**: Easily explore available missions, instruments, and indices
 
 ```python
-from planetarypy.pds import print_pds_tree, list_missions, list_instruments, list_indexes
+from planetarypy.pds import print_available_indexes, get_mission_names, get_instrument_names, get_index_names
 
 # Display all available PDS indices in a tree structure
-print_pds_tree()
+print_available_indexes()
 
 # Get a list of all missions
-missions = list_missions()
+missions = get_mission_names()
 
 # Get all instruments for a specific mission
-instruments = list_instruments('mro')
+instruments = get_instrument_names('mro')
 
 # Get all indices for a specific mission and instrument
-indices = list_indexes('cassini', 'iss')
+indices = get_index_names('cassini.iss')
 ```
 
 - **Index Management**: Download, update, and convert indices to high-performance parquet format
