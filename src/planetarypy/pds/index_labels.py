@@ -22,7 +22,7 @@ from fastcore.utils import Path
 from loguru import logger
 from tqdm.auto import tqdm
 
-from .. import dt_fmt_converters as mydatetime
+from .. import datetime_format_converters as tformats
 
 warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="pvl")
 
@@ -180,12 +180,9 @@ def _convert_times(df):
                 col_data = col_data.replace(miss, np.nan, regex=True)
             df[column] = pd.to_datetime(col_data)
         except ValueError:
-            df[column] = df[column].apply(mydatetime.fromdoyformat)
+            df[column] = df[column].apply(tformats.fromdoyformat)
     logger.info("Converted time strings to datetime objects.")
     return df
-
-
-    
 
 
 def index_to_df(

@@ -26,7 +26,7 @@ except ImportError:
         return x
 from yarl import URL
 
-from planetarypy.dt_fmt_converters import fromdoyformat
+from planetarypy.datetime_format_converters import fromdoyformat
 
 __all__ = [
     "replace_all_doy_times",
@@ -37,8 +37,7 @@ __all__ = [
     "have_internet",
     "file_variations",
     "catch_isis_error",
-    # "read_config_carefully",
-    "compare_remote_content",
+    "compare_remote_file",
     "calculate_hours_since_timestamp",
     "NestedTomlDict",
     "compare_remote_file",

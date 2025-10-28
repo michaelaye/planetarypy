@@ -35,7 +35,7 @@ from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 from yarl import URL
 
-from ..dt_fmt_converters import fromdoyformat
+from ..datetime_format_converters import fromdoyformat
 from ..utils import url_retrieve
 from .config import BASE_URL, KERNEL_STORAGE
 
