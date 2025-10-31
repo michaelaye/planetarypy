@@ -1,5 +1,6 @@
 """Logging handlers for PDS index access timestamps and URL discoveries."""
 
+
 from datetime import datetime as dt
 from datetime import timedelta
 from pathlib import Path
@@ -11,15 +12,17 @@ from planetarypy.utils import NestedTomlDict
 
 class AccessLog(NestedTomlDict):
     """Handler for index log operations.
-
-    The key should be a dotted key representing the index or configuration being logged, e.g. "config.indexes.static"
-    or "mro.ctx.edr"
+    
+    Parameters
+    ----------
+    key : str
+        Key identifying the index being logged, e.g. "mro.ctx.index".
     """
 
     ONEDAY = timedelta(days=1)
     FILE_PATH = Path.home() / ".planetarypy_index_log.toml"
 
-    def __init__(self, key: str | None = None):
+    def __init__(self, key):
         super().__init__(self.FILE_PATH)
         self.key = key
 
@@ -112,7 +115,7 @@ class AccessLog(NestedTomlDict):
             return True
         return self.time_since_last_check > timedelta(minutes=1)
 
-    def delete(self):
+    def _delete(self):
         """Delete the index log file."""
         if self.FILE_PATH.is_file():
             self.FILE_PATH.unlink()

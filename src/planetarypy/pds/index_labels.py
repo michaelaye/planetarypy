@@ -28,8 +28,13 @@ warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="pv
 
 
 class PVLColumn:
-    "Manages just one of the columns in a table that is described via PVL."
+    """Manages just one of the columns in a table that is described via PVL.
+    
+    Parameters
+    ----------
 
+    pvlobj :
+        """
     def __init__(self, pvlobj):
         self.pvlobj = pvlobj
 
@@ -173,14 +178,15 @@ def _convert_times(df):
         if column in ["LOCAL_TIME", "DWELL_TIME"] or column.startswith("NTV"):
             continue
         logger.debug(f"Trying to convert {column} column to datetime type.")
+        # Replace all known missing value strings with np.nan
+        col_data = df[column]
+        for miss in missing_strings:
+            col_data = col_data.replace(miss, np.nan, regex=True)
         try:
-            # Replace all known missing value strings with np.nan
-            col_data = df[column]
-            for miss in missing_strings:
-                col_data = col_data.replace(miss, np.nan, regex=True)
             df[column] = pd.to_datetime(col_data)
         except ValueError:
-            df[column] = df[column].apply(tformats.fromdoyformat)
+            logger.warning(f"Could not convert {column} with one format, trying multiple formats. (slower)")
+            df[column] = pd.to_datetime(col_data, format='mixed')
     logger.info("Converted time strings to datetime objects.")
     return df
 
@@ -192,9 +198,9 @@ def index_to_df(
     # 'colnames' and 'colspecs'
     label: IndexLabel,
     # Switch to control if to convert columns with "TIME" in name (unless COUNT is as well in name) to datetime
-    convert_times=True,
+    convert_times: bool = True,
 ):
-    """The main reader function for PDS Indexfiles.
+    """The main reader function for PDS Index files. 
 
     In conjunction with an IndexLabel object that figures out the column widths,
     this reader should work for all PDS TAB files.

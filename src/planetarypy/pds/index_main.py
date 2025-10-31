@@ -3,16 +3,17 @@
 This module provides a unified Index class that uses composition with Remote classes
 to handle URL management."""
 
-__all__ = ["Index"]
+__all__ = ["Index", "InventoryIndex"]
 
 from pathlib import Path
+import csv
+import pandas as pd
 
 from loguru import logger
 from yarl import URL
-import pandas as pd
 
 from ..config import config
-from ..utils import url_retrieve
+from ..utils import url_retrieve, have_internet
 
 from .index_labels import IndexLabel
 from .dynamic_index import (
@@ -24,15 +25,24 @@ from .static_index import StaticRemoteHandler
 
 class Index:
     """Unified Index class using composition with Remote classes.
-
+    
     This class provides file management operations while delegating URL management
     to appropriate Remote classes based on the index configuration.
-    """
 
+    Parameters
+    ----------
+    index_key : str
+        Dotted key identifying the index (e.g., "mro.ctx.edr")
+    local_dir : str | Path | None, optional
+        Local directory for index files. If None, a default path is used.
+    force_config_update : bool, optional
+        Whether to force update of static index configuration.
+    """
     def __init__(
-        self,
-        index_key: str,
-        local_dir: str | Path | None = None,
+        self, 
+        index_key: str, 
+        local_dir: str | Path | None = None, 
+        force_config_update: bool = False
     ):
         """Initialize Index with composition-based Remote handling.
 
@@ -46,11 +56,12 @@ class Index:
 
         self._remote = None
         self._remote_type = None
+        self._force_config_update = force_config_update
         self._determine_remote_type()
 
     def _default_local_dir(self) -> Path:
         """Get default local directory for this index."""
-        return Path(config.storage_root) / f"{self.mission}/{self.instrument}/indexes/"
+        return Path(config.storage_root) / f"{self.mission}/{self.instrument}/indexes/{self.indexname}"
 
     @property
     def local_dir(self) -> Path:
@@ -60,22 +71,22 @@ class Index:
 
     def _determine_remote_type(self):
         """Determine if this index uses static or dynamic remote handling."""
-        instrument_key = ".".join(self.index_key.split(".")[0:2])
-
-        if instrument_key in DYNAMIC_URL_HANDLERS:  # like 'mro.ctx'
+        if self.index_key in DYNAMIC_URL_HANDLERS:  # like 'mro.ctx'
             self._remote_type = "dynamic"
             self._remote = DynamicRemoteHandler(index_key=self.index_key)
             logger.debug(f"Index {self.index_key} will use dynamic remote handling")
         else:
             self._remote_type = "static"  # like 'go.ssi'
-            self._remote = StaticRemoteHandler(index_key=self.index_key)
+            self._remote = StaticRemoteHandler(
+                index_key=self.index_key, force_config_update=self._force_config_update
+            )
             logger.debug(f"Index {self.index_key} will use static remote handling")
 
     @property
     def remote_type(self) -> str:
         """Get the type of remote handling used ('static' or 'dynamic')."""
         return self._remote_type
-    
+
     @property
     def remote(self) -> StaticRemoteHandler | DynamicRemoteHandler:
         """Get the appropriate Remote instance for this index."""
@@ -83,7 +94,15 @@ class Index:
 
     @property
     def update_available(self) -> bool:
-        """Check if an update is available."""
+        """Check if an update is available.
+
+        Returns False if no internet connection is available.
+        """
+        if not have_internet():
+            logger.debug(
+                f"No internet connection; skipping update check for {self.index_key}"
+            )
+            return False
         return self.remote.update_available
 
     @property
@@ -160,6 +179,10 @@ class Index:
         Returns:
             True if download was successful
         """
+        if not have_internet():
+            logger.warning(f"No internet connection; cannot download {self.index_key}")
+            return False
+
         url = self.url
         if not url:
             logger.error(f"No URL available for {self.index_key}")
@@ -179,14 +202,14 @@ class Index:
 
             if convert_to_parquet:
                 self.convert_to_parquet()
-            
+
             # Log the successful update
             self.remote.log.log_update_time()
-            
+
             # For dynamic indexes, record the URL we just downloaded as current_url
             if self.remote_type == "dynamic":
                 self.remote.log.log_current_url(url)
-            
+
             # Clear the update_available flag since we just downloaded
             self.remote.log.log_update_available(False)
 
@@ -221,7 +244,7 @@ class Index:
     def convert_to_parquet(self):
         """Convert the downloaded index files to parquet format."""
         logger.info(f"Converting {self.index_key} to parquet format.")
-        
+
         try:
             df = self.read_index_data()
             logger.debug(f"Storing {self.index_key} as parquet")
@@ -252,20 +275,70 @@ class Index:
         elif hasattr(self.remote, "refresh_config"):
             self.remote.refresh_config()
 
-    def get_info(self) -> dict:
-        """Get information about this index."""
-        return {
-            "index_key": self.index_key,
-            "local_dir": str(self.local_dir),
-            "local_label_path": str(self.local_label_path),
-            "local_table_path": str(self.local_table_path),
-            "local_parq_path": str(self.local_parq_path),
-            "exists_locally": self.exists_locally(),
-            "remote_type": self._remote_type,
-            "url": self.url if self._remote else None,
-            "table_url": self.table_url if self._remote else None,
-            "check_and_update": self.check_and_update,
-        }
-
     def __repr__(self) -> str:
-        return f"Index(key='{self.index_key}', remote={self._remote_type})"
+        """Return a concise string representation of this Index."""
+        return (
+            f"<Index index_key={self.index_key!r} "
+            f"remote_type={self._remote_type!r} "
+            f"local_dir={str(self._local_dir)!r} "
+            f"label={str(self.local_label_path)!r} "
+            f"table={str(self.local_table_path)!r} "
+            f"parq={str(self.local_parq_path)!r} "
+            f"exists_locally={self.files_downloaded}>"
+        )
+
+
+class InventoryIndex(Index):
+    """Index class for inventory-style CSV indexes.
+    This class handles CSV files where:
+    - First 3 columns are: volume, file_path, observation_id
+    - Remaining columns contain comma-separated target names
+
+    The data is exploded so each target gets its own row, then grouped back
+    by observation_id with targets as lists for efficient querying.
+    """
+
+    @property
+    def tab_extension(self):
+        """Get the appropriate table extension."""
+        return ".csv"
+
+    def read_index_data(self, convert_times: bool = True):
+        logger.debug("Using InventoryIndex for these csv tables.")
+        rows = []
+        with open(self.local_table_path, "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                volume, file_path, obs_id = row[:3]
+                # All remaining fields are targets
+                targets = [t.strip() for t in row[3:]]
+
+                # Create one row per target
+                for target in targets:
+                    rows.append(
+                        {
+                            "volume": volume,
+                            "file_path": file_path,
+                            "observation_id": obs_id,
+                            "target": target,
+                        }
+                    )
+
+        self.target_per_row = pd.DataFrame(rows)
+        logger.info(f"Read {len(self.target_per_row)} observations with target lists")
+        return self.target_per_row
+
+    @property
+    def targets_per_obsid(self):
+        obs_targets = (
+            self.target_per_row.groupby("observation_id")
+            .agg(
+                {
+                    "volume": "first",  # Take the first volume (they're all the same)
+                    "file_path": "first",  # Take the first file_path
+                    "target": list,  # Collect all targets into a list
+                }
+            )
+            .reset_index()
+        )
+        return obs_targets

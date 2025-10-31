@@ -1,3 +1,6 @@
+"""dynamic_url_handlers module.
+"""
+
 __all__ = ["CTXIndex", "LROCIndex"]
 
 import pandas as pd

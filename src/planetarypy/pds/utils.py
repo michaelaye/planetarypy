@@ -10,19 +10,22 @@ __all__ = [
     "print_available_indexes",
 ]
 
-
-# (no external imports needed here)
+from .static_index import ConfigHandler
+from .dynamic_index import DYNAMIC_URL_HANDLERS
 
 
 def _all_dotted_index_keys() -> list[str]:
     """Return all dotted index keys mission.instrument.index from static and dynamic sources.
 
-    This centralizes how available keys are computed so that other list functions
-    remain consistent and avoid repeated config loading/flattening logic.
-    """
-    from .static_index import ConfigHandler
-    from .dynamic_index import DYNAMIC_URL_HANDLERS
+    Parameters
+    ----------
+    None
 
+    Returns
+    -------
+    list[str]
+        Sorted list of all available dotted index keys.
+    """
     # Static: flatten nested config to dotted keys
     config = ConfigHandler()
     config_doc = config.to_dict()
@@ -52,7 +55,6 @@ def get_mission_names() -> list[str]:
     return sorted(missions)
 
 
-
 def get_instrument_names(mission: str) -> list[str]:
     """Return a sorted list of all instruments for a given mission (from static and dynamic configs)."""
     keys = _all_dotted_index_keys()
@@ -62,7 +64,6 @@ def get_instrument_names(mission: str) -> list[str]:
         if len(parts) >= 2 and parts[0] == mission:
             instruments.add(parts[1])
     return sorted(instruments)
-
 
 
 def get_index_names(mission_instrument: str) -> list[str]:
@@ -156,4 +157,3 @@ def print_available_indexes(
                 print(f"{m_indent}{i_indent}{idx_prefix}{index}")
 
     return None
-

@@ -1,12 +1,10 @@
+"""PDS Tools, to work with Planetary Data System datasets.
 """
-PDS Tools, to work with Planetary Data System datasets.
 
-Includes tools specifically designed for PDS3 label parsing and data format understanding.
-"""
 
 from loguru import logger
 from pandas import DataFrame
-from planetarypy.pds.index_main import Index
+from planetarypy.pds.index_main import Index, InventoryIndex
 from planetarypy.pds.utils import (
     print_available_indexes,
     get_index_names,
@@ -16,6 +14,7 @@ from planetarypy.pds.utils import (
 
 __all__ = [
     "Index",
+    "InventoryIndex",
     "get_index",
     "print_available_indexes",
     "get_mission_names",
@@ -29,46 +28,36 @@ def get_index(
     allow_refresh: bool = False,
     force_refresh: bool = False,
     rebuild_parquet: bool = False,
+    force_config_update: bool = False,
 ) -> DataFrame:
     """Retrieve a specific index file .
+    
+    A check is made for possible updates to the index file once per day.
 
-    If the file is not yet downloaded, it will be, its time strings will be
-    converted to datetime objects to enable proper time-based filtering, and the
-    resulting DataFrame will be written to disk as a Parquet file for future use.
-
-    Args:
-        dotted_index_key (e.g. "mro.ctx.edr")
-        allow_refresh (bool):
-            If True, check for updates and download the latest index file.
-            Setting this to False will increase performance as it will not check for
-            updated files on the PDS server.
-            Default is False.
-        force_refresh (bool):
-            If True, force download even if the index is already the newest,
-            useful if the index file broke for some reason, like interrupted
-            download or processing.
-            Default is False.
-        rebuild_parquet (bool):
-            If True, rebuild the parquet cache from existing label+table files
-            without re-downloading. Useful if conversion failed but download succeeded.
-            Default is False.
-
-    Returns:
-        pd.DataFrame
-
-    Examples:
-        >>> from loguru import logger
-        >>> logger.enable("planetarypy")  # Enable INFO-level logging (pre-configured)
-        >>> from planetarypy.pds import get_index
-        >>> df = get_index('mro.ctx.edr')
-
-        >>> # Force refresh to get latest version
-        >>> df = get_index('mro.ctx.edr', force_refresh=True)
-
-        >>> # Rebuild parquet only (no download)
-        >>> df = get_index('mro.ctx.edr', rebuild_parquet=True)
+    Parameters
+    ----------
+    dotted_index_key : str
+        Main identifier for the index to retrieve. Example: 'mro.ctx.edr'
+    allow_refresh : bool
+        If True, download the latest version if an update is available.
+    force_refresh : bool
+        Download the latest version unconditionally.
+    rebuild_parquet : bool
+        If True, rebuild the parquet file from existing downloaded files only.
+    force_config_update : bool
+        If True, force update of local URL config file from remote source.
+    
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing the index data, read from the local parquet file.
     """
-    index = Index(dotted_index_key)
+    # Use InventoryIndex for special inventory files that have multi-target CSV format
+    if dotted_index_key.endswith('.inventory'):
+        index = InventoryIndex(dotted_index_key, force_config_update=force_config_update)
+    else:
+        index = Index(dotted_index_key, force_config_update=force_config_update)
+    
     # Ensure parquet exists; optionally rebuild from existing files only
     downloaded = index.ensure_parquet(force=rebuild_parquet)
 

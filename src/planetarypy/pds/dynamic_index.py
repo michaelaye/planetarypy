@@ -1,14 +1,8 @@
-"""Dynamic index management with web-scraped URL discovery.
+"""Dynamic index management
 
-This module handles indexes where URLs change over time and must be discovered
-through web scraping. Update logic focuses ONLY on discovering new URL locations
-and caching them locally. Unlike static indexes, dynamic indexes don't need to
-check file timestamps at the same URL because updates always come as new URLs
-(e.g., new volume/release folders), not file replacements at existing URLs.
+These are the codes for web-scraped PDS archive pages to discover the most recent 
+volume delivery with a new index file and its URL.
 """
-
-from __future__ import annotations
-
 __all__ = ["DYNAMIC_URL_HANDLERS", "DynamicRemoteHandler"]
 
 from loguru import logger
@@ -31,35 +25,33 @@ class DynamicRemoteHandler:
     2. available_url: The URL of a newly discovered update (if any)
     
     This separation ensures we always know which URL corresponds to our cached data.
-    """
 
-    def __init__(self, index_key: str):
+    Parameters
+    ----------
+    index_key : str
+        The dotted index key (e.g. "mro.ctx.edr").     
+    """
+ 
+    def __init__(self, index_key : str):
         self.key = index_key
         self.log = AccessLog(key=index_key)
         if self.should_check:
             self._check_for_updates()
-
-    @property
-    def instrument_key(self) -> str:
-        """Get instrument key from index key.
-        
-        E.g., for "mro.ctx.edr", returns "mro.ctx".
-        """
-        key = self.key
-        return key[:key.rfind('.')]  # all chars before right-first dot.
     
     @property
     def handler_class(self) -> type | None:
         """Get handler class."""
-        return DYNAMIC_URL_HANDLERS.get(self.instrument_key)
+        return DYNAMIC_URL_HANDLERS.get(self.key)
+
 
     @property
     def should_check(self) -> bool:
+        """Determine if we should check for updates based on last check time."""
         return self.log.should_check
-    
+
     def discover_latest_url(self) -> str | None:
-        """Discover the latest URL by scraping the remote server.
-        
+        """Discover the latest index URL from the remote source.
+                
         This method only discovers and returns the URL - it does NOT update any logs.
         Logging is handled by the caller based on what they want to do with the URL.
         """

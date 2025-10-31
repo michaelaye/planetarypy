@@ -7,7 +7,6 @@ Update logic focuses on checking for newer file timestamps at known stable URLs.
 import datetime
 from pathlib import Path
 from urllib.request import URLError
-from functools import cached_property
 from loguru import logger
 from yarl import URL
 
@@ -22,6 +21,12 @@ class ConfigHandler(utils.NestedTomlDict):
     - Download from planetarypy config repo if it is not present.
     - Check once per day if there's an updated version available.
     - Read out the URLs for the static indexes, based on dotted keys like "mro.ctx.edr".
+
+    Parameters
+    ----------
+    local_path : str | None
+        If needed, a local path with more indexes could be provided.    
+    
     """
     FNAME = "planetarypy_index_urls.toml"
     BASE_URL = URL(
@@ -30,7 +35,7 @@ class ConfigHandler(utils.NestedTomlDict):
     CONFIG_URL = BASE_URL / FNAME
     CONFIG_PATH = Path.home() / f".{FNAME}"
 
-    def __init__(self, local_path: str | None = None):
+    def __init__(self, local_path: str | None = None, force_update: bool = False):
         self.path = Path(local_path) if local_path else self.CONFIG_PATH
         self.log = AccessLog("indexes.static.config")
         
@@ -38,7 +43,7 @@ class ConfigHandler(utils.NestedTomlDict):
             logger.info(f"Downloading fresh static config from {self.CONFIG_URL}.")
             utils.url_retrieve(str(self.CONFIG_URL), self.path, disable_tqdm=True)
             self.log.log_update_time()
-        elif self.should_update:
+        elif force_update or self.should_update:
             self._check_and_update_config()
             
         super().__init__(self.path)
@@ -99,22 +104,21 @@ class ConfigHandler(utils.NestedTomlDict):
     def get_url(self, key) -> URL:
         return URL(str(self.get(key)))
     
-    def delete(self):
+    def _delete(self):
         """Delete the local configuration file."""
         if self.path.is_file():
             self.path.unlink()
-            logger.info(f"Deleted static config file: {self.path}")
+            logger.info(f"Deleted static config file at {self.path}")
         else:
-            logger.warning(f"Static config file does not exist: {self.path}")
+            logger.warning(f"Static config file at {self.path} does not exist, cannot delete.") 
 
 
 class StaticRemoteHandler:
-    """Represents a static remote index with a fixed URL.
-    
+    """Handler for static remote indexes with fixed URLs from configuration.
+
     This handler deals with all aspects of the status of a remotely stored index file.
     It is a helper class-based attribute for the Index class, to determine if updates are available and if a remote
     check should be performed (limited to once per day).
-
     This class differs from the DynamicRemoteHandler, as the updates there look for new URLs, not for new files
     at the same URL.
 
@@ -123,9 +127,9 @@ class StaticRemoteHandler:
     From the moment of having an URL and a reason to use it, the actual Index class should take over.
     """
 
-    def __init__(self, index_key: str):
+    def __init__(self, index_key: str, force_config_update: bool = False):
         self.index_key = index_key
-        self.config = ConfigHandler()
+        self.config = ConfigHandler(force_update=force_config_update)
         self.log = AccessLog(key=index_key)
 
         self._remote_timestamp = None
