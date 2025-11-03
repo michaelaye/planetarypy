@@ -29,12 +29,13 @@ warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module="pv
 
 class PVLColumn:
     """Manages just one of the columns in a table that is described via PVL.
-    
+
     Parameters
     ----------
-
+    
     pvlobj :
-        """
+    """
+
     def __init__(self, pvlobj):
         self.pvlobj = pvlobj
 
@@ -185,8 +186,16 @@ def _convert_times(df):
         try:
             df[column] = pd.to_datetime(col_data)
         except ValueError:
-            logger.warning(f"Could not convert {column} with one format, trying multiple formats. (slower)")
-            df[column] = pd.to_datetime(col_data, format='mixed')
+            logger.warning(
+                f"Could not convert {column} with one format, trying multiple formats. (slower)"
+            )
+            try:
+                df[column] = pd.to_datetime(col_data, format="mixed")
+            except ValueError:
+                logger.warning(
+                    f"Mixed-format conversion failed for {column}, trying DOY format converter."
+                )
+                df[column] = df[column].apply(tformats.fromdoyformat)
     logger.info("Converted time strings to datetime objects.")
     return df
 
@@ -200,7 +209,7 @@ def index_to_df(
     # Switch to control if to convert columns with "TIME" in name (unless COUNT is as well in name) to datetime
     convert_times: bool = True,
 ):
-    """The main reader function for PDS Index files. 
+    """The main reader function for PDS Index files.
 
     In conjunction with an IndexLabel object that figures out the column widths,
     this reader should work for all PDS TAB files.
