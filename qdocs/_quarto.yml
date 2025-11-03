@@ -1,0 +1,115 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: PlanetaryPy (Quarto Docs)
+  repo-url: https://github.com/michaelaye/planetarypy
+  repo-actions: [issue]
+  navbar:
+    search: true
+    left:
+      - text: Home
+        href: index.qmd
+      - text: "Tutorials"
+        href: tutorials/
+      - text: "How-To"
+        href: howto/index.qmd
+      - text: "Fundamentals"
+        href: fundamentals/index.qmd
+      - text: API Reference
+        href: reference/index.qmd
+  sidebar:
+    - title: "Tutorials"
+      style: "docked"
+      background: light
+      contents:
+        - tutorials/index.qmd
+        - tutorials/pds_indexes_examples.ipynb
+        - tutorials/spice_kernel_examples.ipynb
+
+    - title: "How-To"
+      contents:
+        - howto/index.qmd
+        - howto/installing_planetarypy.qmd
+        - howto/configuring_spice_kernels.qmd
+
+    - title: Fundamentals
+      contents:
+        - fundamentals/index.qmd
+        - fundamentals/planetary_data_systems.qmd
+        - fundamentals/spice_kernels.qmd
+
+    - title: "API Reference"
+      contents: "{{ contents }}"
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-link: true
+    css:
+      - reference/_styles-quartodoc.css
+      - custom.css
+
+# Read the generated sidebar definitions
+metadata-files:
+  - reference/_sidebar.yml
+
+quartodoc:
+  # Use the multi-page (pkgdown-like) layout
+  style: pkgdown
+  # Where to write generated API pages
+  dir: reference
+  # The import name of the package to document
+  package: planetarypy
+  # Docstring parser (numpy | google | sphinx)
+  parser: numpy
+  # Also write sidebar and default CSS that Quarto should load
+  sidebar: reference/_sidebar.yml
+  css: reference/_styles-quartodoc.css
+  # Title for the API index page
+  title: API Reference
+  # Grouped sections for the API
+  sections:
+    - title: Core Modules
+      desc: Core interfaces and utilities.
+      contents:
+        - cli
+        - config
+        - datetime_format_converters
+        - exceptions
+        - utils
+
+    - title: PDS Utilities and CLI
+      desc: Tools for managing and working with Planetary Data System indexes.
+      contents:
+        - pds.cli
+        - pds.dynamic_index
+        - pds.dynamic_url_handlers
+        - pds.index_fixes
+        - pds.index_labels
+        - pds.index_logging
+        - pds.index_main
+        - pds.static_index
+        - pds.utils
+
+    - title: SPICE Kernels
+      desc: Helpers for SPICE kernels and configuration.
+      contents:
+        - spice.archived_kernels
+        - spice.config
+        - spice.generic_kernels
+        - spice.pckernels
+
+    # - title: ISIS
+    #   contents:
+    #     - isis.autoseed
+
+    - title: Instruments
+      contents:
+        - instruments.ctx
+        - instruments.go_ssi
+        - instruments.hirise
+        - instruments.utils

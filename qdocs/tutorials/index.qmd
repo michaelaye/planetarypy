@@ -1,0 +1,13 @@
+---
+title: Tutorials
+listing:
+  contents: .
+  type: default      # grid | table | default
+  sort: "date desc"  # optional: recent first; remove if not needed
+  filter-ui: false   # hide filters unless you want them
+page-layout: article
+---
+
+Welcome to the Tutorials section. Pick a tutorial below to get started.
+
+This page automatically lists all notebooks and documents in this folder, so you can just drop new `.qmd` or `.ipynb` files here and they’ll appear below.
