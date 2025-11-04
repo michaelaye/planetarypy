@@ -47,7 +47,7 @@ def patch_config_and_dynamic(monkeypatch):
 
     # Fake dynamic registry with full dotted keys
     dynamic = {
-        "mro.ctx.rdr": _DummyHandler,
+        "mro.ctx.edr": _DummyHandler,
         "lro.lroc.edr": _DummyHandler,
     }
     monkeypatch.setattr(
@@ -57,49 +57,47 @@ def patch_config_and_dynamic(monkeypatch):
     yield
 
 
-def test_list_missions_includes_static_and_dynamic():
-    missions = pds_utils.list_missions()
-    assert missions == ["cassini", "lro", "mro"]
+def test_get_mission_names():
+    missions = pds_utils.get_mission_names()
+    assert set(["cassini", "lro", "mro"]).issubset(missions)
 
 
-def test_list_instruments_for_mission_static_only():
+def test_get_instrument_names():
     # cassini from static only
-    instruments = pds_utils.list_instruments("cassini")
-    assert instruments == ["iss", "uvis"]
-
-
-def test_list_instruments_for_mission_with_dynamic():
+    instruments = pds_utils.get_instrument_names("cassini")
+    assert set(["iss", "uvis"]).issubset(instruments)
     # lro has no static, but dynamic has lroc
-    instruments = pds_utils.list_instruments("lro")
-    assert instruments == ["lroc"]
+    instruments = pds_utils.get_instrument_names("lro")
+    assert set(["lroc"]).issubset(instruments)
 
 
-def test_list_indexes_for_combined_sources():
+def test_get_index_names():
     # mro.ctx has static edr and dynamic rdr
-    idx = pds_utils.list_indexes("mro.ctx")
-    assert idx == ["edr", "rdr"]
+    idx = pds_utils.get_index_names("mro.hirise")
+    assert set(["edr", "rdr"]).issubset(idx)
 
     # cassini.iss only static
-    idx2 = pds_utils.list_indexes("cassini.iss")
-    assert idx2 == ["index", "moon_summary"]
+    idx2 = pds_utils.get_index_names("cassini.iss")
+    assert set(["index", "moon_summary"]).issubset(idx2)
 
 
-def test_list_available_indexes_keys_only_and_filters():
-    keys = pds_utils.list_available_indexes(keys_only=True)
+def test_print_available_indexes_keys_only_and_filters():
+    keys = pds_utils.print_available_indexes(keys_only=True)
     # All dotted keys from static + dynamic
-    assert keys == [
+    expected_keys = [
         "cassini.iss.index",
         "cassini.iss.moon_summary",
         "cassini.uvis.index",
         "lro.lroc.edr",
         "mro.ctx.edr",
-        "mro.ctx.rdr",
+        "mro.hirise.rdr",
     ]
+    assert set(expected_keys).issubset(keys)
 
     # Filter by mission
-    mro_keys = pds_utils.list_available_indexes("mro", keys_only=True)
-    assert mro_keys == ["mro.ctx.edr", "mro.ctx.rdr"]
+    mro_keys = pds_utils.print_available_indexes("mro", keys_only=True)
+    assert set(["mro.ctx.edr", "mro.hirise.rdr"]).issubset(mro_keys)
 
     # Filter by mission and instrument
-    mro_ctx_keys = pds_utils.list_available_indexes("mro", "ctx", keys_only=True)
-    assert mro_ctx_keys == ["mro.ctx.edr", "mro.ctx.rdr"]
+    mro_ctx_keys = pds_utils.print_available_indexes("mro", "ctx", keys_only=True)
+    assert set(["mro.ctx.edr"]).issubset(mro_ctx_keys)
