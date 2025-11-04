@@ -22,9 +22,12 @@ class Error(Exception):
 class SomethingNotSetError(Error):
     """Exception raised for errors in the input of transformations.
 
-    Attributes:
-        where -- where is something missing
-        what     -- what is missing
+    Parameters
+    ----------
+    where: str 
+        Where something is missing.
+    what: str 
+        What is missing.
     """
 
     def __init__(self, where, what):

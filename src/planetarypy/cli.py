@@ -4,7 +4,7 @@ import argparse
 import sys
 
 
-def main(args=None):
+def main(args: list[str] | None = None) -> int:
     """Console script for planetarypy.
 
     Args:

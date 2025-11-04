@@ -3,6 +3,7 @@ import datetime as dt
 import email.utils as eut
 import http.client as httplib
 from pathlib import Path
+from typing import Any
 from urllib.request import urlopen
 
 import pandas as pd
@@ -12,7 +13,7 @@ from loguru import logger
 
 try:
     from kalasiris.pysis import ProcessError
-except KeyError:
+except (KeyError, ImportError):
     ISIS_AVAILABLE = False
 else:
     ISIS_AVAILABLE = True
@@ -71,7 +72,7 @@ class NestedTomlDict:
         except FileNotFoundError:
             self.doc = tomlkit.document()
     
-    def set(self, dotted_key: str, field: str, value):
+    def set(self, dotted_key: str, field: str, value: Any) -> None:
         """Set a value using a dotted key path.
         
         Args:
@@ -91,7 +92,7 @@ class NestedTomlDict:
         # Set the value on the innermost table
         current[field] = value
     
-    def get(self, dotted_key: str, field: str = None):
+    def get(self, dotted_key: str, field: str | None = None) -> Any:
         """Get a value using a dotted key path.
         
         Args:
@@ -116,15 +117,15 @@ class NestedTomlDict:
             return current.get(field)
         return current
     
-    def to_dict(self):
+    def to_dict(self) -> dict:
         """Convert to a regular Python dict."""
         return dict(self.doc)
     
-    def dumps(self):
+    def dumps(self) -> str:
         """Dump to TOML string."""
         return tomlkit.dumps(self.doc)
     
-    def save(self):
+    def save(self) -> None:
         """Save to the TOML file."""
         with self.file_path.open("w", encoding="utf-8") as f:
             tomlkit.dump(self.doc, f)
@@ -179,7 +180,7 @@ def get_remote_timestamp(url: str) -> dt.datetime:
     return t
 
 
-def check_url_exists(url):
+def check_url_exists(url: str) -> bool:
     """Check if a URL exists."""
     response = requests.head(url)
     return response.status_code < 400
@@ -289,7 +290,7 @@ def url_retrieve(
             fd.write(chunk)
 
 
-def have_internet():
+def have_internet() -> bool:
     """
     Fast way to check for active internet connection.
 

@@ -67,7 +67,7 @@ def is_stop_valid(mission: str, stop: Time) -> bool:
     ----------
     mission : str
         Mission shorthand label of datasets dataframe.
-    start : astropy.Time
+    stop : astropy.Time
         Stop time in astropy.Time format.
     """
     return Time(datasets.at[mission, "Stop Time"]) >= stop
@@ -98,14 +98,15 @@ class Subsetter:
 
     Attributes
     ----------
-    kernel_names: List of names of kernels for the given time range.
+    kernel_names : list[str]
+        Names of kernels for the given time range.
 
-    Methods
-    -------
-    download_kernels():
-        Download SPICE kernels.
-    get_metakernel():
-        Get metakernel file from NAIF and adjust paths to match local storage.
+    Notes
+    -----
+    The following methods are available on this class:
+
+    - ``download_kernels()`` – Download SPICE kernels.
+    - ``get_metakernel()`` – Get metakernel file from NAIF and adjust paths to match local storage.
 
     """
 
