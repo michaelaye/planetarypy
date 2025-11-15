@@ -1,8 +1,8 @@
 ---
-title: How-To Guides
+title: "How-To Guides"
 listing:
   contents: .
-  type: default
+  type: default  # or table or grid
   sort: "date desc"
   filter-ui: false
 page-layout: article

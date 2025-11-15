@@ -1,6 +1,9 @@
 project:
   type: website
-  output-dir: _site
+  output-dir: _build
+  preview:
+    port: 4200
+    browser: true
 
 website:
   title: PlanetaryPy (Quarto Docs)
@@ -11,47 +14,51 @@ website:
     left:
       - text: Home
         href: index.qmd
-      - text: "Tutorials"
+      - text: Tutorials
         href: tutorials/
       - text: "How-To"
         href: howto/index.qmd
-      - text: "Fundamentals"
-        href: fundamentals/index.qmd
+      - text: Explanation
+        href: explanation/index.qmd
       - text: API Reference
         href: reference/index.qmd
+    right:
+      - icon: github
+        aria-label: GitHub
+        href: https://github.com/michaelaye/planetarypy
   sidebar:
     - title: "Tutorials"
       style: "docked"
-      background: light
       contents:
         - tutorials/index.qmd
         - tutorials/pds_indexes_examples.ipynb
         - tutorials/spice_kernel_examples.ipynb
-
     - title: "How-To"
       contents:
         - howto/index.qmd
-        - howto/installing_planetarypy.qmd
-        - howto/configuring_spice_kernels.qmd
-
-    - title: Fundamentals
+        - howto/howto_spice_archived.ipynb
+    - title: Explanation
       contents:
-        - fundamentals/index.qmd
-        - fundamentals/planetary_data_systems.qmd
-        - fundamentals/spice_kernels.qmd
-
+        - explanation/index.qmd
+        - explanation/config_flow_diagram.qmd
+        - explanation/pds_index_config.qmd
+        - explanation/pds_index_download_flows.qmd
+        - explanation/pds_index_management.qmd
     - title: "API Reference"
       contents: "{{ contents }}"
 
 format:
   html:
-    theme: cosmo
+    theme:
+      dark: [darkly]
+      light: [flatly]
     toc: true
     toc-depth: 3
+    toc-title: Contents
+    toc-location: right
     code-link: true
     css:
       - reference/_styles-quartodoc.css
-      - custom.css
 
 # Read the generated sidebar definitions
 metadata-files:
