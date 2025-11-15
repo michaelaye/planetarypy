@@ -13,8 +13,6 @@ stop as parameters.
 
 __all__ = [
     "datasets",
-    "is_start_valid",
-    "is_stop_valid",
     "download_one_url",
     "Subsetter",
     "get_metakernel_and_files",
@@ -31,35 +29,222 @@ from pathlib import Path
 import pandas as pd
 import requests
 from astropy.time import Time
+from loguru import logger
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 from yarl import URL
 
 from ..datetime_format_converters import fromdoyformat
+from ..pds.index_logging import AccessLog
 from ..utils import url_retrieve
-from .config import BASE_URL, KERNEL_STORAGE
+from .config import BASE_URL, KERNEL_STORAGE, NAIF_URL
 
-datasets_url = "https://raw.githubusercontent.com/planetarypy/planetarypy_configs/main/archived_spice_kernel_sets.csv"
+ARCHIVE_URL = NAIF_URL / "naif/data_archived.html"
+# Cache location for the parsed datasets table; reused across sessions
+DATASETS_CACHE = Path.home() / ".planetarypy_cache" / "archived_spice_datasets.csv"
 
-datasets = pd.read_csv(datasets_url).set_index("shorthand")
+shorthands = {
+    "bc": "BepiColombo",
+    "clps": "CLPS",
+    "cassini": "Cassini Orbiter",
+    "clementine": "Clementine",
+    "dart": "DART",
+    "dawn": "DAWN",
+    "di": "Deep Impact",
+    "ds1": "Deep Space 1",
+    "epoxi": "EPOXI",
+    "em16": "ExoMars TGO 2016",
+    "grail": "GRAIL",
+    "hayabusa": "Hayabusa",
+    "hayabusa2": "Hayabusa2",
+    "insight": "InSight",
+    "juno": "JUNO",
+    "ladee": "LADEE",
+    "lucy": "Lucy",
+    "lro": "Lunar Reconnaissance Orbiter",
+    "maven": "MAVEN",
+    "opportunity": "MER 1 (Opportunity)",
+    "mer1": "MER 1 (Opportunity)",
+    "spirit": "MER 2 (Spirit)",
+    "mer2": "MER 2 (Spirit)",
+    "messenger": "MESSENGER",
+    "mars2020": "Mars 2020",
+    "mex": "Mars Express",
+    "mgs": "Mars Global Surveyor",
+    "ody": "Mars Odyssey",
+    "mro": "Mars Reconnaissance Orbiter",
+    "msl": "Mars Science Laboratory",
+    "near": "NEAR",
+    "nh": "New Horizons",
+    "orex": "OSIRIS-REx",
+    "psyche": "Psyche",
+    "rosetta": "Rosetta",
+    "stardust": "Stardust",
+    "venus_climate_orbiter": "Venus Climate Orbiter",
+    "vex": "Venus Express",
+    "vo": "Viking Orbiter",
+}
+
+shorthands = pd.Series(shorthands)
+shorthands.name = "Mission Name"
+shorthands.index.name = "shorthand"
+
+
+def last_part(path, n):
+    """Show only the last n parts from a pathlib.Path object.
+
+    URL derives from pathlib.Path, so that works as well.
+    """
+    # only the last 2 path parts are part of the perl script's payload
+    return Path(*path.parts[-n:]) if n > 0 else path
+
+
+def _resolve_mission(mission_input: str) -> tuple[str, str | None]:
+    """Resolve a mission identifier to (label, shorthand).
+
+    Returns a tuple (mission_name, mission_code_or_None).
+
+    - If mission_input is a shorthand key (e.g. 'mro'), returns (long name, shorthand).
+    - If mission_input is a long name present in the datasets index or in the
+      shorthands mapping values, returns (long name, shorthand or None).
+    - Matching is case-insensitive for long names and shorthands.
+    """
+    if not mission_input:
+        raise ValueError("mission_input must be a non-empty string")
+
+    # direct shorthand match
+    if mission_input in shorthands:
+        return shorthands[mission_input], mission_input
+
+    lower = mission_input.lower()
+    # direct long-name exact match among shorthand values
+    for code, label in shorthands.items():
+        if label.lower() == lower:
+            return label, code
+
+    # If datasets already loaded, check index case-insensitively
+    try:
+        labels = [str(x) for x in datasets.index]
+    except Exception:
+        labels = []
+
+    for lab in labels:
+        if lab.lower() == lower:
+            # attempt to find shorthand for this label
+            for code, label in shorthands.items():
+                if label.lower() == lab.lower():
+                    return lab, code
+            return lab, None
+
+    # No exact matches; try to fuzzy-match shorthand (case-insensitive)
+    for code in shorthands:
+        if code.lower() == lower:
+            return shorthands[code], code
+
+    # Last resort: accept the input as label (no shorthand)
+    return mission_input, None
+
+
+def get_datasets():
+    """Retrieve the NAIF archived datasets table with a once-per-day cache.
+
+    Uses the shared PDS AccessLog mechanism to avoid refetching more than once
+    per day. The parsed table is cached to a CSV under ~/.planetarypy_cache.
+    """
+    # Use the same central log file mechanism as PDS indices (no new log file)
+    log = AccessLog("spice.archived_kernels.datasets")
+    logger.debug(f"Datasets cache path: {DATASETS_CACHE}")
+    logger.debug(
+        "Datasets last_checked: {} | should_check: {}".format(
+            log.last_check, log.should_check
+        )
+    )
+    # If we've checked within the last day and a cache exists, load and return it
+    if DATASETS_CACHE.is_file() and not log.should_check:
+        try:
+            logger.info("Using cached SPICE datasets table")
+            return pd.read_csv(DATASETS_CACHE, index_col=0)
+        except Exception as e:
+            # If cache is unreadable, fall through to refresh
+            logger.warning(
+                f"Failed to read cached datasets at {DATASETS_CACHE}: {e}; refetching"
+            )
+
+    # Ensure parent exists before writing cache later
+    DATASETS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+
+    # Fetch and parse from the remote page
+    logger.info(f"Fetching SPICE datasets table from {ARCHIVE_URL}")
+    res = pd.read_html(str(ARCHIVE_URL), extract_links="all", header=0)[
+        6
+    ]  # table is at index 6
+
+    # The extract_links causes a lot of (<text>, None) tuples.
+    # Normalize link cells: replace (text, None) with plain text; keep (text, href) when a link exists
+    def _normalize_link_cell(v):
+        # v can be a string, a (text, href) tuple, or a list of such tuples
+        if isinstance(v, list):
+            # Prefer the first tuple that has a real href; otherwise fall back to the first text
+            for t in v:
+                if isinstance(t, tuple) and t[1]:
+                    return t  # keep (text, href)
+            # No hrefs found; return just the text of the first tuple if present
+            return v[0][0] if v and isinstance(v[0], tuple) else v
+        if isinstance(v, tuple):
+            text, href = v
+            return text if not href else (text, href)
+        return v
+
+    df = res.map(_normalize_link_cell)
+
+    # clean up header names and set index
+    df.columns = [_normalize_link_cell(col) for col in df.columns]
+    df = df.set_index("Mission Name")
+
+    for col in df.columns:
+        # If any value in the column is a (text, href) tuple, split it
+        if df[col].apply(lambda x: isinstance(x, tuple)).any():
+            # df[col] = df[col].apply(lambda x: urljoin(url, x[1]) if isinstance(x, tuple) and x[1] else None)
+            df[col] = df[col].apply(
+                lambda x: x[1] if isinstance(x, tuple) and x[1] else None
+            )
+    logger.debug(
+        f"Parsed datasets table: {df.shape[0]} missions x {df.shape[1]} columns"
+    )
+    # Write/update cache and log times
+    try:
+        df.to_csv(DATASETS_CACHE)
+        logger.debug(f"Wrote datasets cache to {DATASETS_CACHE}")
+    finally:
+        # Record both last update and last check
+        log.log_update_time()
+        log.log_check_time()
+        logger.debug("Updated datasets access log timestamps")
+    return df
+
+
+datasets = get_datasets()
+datasets = datasets.merge(
+    shorthands.to_frame().reset_index(), on="Mission Name"
+).set_index("shorthand")
 
 
 ## Validation helpers
-def is_start_valid(mission: str, start: Time) -> bool:
+def _is_start_valid(mission: str, start: Time) -> bool:
     """
     Check if the start time is valid for a given mission.
 
     Parameters
     ----------
     mission : str
-        Mission shorthand label of datasets dataframe.
+        Mission shorthand label of datasets dataframe, e.g. 'cassini'.
     start : astropy.Time
         Start time in astropy.Time format.
     """
     return Time(datasets.at[mission, "Start Time"]) <= start
 
 
-def is_stop_valid(mission: str, stop: Time) -> bool:
+def _is_stop_valid(mission: str, stop: Time) -> bool:
     """
     Check if the stop time is valid for a given mission.
 
@@ -86,8 +271,10 @@ def download_one_url(url, local_path, overwrite: bool = False):
         Whether to overwrite existing files, by default False
     """
     if local_path.exists() and not overwrite:
+        logger.debug(f"Skipping download, exists: {local_path}")
         return
     local_path.parent.mkdir(exist_ok=True, parents=True)
+    logger.info(f"Downloading kernel: {url} -> {local_path}")
     url_retrieve(url, local_path)
 
 
@@ -128,7 +315,8 @@ class Subsetter:
         save_location : str, optional
             Overwrite default storing in planetarypy archive. Defaults to None.
         """
-        self.mission = mission
+        # Resolve mission input to canonical label and optional shorthand code
+        self.mission_name, self.mission_code = _resolve_mission(mission)
         self.start = start
         self.stop = stop
         self.save_location = save_location
@@ -136,6 +324,9 @@ class Subsetter:
 
     def _initialize(self):
         "get metadata via self.r and unpack it."
+        logger.debug(
+            f"Requesting subset package for mission={self.mission_name} (code={self.mission_code}) start={self.start} stop={self.stop}"
+        )
         r = self.r
         if r.ok:
             z = zipfile.ZipFile(BytesIO(r.content))
@@ -148,6 +339,7 @@ class Subsetter:
         self.metakernel_file = [n for n in z.namelist() if n.lower().endswith(".tm")][0]
         with self.z.open(self.urls_file) as f:
             self.kernel_urls = f.read().decode().split()
+        logger.debug(f"Discovered {len(self.kernel_urls)} kernel URLs from subset")
 
     @property
     def r(self):
@@ -191,14 +383,16 @@ class Subsetter:
         from `planetarypy.utils`.
         """
         if not (
-            is_start_valid(self.mission, self.start)
-            and is_stop_valid(self.mission, self.stop)
+            _is_start_valid(self.mission_code, self.start)
+            and _is_stop_valid(self.mission_code, self.stop)
         ):
             raise ValueError(
                 "One of start/stop is outside the supported date-range. See `datasets`."
             )
         p = {
-            "dataset": datasets.at[self.mission, "path"],
+            "dataset": last_part(
+                URL(datasets.at[self.mission_code, "Archive Link"]), 2
+            ),
             "start": self.start.iso,
             "stop": self.stop.iso,
             "action": "Subset",
@@ -224,11 +418,15 @@ class Subsetter:
             URL of the kernel file.
         """
         u = URL(url)
-        basepath = (
-            KERNEL_STORAGE / self.mission
-            if not self.save_location
-            else self.save_location
-        )
+        # prefer shorthand code for local storage directory; fall back to sanitized label
+        if not self.save_location:
+            if self.mission_code:
+                mission_dir = self.mission_code
+            else:
+                mission_dir = self.mission_name.replace(" ", "_").lower()
+            basepath = KERNEL_STORAGE / mission_dir
+        else:
+            basepath = Path(self.save_location)
         return basepath / u.parent.name / u.name
 
     def _non_blocking_download(self, overwrite: bool = False):
@@ -237,6 +435,7 @@ class Subsetter:
         # Create individual argument lists for each parameter
         urls = self.kernel_urls
         overwrites = [overwrite] * len(urls)
+        logger.info("Starting parallel kernel downloads")
         _ = process_map(
             download_one_url,
             urls,  # First argument (url)
@@ -273,13 +472,16 @@ class Subsetter:
         if non_blocking:
             return self._non_blocking_download(overwrite)
         # sequential download
+        logger.info("Starting sequential kernel downloads")
         for url in tqdm(self.kernel_urls, desc="Kernels downloaded"):
             local_path = self.get_local_path(url)
             if local_path.exists() and not overwrite:
                 if not quiet:
                     print(local_path.parent.name, local_path.name, "locally available.")
+                logger.debug(f"Locally available: {local_path}")
                 continue
             local_path.parent.mkdir(exist_ok=True, parents=True)
+            logger.info(f"Downloading kernel: {url} -> {local_path}")
             url_retrieve(url, local_path)
 
     def get_metakernel(self) -> Path:
@@ -290,7 +492,7 @@ class Subsetter:
         Uses self.save_location if given, otherwise `planetarypy` archive.
         """
         basepath = (
-            KERNEL_STORAGE / self.mission
+            KERNEL_STORAGE / self.mission_code
             if not self.save_location
             else self.save_location
         )
@@ -329,7 +531,7 @@ def get_metakernel_and_files(
 
     subset = Subsetter(mission, start, stop, save_location)
     subset.download_kernels(non_blocking=True, quiet=quiet)
-    return subset.get_metakernel()
+    return str(subset.get_metakernel())
 
 
 def list_kernels_for_day(mission: str, start: str, stop: str = "") -> list:
