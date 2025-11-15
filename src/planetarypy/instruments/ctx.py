@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
+import tomlkit
 
 import geopandas as gpd
 import hvplot.pandas  # noqa: F401
@@ -20,7 +21,7 @@ from yarl import URL
 from planetarypy.config import config
 from planetarypy.instruments import utils
 from planetarypy.pds import get_index
-from planetarypy.utils import catch_isis_error, file_variations, read_config_carefully
+from planetarypy.utils import catch_isis_error, file_variations
 
 try:
     from kalasiris import (
@@ -48,7 +49,9 @@ storage_root = Path(config["storage_root"])
 
 configpath = Path.home() / ".planetarypy_mro_ctx.toml"
 
-ctxconfig = read_config_carefully(configpath)
+with configpath.open() as f:
+    ctxconfig = tomlkit.load(f)
+
 # warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
 baseurl = URL(ctxconfig["raw"]["url"])
@@ -84,7 +87,7 @@ def get_edr_index(refresh=False):
     if "edrindex" in cache and not refresh:
         return cache["edrindex"]
     else:
-        edrindex = get_index("mro.ctx.edr", refresh=refresh)
+        edrindex = get_index("mro.ctx.edr", allow_refresh=refresh)
         edrindex["short_pid"] = edrindex.PRODUCT_ID.map(lambda x: x[:15])
         edrindex["month_col"] = edrindex.PRODUCT_ID.map(lambda x: x[:3])
         edrindex.LINE_SAMPLES = edrindex.LINE_SAMPLES.astype(int)
@@ -361,8 +364,6 @@ class Calib:
     @catch_isis_error
     def footprintinit(self, refresh=False, **kwargs) -> None:
         """Initialize footprint for the calibrated cube.
-
-        If map is None, mapping data will be taken
         """
         if not self.has_footprint or refresh:
             footprintinit(from_=self.cal_path, _cwd=self.cub_path.parent, **kwargs)
@@ -434,14 +435,12 @@ def do_footprintinit(pid, refresh=False):
     return d
 
 
-def process_parallel(Executor, task, pids, map=None, refresh=None):
+def process_parallel(Executor, task, pids, refresh=None):
     "Use ProcessPoolExecutor for CPU-bound tasks, and ThreadPoolExecutor for I/O-bound"
     argslist = []
     for pid in pids:
         args = [pid]
         kwargs = {}
-        if map is not None:
-            kwargs["map"] = map
         if refresh is not None:
             kwargs["refresh"] = refresh
         argslist.append((args, kwargs))
@@ -564,10 +563,10 @@ class CTXCollection:
             ProcessPoolExecutor, calibrate_pid, todo, refresh=refresh
         )
 
-    def footprintinit(self, map=None, refresh=False):
+    def footprintinit(self, refresh=False):
         "perform ISIS footprint init on the list of files"
         return process_parallel(
-            ProcessPoolExecutor, do_footprintinit, self.pids, map=None, refresh=refresh
+            ProcessPoolExecutor, do_footprintinit, self.pids, refresh=refresh
         )
 
     @property
