@@ -9,10 +9,10 @@ def test_receive_datasets_dataframe():
 
 
 def test_cassini_valid_times():
-    assert kernels.is_start_valid("cassini", Time("1998-01-01")) is True
-    assert kernels.is_start_valid("cassini", Time("1997-01-01")) is False
-    assert kernels.is_stop_valid("cassini", "2017-01-01") is True
-    assert kernels.is_stop_valid("cassini", "2018-01-01") is False
+    assert kernels._is_start_valid("cassini", Time("1998-01-01")) is True
+    assert kernels._is_start_valid("cassini", Time("1997-01-01")) is False
+    assert kernels._is_stop_valid("cassini", "2017-01-01") is True
+    assert kernels._is_stop_valid("cassini", "2018-01-01") is False
 
 
 def test_Subsetter_kernel_names():
