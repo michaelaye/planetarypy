@@ -3,10 +3,9 @@ title: PlanetaryPy Documentation (Quarto)
 page-layout: article
 ---
 
-Welcome to the experimental Quarto documentation site for the PlanetaryPy package. This lives in a separate folder (`qdocs/`) so it won't interfere with the existing Sphinx/RST docs in `docs/`.
+Welcome to the documentation site for the PlanetaryPy package. 
 
 - Project repository: <https://github.com/michaelaye/planetarypy>
-- Existing documentation (RST/Sphinx): see the `docs/` folder in the repo
 - API reference (generated): [API Reference](reference/index.qmd)
 
 ## About
