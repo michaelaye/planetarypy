@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "planetarypy"
-version = "0.40.0"
+version = "0.41.0"
 description = "Core package for planetary data tools. Includes PDS index utilities, SPICE integrations, and more."
 readme = "README.md"
-requires-python = ">= 3.10, <4"
+requires-python = ">= 3.11, <4"
 license = {text = "BSD license"}
 authors = [
     {name = "Planetarypy Developers", email = "69774+michaelaye@users.noreply.github.com"}
@@ -117,6 +117,6 @@ max-line-length = 88
 extend-ignore = ["E203", "E701"]
 
 [tool.bumpversion]
-current_version = "0.3.0"
+current_version = "0.41.0"
 commit = true
 tag = true

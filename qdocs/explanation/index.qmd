@@ -1,0 +1,12 @@
+---
+title: Explanation
+listing:
+  contents: .
+  type: default
+  sort: "date desc"
+  filter-ui: false
+page-layout: article
+---
+
+Welcome to the Explanation section. 
+Explore the core concepts and background information for PlanetaryPy.
