@@ -511,7 +511,7 @@ class Subsetter:
 
 def get_metakernel_and_files(
     mission: str, start: str, stop: str, save_location: str = None, quiet: bool = False
-) -> Path:
+) -> str:
     """
     For a given mission and start/stop times, download the kernels and get metakernel path.
 
