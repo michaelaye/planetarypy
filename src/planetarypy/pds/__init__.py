@@ -4,12 +4,13 @@
 
 from loguru import logger
 from pandas import DataFrame
+
 from planetarypy.pds.index_main import Index, InventoryIndex
 from planetarypy.pds.utils import (
-    print_available_indexes,
     get_index_names,
     get_instrument_names,
     get_mission_names,
+    print_available_indexes,
 )
 
 __all__ = [
@@ -63,12 +64,14 @@ def get_index(
 
     # Skip refresh logic if we just downloaded in ensure_parquet
     if not downloaded:
-        if (allow_refresh and index.update_available) or force_refresh:
+        # Check update_available only once to avoid repeated remote checks
+        update_avail = index.update_available if not force_refresh else False
+        if (allow_refresh and update_avail) or force_refresh:
             logger.debug(
                 f"Refreshing index {dotted_index_key}, downloading latest version."
             )
             index.download()
-        elif index.update_available:
+        elif update_avail:
             # Warn user that an update is available but not being downloaded
             logger.warning(
                 f"Update available for {dotted_index_key}. "

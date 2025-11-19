@@ -8,12 +8,12 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
-import tomlkit
 
 import geopandas as gpd
 import hvplot.pandas  # noqa: F401
 import pandas as pd
 import pooch
+import tomlkit
 from loguru import logger
 from tqdm.auto import tqdm
 from yarl import URL
@@ -80,22 +80,37 @@ else:
 
 # make a cache for the index file to prevent repeated index loading
 cache = dict()
+# Track if we've already checked for updates this session to avoid repeated Index instantiations
+_update_checked_this_session = False
 
 
-def get_edr_index(refresh=False):
+def get_edr_index(allow_refresh=True):  # can afford refresh as it's cached
     "add some useful extra columns to the index."
-    if "edrindex" in cache and not refresh:
+    global _update_checked_this_session
+
+    # Use cache if available and refresh not explicitly requested
+    if "edrindex" in cache and not allow_refresh:
         return cache["edrindex"]
-    else:
-        edrindex = get_index("mro.ctx.edr", allow_refresh=refresh)
-        edrindex["short_pid"] = edrindex.PRODUCT_ID.map(lambda x: x[:15])
-        edrindex["month_col"] = edrindex.PRODUCT_ID.map(lambda x: x[:3])
-        edrindex.LINE_SAMPLES = edrindex.LINE_SAMPLES.astype(int)
-        cache["edrindex"] = edrindex
-        return edrindex
+
+    # If cache exists and we've already checked for updates this session, use cache
+    # This prevents repeated Index instantiations when multiple Raw instances
+    # are created (e.g., in remove_bad_data())
+    if "edrindex" in cache and allow_refresh and _update_checked_this_session:
+        return cache["edrindex"]
+
+    # Call get_index() with allow_refresh - it will only refresh if update is available
+    # This creates an Index instance and checks for updates, but only once per session
+    edrindex = get_index("mro.ctx.edr", allow_refresh=allow_refresh)
+    edrindex["short_pid"] = edrindex.PRODUCT_ID.map(lambda x: x[:15])
+    edrindex["month_col"] = edrindex.PRODUCT_ID.map(lambda x: x[:3])
+    edrindex.LINE_SAMPLES = edrindex.LINE_SAMPLES.astype(int)
+    cache["edrindex"] = edrindex
+    if allow_refresh:
+        _update_checked_this_session = True
+    return edrindex
 
 
-def product_id_from_serial_number(serial_number, refresh=False):
+def product_id_from_serial_number(serial_number, allow_refresh=True):
     """
     Given a serial_number like 'MRO/CTX/1234567890.123', return the matching PRODUCT_ID.
     """
@@ -103,7 +118,7 @@ def product_id_from_serial_number(serial_number, refresh=False):
     if not serial_number.startswith(prefix):
         raise ValueError("serial_number must start with 'MRO/CTX/'")
     count = serial_number[len(prefix) :]
-    edrindex = get_edr_index(refresh=refresh)
+    edrindex = get_edr_index(allow_refresh=allow_refresh)
     matches = edrindex[edrindex["SPACECRAFT_CLOCK_START_COUNT"].str.strip() == count]
     if matches.empty:
         raise ValueError(f"No PRODUCT_ID found for serial_number: {serial_number}")
@@ -111,9 +126,9 @@ def product_id_from_serial_number(serial_number, refresh=False):
 
 
 class Raw:
-    def __init__(self, pid: str, refresh_index=False, prefer_mirror=True):
+    def __init__(self, pid: str, allow_refresh_index=True, prefer_mirror=True):
         self.pid = pid  # product_id
-        self.refresh_index = refresh_index
+        self.allow_refresh_index = allow_refresh_index
         self.with_volume = ctxconfig["raw"]["with_volume"]
         self.with_pid = ctxconfig["raw"]["with_pid"]
         self.prefer_mirror = prefer_mirror
@@ -137,7 +152,7 @@ class Raw:
     @cached_property
     def meta(self):
         "get the metadata from the index table"
-        edrindex = get_edr_index(refresh=self.refresh_index)
+        edrindex = get_edr_index(allow_refresh=self.allow_refresh_index)
         s = edrindex.query("PRODUCT_ID == @self.pid").squeeze()
         s.name = f"Metadata for {self.pid}"
         s.index = s.index.str.lower()
