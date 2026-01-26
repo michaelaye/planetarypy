@@ -54,19 +54,19 @@ with configpath.open() as f:
 
 # warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
 
-baseurl = URL(ctxconfig["raw"]["url"])
+baseurl = URL(ctxconfig["edr"]["url"])
 
 # local mirror is a potentially read-only local data server that many groups have.
 # usually a user can't write on it, hence extra treatment for it.
 # first lookup would be tried here, if it's set in config file.
-raw_local_mirror = ctxconfig["raw"]["local_mirror"]
+raw_local_mirror = ctxconfig["edr"]["local_mirror"]
 mirror_readable = os.access(raw_local_mirror, os.R_OK)
 mirror_writeable = os.access(raw_local_mirror, os.W_OK)
 
 # The next is where we
 # 1. lookup data if raw_local_mirror is not set-up or not readable (like currently unmounted drive
 # 2. store new data that isn't on the local mirror if it is not writeable.
-raw_local_storage = ctxconfig["raw"]["local_storage"]
+raw_local_storage = ctxconfig["edr"]["local_storage"]
 
 # consider different cases for raw_local_storage
 if not raw_local_storage:  # empty string
@@ -93,7 +93,7 @@ def get_edr_index(allow_refresh=True):  # can afford refresh as it's cached
         return cache["edrindex"]
 
     # If cache exists and we've already checked for updates this session, use cache
-    # This prevents repeated Index instantiations when multiple Raw instances
+    # This prevents repeated Index instantiations when multiple EDR instances
     # are created (e.g., in remove_bad_data())
     if "edrindex" in cache and allow_refresh and _update_checked_this_session:
         return cache["edrindex"]
@@ -125,12 +125,12 @@ def product_id_from_serial_number(serial_number, allow_refresh=True):
     return matches.iloc[0]["PRODUCT_ID"]
 
 
-class Raw:
+class EDR:
     def __init__(self, pid: str, allow_refresh_index=True, prefer_mirror=True):
         self.pid = pid  # product_id
         self.allow_refresh_index = allow_refresh_index
-        self.with_volume = ctxconfig["raw"]["with_volume"]
-        self.with_pid = ctxconfig["raw"]["with_pid"]
+        self.with_volume = ctxconfig["edr"]["with_volume"]
+        self.with_pid = ctxconfig["edr"]["with_pid"]
         self.prefer_mirror = prefer_mirror
 
     @property
@@ -157,6 +157,10 @@ class Raw:
         s.name = f"Metadata for {self.pid}"
         s.index = s.index.str.lower()
         return s
+
+    @property
+    def image_time(self):
+        return self.meta.image_time
 
     @property
     def serial_number(self):
@@ -227,14 +231,14 @@ class Raw:
         return url
 
     def __repr__(self):
-        return f"Raw(pid='{self.pid}')"
+        return f"EDR(pid='{self.pid}') # Volume: {self.volume}"
 
     def __str__(self):
         return self.__repr__()
 
 
 class Calib:
-    "Manage processing of raw PDS files using ISIS tools."
+    "Manage processing of EDR PDS files using ISIS tools."
 
     def __init__(
         self,
@@ -244,10 +248,10 @@ class Calib:
     ):
         self.pid = pid
         self.destripe_to_calib = destripe_to_calib
-        self.raw = Raw(pid, prefer_mirror=prefer_mirror)
+        self.edr = EDR(pid, prefer_mirror=prefer_mirror)
         (self.cub_name, self.cal_name, self.destripe_name, self.map_name) = (
             file_variations(
-                self.raw.path.name,
+                self.edr.path.name,
                 [
                     ".cub",
                     f"{ctxconfig['calib']['calibrated_ext']}.cub",
@@ -260,7 +264,7 @@ class Calib:
         self.with_pid = ctxconfig["calib"]["with_pid"]
 
     def _check_and_add_sub_paths(self, base):
-        base = Path(base) / self.raw.volume if self.with_volume else base
+        base = Path(base) / self.edr.volume if self.with_volume else base
         base = base / self.pid if self.with_pid else base
         return base
 
@@ -299,7 +303,7 @@ class Calib:
         if not refresh and self.cub_path.is_file():
             return self.cub_path
         self.cub_path.parent.mkdir(exist_ok=True, parents=True)
-        mroctx2isis(from_=self.raw.path, to=self.cub_path, _cwd=self.cub_path.parent)
+        mroctx2isis(from_=self.edr.path, to=self.cub_path, _cwd=self.cub_path.parent)
         return self.cub_path
 
     @property
@@ -329,7 +333,7 @@ class Calib:
     @property
     def spatial_summing(self) -> int:
         "Get the spatial summing value from the index file."
-        return int(self.raw.meta["spatial_summing"])
+        return int(self.edr.meta["spatial_summing"])
 
     @catch_isis_error
     def destripe(self) -> None:
@@ -378,8 +382,7 @@ class Calib:
 
     @catch_isis_error
     def footprintinit(self, refresh=False, **kwargs) -> None:
-        """Initialize footprint for the calibrated cube.
-        """
+        """Initialize footprint for the calibrated cube."""
         if not self.has_footprint or refresh:
             footprintinit(from_=self.cal_path, _cwd=self.cub_path.parent, **kwargs)
             logger.info("")
@@ -495,7 +498,7 @@ class CTXCollection:
 
     def remove_bad_data(self):
         "use meta data marker to remove bad pids"
-        newlist = [pid for pid in self.pids if Raw(pid).data_ok]
+        newlist = [pid for pid in self.pids if EDR(pid).data_ok]
         if (diff := len(self.pids) - len(newlist)) > 0:
             removed = set(self.pids) - set(newlist)
             logger.warning(
@@ -508,16 +511,16 @@ class CTXCollection:
         return [Calib(pid) for pid in self.pids]
 
     @property
-    def cubpaths(self):
-        "get raw import cubes"
+    def cub_paths(self):
+        "get EDR cubes"
         return [cal.cub_path for cal in self.calibs]
 
     @property
-    def calpaths(self):
+    def cal_paths(self):
         return [cal.cal_path for cal in self.calibs]
 
     @property
-    def mappaths(self):
+    def map_paths(self):
         return [cal.map_path for cal in self.calibs]
 
     @property
@@ -546,16 +549,17 @@ class CTXCollection:
         "get the path to the image list file"
         return self.workdir / "image_list_lev2.lis"
 
-    def create_image_list(self, workdir=None, level=1):
+    def write_isis_filelist(self, workdir=None, level=1):
         workdir = self.workdir if workdir is None else Path(workdir)
+        logger.debug(f"{self.workdir=}")
         savepath = workdir / f"image_list_lev{level}.lis"
         match level:
             case 0:
-                paths = self.cubpaths
+                paths = self.cub_paths
             case 1:
-                paths = self.calpaths
+                paths = self.cal_paths
             case 2:
-                paths = self.mappaths
+                paths = self.map_paths
         text = "\n".join([str(p) for p in paths])
         text += "\n"
         savepath.write_text(text)
@@ -589,7 +593,7 @@ class CTXCollection:
         return self.workdir / "overlap_list.lis"
 
     def findimageoverlaps(self):
-        with fromlist.temp(self.calpaths) as f:
+        with fromlist.temp(self.cal_paths) as f:
             findimageoverlaps(fromlist=f, overlaplist=self.overlap_list_path)
         return self.overlap_list_path
 
