@@ -120,12 +120,12 @@ def test_storage_paths_exist():
     assert KERNEL_STORAGE.exists(), f"Expected {KERNEL_STORAGE} to exist"
 
 
+@pytest.mark.slow
 def test_urls_are_valid():
-    """Test that all URLs in the datasets are valid and point to NAIF."""
+    """Test that all Archive Link URLs in the datasets are valid."""
     for mission in datasets.index:
-        path = datasets.at[mission, "path"]
-        full_url = BASE_URL / path
-        assert requests.head(full_url).ok, f"URL for {mission} is not accessible"
+        url = datasets.at[mission, "Archive Link"]
+        assert requests.head(url).ok, f"Archive Link for {mission} is not accessible"
 
 
 def test_available_missions():
