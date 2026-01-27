@@ -2,7 +2,8 @@
 title: Tutorials
 listing:
   contents: .
-  type: default      # grid | table | default
+  type: grid
+  fields: [title]
   sort: "date desc"  # optional: recent first; remove if not needed
   filter-ui: false   # hide filters unless you want them
 page-layout: article

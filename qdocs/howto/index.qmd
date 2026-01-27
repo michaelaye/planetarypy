@@ -2,7 +2,8 @@
 title: "How-To Guides"
 listing:
   contents: .
-  type: default  # or table or grid
+  type: grid
+  fields: [title]
   sort: "date desc"
   filter-ui: false
 page-layout: article

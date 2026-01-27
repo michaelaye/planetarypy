@@ -2,7 +2,8 @@
 title: Explanation
 listing:
   contents: .
-  type: default
+  type: grid
+  fields: [title]
   sort: "date desc"
   filter-ui: false
 page-layout: article
