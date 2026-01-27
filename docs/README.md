@@ -1,6 +1,6 @@
 # Quarto + quartodoc docs for PlanetaryPy
 
-This folder contains an experimental Quarto documentation site that uses [quartodoc](https://github.com/machow/quartodoc) to generate API reference pages from Python docstrings. It's separate from the existing `docs/` to avoid disrupting current documentation workflows.
+This folder contains the Quarto documentation site that uses [quartodoc](https://github.com/machow/quartodoc) to generate API reference pages from Python docstrings.
 
 ## Prerequisites
 
@@ -19,16 +19,16 @@ pip install quartodoc
 
 ## Build and preview
 
-Run the following from this `qdocs/` folder:
+Run the following from this `docs/` folder:
 
 ```fish
-# 1) Generate API pages under qdocs/reference/
+# 1) Generate API pages under docs/reference/
 quartodoc build
 
 # 2) Preview the Quarto website (auto-reloads on content changes)
 quarto preview
 
-# Optional: render the site to qdocs/_site without starting a server
+# Optional: render the site to docs/_site without starting a server
 quarto render
 ```
 
