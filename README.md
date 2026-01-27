@@ -141,6 +141,32 @@ In the future, additional frequently used procedures will be added to this libra
 - frequently used GDAL/rasterio procedures
 - frequently used SPICE operations, e.g. surface illumination on a given body
 
+## Project History
+
+This project evolved through several iterations, each building on lessons learned.
+
+### Origins: planetarypy (2015-2020)
+
+The original `planetarypy` was a private collection of planetary science tools
+created by K.-Michael Aye, inspired by the organizational approach of `astropy`.
+Key features included NASA factsheet parsing, PDS index tools for Cassini ISS
+and MRO CTX, SPICE kernel management, and Mars-specific image processing.
+
+### Evolution: nbplanetary (2021-2025)
+
+The project was rewritten using nbdev (notebook-driven development), significantly
+expanding to include full instrument modules (CTX, HiRISE, UVIS, CISS, Diviner),
+ISIS integration via kalasiris, Dask-based parallel processing, and CLI tools.
+
+### Current Focus (2025-present)
+
+The current `planetarypy` represents a deliberate refocusing on core functionality.
+Rather than maintaining all features, the goal is to provide fewer features that
+work reliably and are well-documented. Advanced features from previous iterations
+may be reintroduced as the core stabilizes.
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
 ## Contributing
 
 Feedback, issues, and contributions are always gratefully welcomed. See the

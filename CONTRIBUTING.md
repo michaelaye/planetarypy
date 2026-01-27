@@ -80,7 +80,7 @@ Also, for this early stage, after three days without a review, the PR can be mer
 ## Deploying (Maintainers)
 
 A reminder for the maintainers on how to deploy.
-Make sure all your changes are committed (including an entry in HISTORY.rst).
+Make sure all your changes are committed (including an entry in CHANGELOG.md).
 Then run:
 
 ```bash

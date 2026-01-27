@@ -77,7 +77,7 @@ include = [
     "src/planetarypy/**/*.so",
     "LICENSE",
     "README.md",
-    "HISTORY.rst",
+    "CHANGELOG.md",
 ]
 
 [tool.pytest.ini_options]
