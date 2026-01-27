@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "planetarypy"
-version = "0.41.1"
+version = "0.41.2"
 description = "Core package for planetary data tools. Includes PDS index utilities, SPICE integrations, and more."
 readme = "README.md"
 requires-python = ">= 3.11, <4"
@@ -29,6 +29,7 @@ dependencies = [
     "fastcore",        # For utilities like improved Path
     "numpy",           # For numerical operations
     "pandas",          # For data handling
+    "pooch",           # For downloading and caching data files
     "pvl",             # For PDS label parsing
     "lxml",            # For XML handling
     "python-dateutil", # For date parsing
@@ -117,6 +118,6 @@ max-line-length = 88
 extend-ignore = ["E203", "E701"]
 
 [tool.bumpversion]
-current_version = "0.41.1"
+current_version = "0.41.2"
 commit = true
 tag = true
