@@ -1,0 +1,145 @@
+
+# PlanetaryPy Configuration and Dynamic URL Flow (2025)
+
+This document visualizes the configuration and dynamic URL discovery system in PlanetaryPy, updated for the current implementation.
+
+
+## System Overview
+
+The system manages two main types of configuration:
+1. **Static Configuration**: Base URLs for most PDS indexes stored in `.planetarypy_index_urls.toml` (in the user home directory)
+2. **Dynamic URLs**: CTX and LROC index URLs that change over time, discovered automatically
+3. **Access Logging**: Timestamps and discovery history stored in `.planetarypy_access_log.toml` (in the user home directory)
+
+
+## Configuration and Dynamic URL Flow
+
+```{mermaid}
+flowchart TD
+  %% Entry Points
+  A(User calls get_index<br>or instantiates ConfigHandler) --> B{Config file exists?}
+  A2(CLI: planetarypy-index-discover) --> M(DynamicRemoteHandler/<br>discover_latest_url)
+    
+  %% Initial Configuration Creation
+  B -- No --> C(Download config<br>from GitHub)
+  C --> D(Write to <br>~/.planetarypy_index_urls.toml)
+  D --> E(Parse & validate TOML)
+  E --> F(Log config download<br>timestamp in <br>.planetarypy_index_log.toml)
+  F --> G(Trigger dynamic URL<br>discovery)
+    
+  %% Existing Configuration
+  B -- Yes --> H(Load config from<br>~/.planetarypy_index_urls.toml)
+  H --> I{Check for config update,<br>once per day}
+  I -- Update needed --> J(Download new config,<br>overwrite local)
+  J --> K(Log config update<br>timestamp)
+  I -- No update --> L(Log config check<br>timestamp)
+  K --> G
+  L --> G
+    
+  %% Dynamic URL Discovery
+  G --> M(For each dynamic index:<br>mro.ctx.edr, lro.lroc.edr)
+  M --> N(DynamicRemoteHandler.<br>discover_latest_url)
+  N --> O{URL changed?}
+  O -- Yes --> P(Log available_url,<br>set update_available=True)
+  O -- No --> Q(Log last_checked only)
+  P --> R(User notified:<br>update available)
+  Q --> S(No update)
+    
+  %% Logging and Persistence
+  P --> T(Write to <br>.planetarypy_index_log.toml)
+  Q --> T
+  K --> T
+  F --> T
+    
+  %% File System
+  T --> U(.planetarypy_index_log.toml:<br>Timestamps, URLs, update flags)
+  D --> V(.planetarypy_index_urls.toml:<br>Static & Dynamic URLs)
+    
+  %% Styling
+  classDef configFile fill:#ffffff,stroke:#01579b,stroke-width:2px,color:#0d1a26
+  classDef dynamicProcess fill:#f5f5ff,stroke:#4a148c,stroke-width:2px,color:#1a0033
+  classDef networkOp fill:#f0fff0,stroke:#1b5e20,stroke-width:2px,color:#002d00
+  classDef decision fill:#fffbe6,stroke:#e65100,stroke-width:2px,color:#332600
+  classDef logging fill:#fff0f6,stroke:#880e4f,stroke-width:2px,color:#33001a
+    
+  class D,V configFile
+  class U logging
+  class M,N dynamicProcess
+  class C networkOp
+  class B,O decision
+```
+
+## Key Components
+
+
+### 1. Configuration Files
+
+| File | Purpose | Location |
+|------|---------|----------|
+| `.planetarypy_index_urls.toml` | Static and dynamic index URLs | `~/.planetarypy_index_urls.toml` |
+| `.planetarypy_index_log.toml` | Access timestamps, URLs, update flags | `~/.planetarypy_index_log.toml` |
+
+### 2. Dynamic URL Discovery
+
+The system automatically discovers updated URLs for:
+
+- **CTX (Mars Reconnaissance Orbiter)**: `mro.ctx.edr`
+  - Scans: `https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/`
+  - Pattern: `mrox_XXXX/index/cumindex.lbl`
+  - Current: `mrox_5100`
+
+- **LROC (Lunar Reconnaissance Orbiter)**: `lro.lroc.edr`  
+  - Scans: `https://pds.lroc.asu.edu/data/LRO-L-LROC-2-EDR-V1.0/`
+  - Pattern: `LROLRC_XXXX/INDEX/CUMINDEX.LBL`
+  - Current: `LROLRC_0063A`
+
+### 3. Update Triggers
+
+1. **First Time**: When config doesn't exist
+2. **Manual**: CLI command `planetarypy-index-discover`
+3. **Automatic**: Every 24 hours during normal usage
+4. **Remote Updates**: Daily check for updated base configuration
+
+### 4. Functional API
+
+```python
+from planetarypy.pds import get_url, set_url, load_config, discover_dynamic_urls
+
+# Load configuration
+config = load_config()
+
+# Get URLs (static or dynamic)
+ctx_url = get_url("mro.ctx.edr")
+cassini_url = get_url("cassini.iss.ring_summary")
+
+# Manually trigger discovery
+updates = discover_dynamic_urls()
+```
+
+## Configuration Structure
+
+
+### .planetarypy_index_log.toml
+```toml
+[mro.ctx.edr]
+```
+
+### .planetarypy_index_log.toml
+```toml
+config_download = "2025-07-30T12:07:05"
+
+[dynamic_urls."missions.mro.ctx.edr"]
+url = "https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_5100/index/cumindex.lbl"
+last_checked = "2025-07-30T12:07:08"
+is_update = false
+discovered_at = "2025-07-30T11:51:47"
+```
+
+
+## Benefits
+
+- ✅ **Automatic Updates**: Dynamic URLs discovered without user intervention
+- ✅ **Efficient Checking**: Per-index 24h check avoids excessive network requests
+- ✅ **Change Tracking**: Logs when URLs actually change vs. routine checks
+- ✅ **Clean Architecture**: Uses ConfigHandler and AccessLog classes
+- ✅ **Offline Resilience**: Works with cached config if network unavailable

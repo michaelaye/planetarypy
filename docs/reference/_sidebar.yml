@@ -1,0 +1,36 @@
+website:
+  sidebar:
+  - contents:
+    - reference/index.qmd
+    - contents:
+      - reference/cli.qmd
+      - reference/config.qmd
+      - reference/datetime_format_converters.qmd
+      - reference/exceptions.qmd
+      - reference/utils.qmd
+      section: Core Modules
+    - contents:
+      - reference/pds.cli.qmd
+      - reference/pds.dynamic_index.qmd
+      - reference/pds.dynamic_url_handlers.qmd
+      - reference/pds.index_fixes.qmd
+      - reference/pds.index_labels.qmd
+      - reference/pds.index_logging.qmd
+      - reference/pds.index_main.qmd
+      - reference/pds.static_index.qmd
+      - reference/pds.utils.qmd
+      section: PDS Utilities and CLI
+    - contents:
+      - reference/spice.archived_kernels.qmd
+      - reference/spice.config.qmd
+      - reference/spice.generic_kernels.qmd
+      - reference/spice.pckernels.qmd
+      section: SPICE Kernels
+    - contents:
+      - reference/instruments.ctx.qmd
+      - reference/instruments.go_ssi.qmd
+      - reference/instruments.hirise.qmd
+      - reference/instruments.utils.qmd
+      section: Instruments
+    id: reference
+  - id: dummy-sidebar

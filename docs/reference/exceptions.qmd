@@ -1,0 +1,59 @@
+# exceptions { #planetarypy.exceptions }
+
+`exceptions`
+
+PlanetarPy exceptions.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [Error](#planetarypy.exceptions.Error) | Base class for exceptions in this module. |
+| [GeoTransformNotSetError](#planetarypy.exceptions.GeoTransformNotSetError) | Exception raised when a GeoTransform is not set. |
+| [ProjectionNotSetError](#planetarypy.exceptions.ProjectionNotSetError) | Exception raised when a projection is not set. |
+| [SomethingNotSetError](#planetarypy.exceptions.SomethingNotSetError) | Exception raised for errors in the input of transformations. |
+| [SpicerError](#planetarypy.exceptions.SpicerError) | Base class for exceptions in this module. |
+
+### Error { #planetarypy.exceptions.Error }
+
+```python
+exceptions.Error()
+```
+
+Base class for exceptions in this module.
+
+### GeoTransformNotSetError { #planetarypy.exceptions.GeoTransformNotSetError }
+
+```python
+exceptions.GeoTransformNotSetError(where)
+```
+
+Exception raised when a GeoTransform is not set.
+
+### ProjectionNotSetError { #planetarypy.exceptions.ProjectionNotSetError }
+
+```python
+exceptions.ProjectionNotSetError(where)
+```
+
+Exception raised when a projection is not set.
+
+### SomethingNotSetError { #planetarypy.exceptions.SomethingNotSetError }
+
+```python
+exceptions.SomethingNotSetError(where, what)
+```
+
+Exception raised for errors in the input of transformations.
+
+Attributes:
+    where: Where something is missing.
+    what: What is missing.
+
+### SpicerError { #planetarypy.exceptions.SpicerError }
+
+```python
+exceptions.SpicerError()
+```
+
+Base class for exceptions in this module.

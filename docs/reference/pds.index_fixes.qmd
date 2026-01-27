@@ -1,0 +1,165 @@
+# pds.index_fixes { #planetarypy.pds.index_fixes }
+
+`pds.index_fixes`
+
+Index-specific data formatting fixes.
+
+This module contains workarounds for known formatting issues in PDS index
+files. Each fixer is either a file-level fixer (applied to the raw table file
+before parsing) or a DataFrame-level fixer (applied after parsing but before
+time conversions).
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [apply_file_fixer](#planetarypy.pds.index_fixes.apply_file_fixer) | Apply a file-level fixer for the given index key if registered. |
+| [apply_pre_time_df_fixer](#planetarypy.pds.index_fixes.apply_pre_time_df_fixer) | Apply a DataFrame-level fixer prior to time conversion if registered. |
+| [fix_go_ssi_file](#planetarypy.pds.index_fixes.fix_go_ssi_file) | File-level fix for Galileo SSI index before parsing. |
+| [fix_lro_lola_rdr_df](#planetarypy.pds.index_fixes.fix_lro_lola_rdr_df) | Fix PRODUCT_CREATION_TIME column in lro.lola.rdr index. |
+| [fix_mer_rdr_df](#planetarypy.pds.index_fixes.fix_mer_rdr_df) | DataFrame-level fix for MER Pancam RDR index. |
+| [replace_in_dataframe](#planetarypy.pds.index_fixes.replace_in_dataframe) | Replace text in a pandas DataFrame string columns. |
+| [replace_in_file](#planetarypy.pds.index_fixes.replace_in_file) | Simple in-place text replacement in a file. |
+
+### apply_file_fixer { #planetarypy.pds.index_fixes.apply_file_fixer }
+
+```python
+pds.index_fixes.apply_file_fixer(index_key, table_path)
+```
+
+Apply a file-level fixer for the given index key if registered.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type        | Description                                 | Default    |
+|------------|-------------|---------------------------------------------|------------|
+| index_key  | str         | The dotted index key (e.g. "go.ssi.index"). | _required_ |
+| table_path | str or Path | Path to the table file to fix.              | _required_ |
+
+### apply_pre_time_df_fixer { #planetarypy.pds.index_fixes.apply_pre_time_df_fixer }
+
+```python
+pds.index_fixes.apply_pre_time_df_fixer(index_key, df)
+```
+
+Apply a DataFrame-level fixer prior to time conversion if registered.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type             | Description           | Default    |
+|-----------|------------------|-----------------------|------------|
+| index_key | str              | The dotted index key. | _required_ |
+| df        | pandas.DataFrame | The parsed DataFrame. | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type             | Description                     |
+|--------|------------------|---------------------------------|
+|        | pandas.DataFrame | Potentially modified DataFrame. |
+
+### fix_go_ssi_file { #planetarypy.pds.index_fixes.fix_go_ssi_file }
+
+```python
+pds.index_fixes.fix_go_ssi_file(table_path)
+```
+
+File-level fix for Galileo SSI index before parsing.
+
+The GO SSI index has a malformed value with a quote instead of a comma that
+must be fixed in the raw table file prior to parsing.
+
+### fix_lro_lola_rdr_df { #planetarypy.pds.index_fixes.fix_lro_lola_rdr_df }
+
+```python
+pds.index_fixes.fix_lro_lola_rdr_df(df)
+```
+
+Fix PRODUCT_CREATION_TIME column in lro.lola.rdr index.
+
+If the value contains only a date (YYYY-MM-DD) the missing time portion is
+filled with ``T00:00:00`` so that the column can be parsed uniformly as a
+full datetime.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type             | Description             | Default    |
+|--------|------------------|-------------------------|------------|
+| df     | pandas.DataFrame | Parsed index DataFrame. | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type             | Description                                                            |
+|--------|------------------|------------------------------------------------------------------------|
+|        | pandas.DataFrame | Modified DataFrame with ``PRODUCT_CREATION_TIME`` parsed to datetimes. |
+
+### fix_mer_rdr_df { #planetarypy.pds.index_fixes.fix_mer_rdr_df }
+
+```python
+pds.index_fixes.fix_mer_rdr_df(df)
+```
+
+DataFrame-level fix for MER Pancam RDR index.
+
+The MER Pancam RDR index historically has missing timezone markers ("Z") at
+the end of time strings and non-numeric values like "TBD" in the
+``RELEASE_ID`` column.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type             | Description             | Default    |
+|--------|------------------|-------------------------|------------|
+| df     | pandas.DataFrame | Parsed index DataFrame. | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type             | Description      |
+|--------|------------------|------------------|
+|        | pandas.DataFrame | Fixed DataFrame. |
+
+### replace_in_dataframe { #planetarypy.pds.index_fixes.replace_in_dataframe }
+
+```python
+pds.index_fixes.replace_in_dataframe(
+    df,
+    old_text,
+    new_text,
+    columns=None,
+    regex=False,
+    inplace=False,
+)
+```
+
+Replace text in a pandas DataFrame string columns.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name     | Type                | Description                                                                         | Default    |
+|----------|---------------------|-------------------------------------------------------------------------------------|------------|
+| df       | pandas.DataFrame    | DataFrame to operate on.                                                            | _required_ |
+| old_text | str                 | Text or pattern to replace.                                                         | _required_ |
+| new_text | str                 | Replacement text.                                                                   | _required_ |
+| columns  | list\[str\] or None | Columns to restrict replacements to. If None, all string-like columns are used.     | `None`     |
+| regex    | bool                | Whether to interpret ``old_text`` as a regular expression.                          | `False`    |
+| inplace  | bool                | If True, modify the original DataFrame and return it. Otherwise a copy is returned. | `False`    |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type             | Description                          |
+|--------|------------------|--------------------------------------|
+|        | pandas.DataFrame | DataFrame with replacements applied. |
+
+### replace_in_file { #planetarypy.pds.index_fixes.replace_in_file }
+
+```python
+pds.index_fixes.replace_in_file(filename, old_text, new_text)
+```
+
+Simple in-place text replacement in a file.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name     | Type        | Description                 | Default    |
+|----------|-------------|-----------------------------|------------|
+| filename | str or Path | Path to the file to modify. | _required_ |
+| old_text | str         | Text to replace.            | _required_ |
+| new_text | str         | Replacement text.           | _required_ |

@@ -1,0 +1,90 @@
+# dt_fmt_converters { #planetarypy.dt_fmt_converters }
+
+`dt_fmt_converters`
+
+This module contains datetime functions with extended
+ISO 8601 handling to deal with day-of-year formats and trailing "Z"
+characters instead of +00:00 to indicate UTC.
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [doyformat](#planetarypy.dt_fmt_converters.doyformat) | Return a string representing the date and time in ISO 8601 format with |
+| [fromdoyformat](#planetarypy.dt_fmt_converters.fromdoyformat) | Return a datetime corresponding to *date_string* in one of the formats |
+| [fromisozformat](#planetarypy.dt_fmt_converters.fromisozformat) | Return a datetime corresponding to *date_string* in one of the formats emitted by |
+| [isozformat](#planetarypy.dt_fmt_converters.isozformat) | Return a string representing the UTC date and time in ISO 8601 format with |
+
+### doyformat { #planetarypy.dt_fmt_converters.doyformat }
+
+```python
+dt_fmt_converters.doyformat(date_time, sep='T', timespec='auto')
+```
+
+Return a string representing the date and time in ISO 8601 format with
+the date portion in ISO 8601 Ordinal date format, also known as
+day-of-year format:
+
+* YYYY-DDDTHH:MM:SS.ffffff, if microsecond is not 0
+* YYYY-DDDTHH:MM:SS, if microsecond is 0
+
+If utcoffset() does not return None, a string is appended, giving the UTC offset:
+
+* YYYY-DDDTHH:MM:SS.ffffff+HH:MM[:SS[.ffffff]], if microsecond is not 0
+* YYYY-DDDTHH:MM:SS+HH:MM[:SS[.ffffff]], if microsecond is 0
+
+This function is similar to the standard library's
+datetime.datetime.isoformat() function (see that documentation
+for details on *sep* and *timespec*).
+
+### fromdoyformat { #planetarypy.dt_fmt_converters.fromdoyformat }
+
+```python
+dt_fmt_converters.fromdoyformat(date_string)
+```
+
+Return a datetime corresponding to *date_string* in one of the formats
+emitted by doyformat().
+
+Specifically, this function supports strings in the format:
+
+* YYYY-DDD[*HH[:MM[:SS[.fff[fff]]]][+HH:MM[:SS[.ffffff]]]]
+
+where * can match any single character.
+
+This function is similar to the  standard library's
+datetime.datetime.fromisoformat() function.
+
+### fromisozformat { #planetarypy.dt_fmt_converters.fromisozformat }
+
+```python
+dt_fmt_converters.fromisozformat(date_string)
+```
+
+Return a datetime corresponding to *date_string* in one of the formats emitted by
+isozformat().  This datetime will be a timezone-aware datetime.
+
+### isozformat { #planetarypy.dt_fmt_converters.isozformat }
+
+```python
+dt_fmt_converters.isozformat(date_time, sep='T', timespec='auto')
+```
+
+Return a string representing the UTC date and time in ISO 8601 format with
+the trailing letter 'Z' representing the UTC offset for the provided
+UTC *date_time* object.
+
+This function is similar to the standard library's
+datetime.datetime.isoformat() function (see that documentation
+for details on *sep* and *timespec*).
+
+The difference is that the provided *date_time* must be timezone
+aware and it must be in UTC (its utcoffset() must not be None and
+must equal zero). Otherwise, it will raise a ValueError.
+
+The most important difference is that rather than returning a string
+representation that ends in "+00:00" for a UTC datetime object, it
+will return a representation that ends in "Z".  Both formats are
+valid ISO 8601 date formats, but the standard library picks one
+string representation, and this function provides the other, which
+is the required format for PDS4 labels.

@@ -1,0 +1,19 @@
+# instruments.utils { #planetarypy.instruments.utils }
+
+`instruments.utils`
+
+
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [read_image](#planetarypy.instruments.utils.read_image) | Read all cubes or geotiffs in a standardized way. |
+
+### read_image { #planetarypy.instruments.utils.read_image }
+
+```python
+instruments.utils.read_image(p)
+```
+
+Read all cubes or geotiffs in a standardized way.

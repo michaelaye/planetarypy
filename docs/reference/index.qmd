@@ -1,0 +1,53 @@
+---
+title: API Reference
+---
+
+Welcome to the API Reference. Here you’ll find detailed documentation for all modules and functions in PlanetaryPy.
+
+## Core Modules
+
+Core interfaces and utilities.
+
+| | |
+| --- | --- |
+| [cli](cli.qmd#planetarypy.cli) | Console script for planetarypy. |
+| [config](config.qmd#planetarypy.config) | General configuration for the planetarypy package. |
+| [datetime_format_converters](datetime_format_converters.qmd#planetarypy.datetime_format_converters) | This module contains datetime functions with extended |
+| [exceptions](exceptions.qmd#planetarypy.exceptions) | PlanetarPy exceptions. |
+| [utils](utils.qmd#planetarypy.utils) | General utility functions for planetarypy. |
+
+## PDS Utilities and CLI
+
+Tools for managing and working with Planetary Data System indexes.
+
+| | |
+| --- | --- |
+| [pds.cli](pds.cli.qmd#planetarypy.pds.cli) | Command-line interface for PlanetaryPy PDS index management. |
+| [pds.dynamic_index](pds.dynamic_index.qmd#planetarypy.pds.dynamic_index) | Dynamic index management |
+| [pds.dynamic_url_handlers](pds.dynamic_url_handlers.qmd#planetarypy.pds.dynamic_url_handlers) | dynamic_url_handlers module. |
+| [pds.index_fixes](pds.index_fixes.qmd#planetarypy.pds.index_fixes) | Index-specific data formatting fixes. |
+| [pds.index_labels](pds.index_labels.qmd#planetarypy.pds.index_labels) | PDS index label handling and processing. |
+| [pds.index_logging](pds.index_logging.qmd#planetarypy.pds.index_logging) | Logging handlers for PDS index access timestamps and URL discoveries. |
+| [pds.index_main](pds.index_main.qmd#planetarypy.pds.index_main) | Composition-based Index implementation using Remote classes. |
+| [pds.static_index](pds.static_index.qmd#planetarypy.pds.static_index) | Static index management with configuration-based URLs. |
+| [pds.utils](pds.utils.qmd#planetarypy.pds.utils) | General utilities for working with PDS data. |
+
+## SPICE Kernels
+
+Helpers for SPICE kernels and configuration.
+
+| | |
+| --- | --- |
+| [spice.archived_kernels](spice.archived_kernels.qmd#planetarypy.spice.archived_kernels) | SPICE kernels management for archived datasets. |
+| [spice.config](spice.config.qmd#planetarypy.spice.config) | SPICE configuration. |
+| [spice.generic_kernels](spice.generic_kernels.qmd#planetarypy.spice.generic_kernels) | SPICE generic kernels management. |
+| [spice.pckernels](spice.pckernels.qmd#planetarypy.spice.pckernels) |  |
+
+## Instruments
+
+| | |
+| --- | --- |
+| [instruments.ctx](instruments.ctx.qmd#planetarypy.instruments.ctx) | Module for dealing with CTX data. |
+| [instruments.go_ssi](instruments.go_ssi.qmd#planetarypy.instruments.go_ssi) |  |
+| [instruments.hirise](instruments.hirise.qmd#planetarypy.instruments.hirise) |  |
+| [instruments.utils](instruments.utils.qmd#planetarypy.instruments.utils) |  |

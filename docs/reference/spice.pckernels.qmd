@@ -1,0 +1,28 @@
+# spice.pckernels { #planetarypy.spice.pckernels }
+
+`spice.pckernels`
+
+
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [download_file](#planetarypy.spice.pckernels.download_file) | Download a file from a URL to a local path. |
+| [get_kernel](#planetarypy.spice.pckernels.get_kernel) | Get the path to a PCK kernel file, downloading it if necessary. |
+
+### download_file { #planetarypy.spice.pckernels.download_file }
+
+```python
+spice.pckernels.download_file(url, local_path, overwrite=False)
+```
+
+Download a file from a URL to a local path.
+
+### get_kernel { #planetarypy.spice.pckernels.get_kernel }
+
+```python
+spice.pckernels.get_kernel(version='v11', data_dir=Path('.') / 'pck_kernels')
+```
+
+Get the path to a PCK kernel file, downloading it if necessary.

@@ -1,0 +1,89 @@
+# pds.index_labels { #planetarypy.pds.index_labels }
+
+`pds.index_labels`
+
+PDS index label handling and processing.
+
+This module provides classes and functions for working with PDS index labels,
+parsing index files, and converting them to convenient data structures.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [IndexLabel](#planetarypy.pds.index_labels.IndexLabel) | Support working with label files of PDS Index tables. |
+| [PVLColumn](#planetarypy.pds.index_labels.PVLColumn) | Manages just one of the columns in a table that is described via PVL. |
+
+### IndexLabel { #planetarypy.pds.index_labels.IndexLabel }
+
+```python
+pds.index_labels.IndexLabel(labelpath, index_key=None)
+```
+
+Support working with label files of PDS Index tables.
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [colnames](#planetarypy.pds.index_labels.IndexLabel.colnames) | Read the columns in an PDS index label file. |
+| [index_key](#planetarypy.pds.index_labels.IndexLabel.index_key) | search for table name pointer and store key and fpath. |
+
+### PVLColumn { #planetarypy.pds.index_labels.PVLColumn }
+
+```python
+pds.index_labels.PVLColumn(pvlobj)
+```
+
+Manages just one of the columns in a table that is described via PVL.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type   | Description   | Default    |
+|--------|--------|---------------|------------|
+| pvlobj |        |               | _required_ |
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [name_as_list](#planetarypy.pds.index_labels.PVLColumn.name_as_list) | needs to return a list for consistency for cases when it's an array. |
+| [start](#planetarypy.pds.index_labels.PVLColumn.start) | Decrease by one as Python is 0-indexed. |
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [decode_line](#planetarypy.pds.index_labels.decode_line) | Decode one line of tabbed data with the appropriate label file. |
+| [find_mixed_type_cols](#planetarypy.pds.index_labels.find_mixed_type_cols) | For a given dataframe, find the columns that are of mixed type. |
+| [index_to_df](#planetarypy.pds.index_labels.index_to_df) | The main reader function for PDS Index files. |
+
+### decode_line { #planetarypy.pds.index_labels.decode_line }
+
+```python
+pds.index_labels.decode_line(linedata, labelpath)
+```
+
+Decode one line of tabbed data with the appropriate label file.
+
+### find_mixed_type_cols { #planetarypy.pds.index_labels.find_mixed_type_cols }
+
+```python
+pds.index_labels.find_mixed_type_cols(df, fix=True)
+```
+
+For a given dataframe, find the columns that are of mixed type.
+
+Tool to help with the performance warning when trying to save a pandas DataFrame as a HDF.
+When a column changes datatype somewhere, pickling occurs, slowing down the reading process of the HDF file.
+
+### index_to_df { #planetarypy.pds.index_labels.index_to_df }
+
+```python
+pds.index_labels.index_to_df(indexpath, label, convert_times=True)
+```
+
+The main reader function for PDS Index files.
+
+In conjunction with an IndexLabel object that figures out the column widths,
+this reader should work for all PDS TAB files.

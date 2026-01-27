@@ -1,0 +1,7 @@
+# spice.config { #planetarypy.spice.config }
+
+`spice.config`
+
+SPICE configuration.
+
+This module contains common configuration elements used across the SPICE-related modules.

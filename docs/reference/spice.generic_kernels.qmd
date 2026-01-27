@@ -1,0 +1,55 @@
+# spice.generic_kernels { #planetarypy.spice.generic_kernels }
+
+`spice.generic_kernels`
+
+SPICE generic kernels management.
+
+This module provides functions for downloading and loading generic SPICE kernels
+that are required for basic operations and calculations.
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [download_generic_kernels](#planetarypy.spice.generic_kernels.download_generic_kernels) | Download all kernels required for basic SPICE operations. |
+| [load_generic_kernels](#planetarypy.spice.generic_kernels.load_generic_kernels) | Load all kernels in generic_kernels list. |
+| [show_loaded_kernels](#planetarypy.spice.generic_kernels.show_loaded_kernels) | Show overview of all currently loaded SPICE kernels. |
+
+### download_generic_kernels { #planetarypy.spice.generic_kernels.download_generic_kernels }
+
+```python
+spice.generic_kernels.download_generic_kernels(overwrite=False)
+```
+
+Download all kernels required for basic SPICE operations.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type   | Description                                           | Default   |
+|-----------|--------|-------------------------------------------------------|-----------|
+| overwrite | bool   | Whether to overwrite existing files, by default False | `False`   |
+
+### load_generic_kernels { #planetarypy.spice.generic_kernels.load_generic_kernels }
+
+```python
+spice.generic_kernels.load_generic_kernels()
+```
+
+Load all kernels in generic_kernels list.
+
+Loads pure planetary bodies meta-kernel without spacecraft data.
+Downloads any missing generic kernels.
+
+### show_loaded_kernels { #planetarypy.spice.generic_kernels.show_loaded_kernels }
+
+```python
+spice.generic_kernels.show_loaded_kernels()
+```
+
+Show overview of all currently loaded SPICE kernels.
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description                                            |
+|--------|--------|--------------------------------------------------------|
+|        | list   | List of loaded kernel paths relative to KERNEL_STORAGE |

@@ -1,0 +1,60 @@
+# pds.dynamic_index { #planetarypy.pds.dynamic_index }
+
+`pds.dynamic_index`
+
+Dynamic index management
+
+These are the codes for web-scraped PDS archive pages to discover the most recent 
+volume delivery with a new index file and its URL.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [DynamicRemoteHandler](#planetarypy.pds.dynamic_index.DynamicRemoteHandler) | Manages dynamic index URLs and their discovery/caching. |
+
+### DynamicRemoteHandler { #planetarypy.pds.dynamic_index.DynamicRemoteHandler }
+
+```python
+pds.dynamic_index.DynamicRemoteHandler(index_key)
+```
+
+Manages dynamic index URLs and their discovery/caching.
+
+It uses the AccessLog to track TWO URLs:
+1. current_url: The URL of the locally cached index
+2. available_url: The URL of a newly discovered update (if any)
+
+This separation ensures we always know which URL corresponds to our cached data.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name      | Type   | Description                                | Default    |
+|-----------|--------|--------------------------------------------|------------|
+| index_key | str    | The dotted index key (e.g. "mro.ctx.edr"). | _required_ |
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [handler_class](#planetarypy.pds.dynamic_index.DynamicRemoteHandler.handler_class) | Get handler class. |
+| [should_check](#planetarypy.pds.dynamic_index.DynamicRemoteHandler.should_check) | Determine if we should check for updates based on last check time. |
+| [update_available](#planetarypy.pds.dynamic_index.DynamicRemoteHandler.update_available) | Check if an update is available. |
+| [url](#planetarypy.pds.dynamic_index.DynamicRemoteHandler.url) | Get the URL to use for downloading. |
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [discover_latest_url](#planetarypy.pds.dynamic_index.DynamicRemoteHandler.discover_latest_url) | Discover the latest index URL from the remote source. |
+
+##### discover_latest_url { #planetarypy.pds.dynamic_index.DynamicRemoteHandler.discover_latest_url }
+
+```python
+pds.dynamic_index.DynamicRemoteHandler.discover_latest_url()
+```
+
+Discover the latest index URL from the remote source.
+
+This method only discovers and returns the URL - it does NOT update any logs.
+Logging is handled by the caller based on what they want to do with the URL.

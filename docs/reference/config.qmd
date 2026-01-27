@@ -1,0 +1,65 @@
+# config { #planetarypy.config }
+
+`config`
+
+General configuration for the planetarypy package.
+
+This module handles general configuration settings such as storage locations.
+PDS index URLs and timestamps are now managed separately in pds/index_config.py.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [Config](#planetarypy.config.Config) | Manage general configuration settings. |
+
+### Config { #planetarypy.config.Config }
+
+```python
+config.Config(config_path=None)
+```
+
+Manage general configuration settings.
+
+This class handles general configuration settings for the planetarypy package.
+At minimum, there should be the `storage_root` attribute for storing data.
+
+Note: PDS index URLs and timestamps are now managed separately in pds/index_config.py.
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [d](#planetarypy.config.Config.d) | Get the Python dictionary from the TOML document. |
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [get_value](#planetarypy.config.Config.get_value) | Get sub-dictionary by nested key. |
+| [save](#planetarypy.config.Config.save) | Write the TOML doc to file. |
+| [set_value](#planetarypy.config.Config.set_value) | Set value in sub-dic using dotted key. |
+
+##### get_value { #planetarypy.config.Config.get_value }
+
+```python
+config.Config.get_value(key)
+```
+
+Get sub-dictionary by nested key.
+
+##### save { #planetarypy.config.Config.save }
+
+```python
+config.Config.save()
+```
+
+Write the TOML doc to file.
+
+##### set_value { #planetarypy.config.Config.set_value }
+
+```python
+config.Config.set_value(nested_key, value, save=True)
+```
+
+Set value in sub-dic using dotted key.

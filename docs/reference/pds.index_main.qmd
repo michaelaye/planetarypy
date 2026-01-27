@@ -1,0 +1,142 @@
+# pds.index_main { #planetarypy.pds.index_main }
+
+`pds.index_main`
+
+Composition-based Index implementation using Remote classes.
+
+This module provides a unified Index class that uses composition with Remote classes
+to handle URL management.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [Index](#planetarypy.pds.index_main.Index) | Unified Index class using composition with Remote classes. |
+| [InventoryIndex](#planetarypy.pds.index_main.InventoryIndex) | Index class for inventory-style CSV indexes. |
+
+### Index { #planetarypy.pds.index_main.Index }
+
+```python
+pds.index_main.Index(index_key, local_dir=None, force_config_update=False)
+```
+
+Unified Index class using composition with Remote classes.
+
+This class provides file management operations while delegating URL management
+to appropriate Remote classes based on the index configuration.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name                | Type                | Description                                                       | Default    |
+|---------------------|---------------------|-------------------------------------------------------------------|------------|
+| index_key           | str                 | Dotted key identifying the index (e.g., "mro.ctx.edr")            | _required_ |
+| local_dir           | str \| Path \| None | Local directory for index files. If None, a default path is used. | `None`     |
+| force_config_update | bool                | Whether to force update of static index configuration.            | `False`    |
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [dataframe](#planetarypy.pds.index_main.Index.dataframe) | Get the index data as a pandas DataFrame from parquet cache. |
+| [files_downloaded](#planetarypy.pds.index_main.Index.files_downloaded) | Check if index files exist locally. |
+| [isupper](#planetarypy.pds.index_main.Index.isupper) | Check if filename uses uppercase extension. |
+| [label_filename](#planetarypy.pds.index_main.Index.label_filename) | Get the label filename from URL. |
+| [local_dir](#planetarypy.pds.index_main.Index.local_dir) | Get local directory for this index. |
+| [local_label_path](#planetarypy.pds.index_main.Index.local_label_path) | Get the local label file path. |
+| [local_parq_path](#planetarypy.pds.index_main.Index.local_parq_path) | Get the local parquet file path. |
+| [local_table_path](#planetarypy.pds.index_main.Index.local_table_path) | Get the local table file path. |
+| [remote](#planetarypy.pds.index_main.Index.remote) | Get the appropriate Remote instance for this index. |
+| [remote_type](#planetarypy.pds.index_main.Index.remote_type) | Get the type of remote handling used ('static' or 'dynamic'). |
+| [tab_extension](#planetarypy.pds.index_main.Index.tab_extension) | Get the appropriate table extension. |
+| [table_filename](#planetarypy.pds.index_main.Index.table_filename) | Get the table filename. |
+| [table_url](#planetarypy.pds.index_main.Index.table_url) | Get the table URL from the label URL. |
+| [update_available](#planetarypy.pds.index_main.Index.update_available) | Check if an update is available. |
+| [url](#planetarypy.pds.index_main.Index.url) | Get the current URL for this index. |
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [convert_to_parquet](#planetarypy.pds.index_main.Index.convert_to_parquet) | Convert the downloaded index files to parquet format. |
+| [download](#planetarypy.pds.index_main.Index.download) | Download the index files from remote URL. |
+| [ensure_parquet](#planetarypy.pds.index_main.Index.ensure_parquet) | Ensure a parquet cache exists for this index. |
+| [read_index_data](#planetarypy.pds.index_main.Index.read_index_data) | Read the index data from label and table files. |
+| [refresh_remote](#planetarypy.pds.index_main.Index.refresh_remote) | Force refresh of remote URL information. |
+
+##### convert_to_parquet { #planetarypy.pds.index_main.Index.convert_to_parquet }
+
+```python
+pds.index_main.Index.convert_to_parquet()
+```
+
+Convert the downloaded index files to parquet format.
+
+##### download { #planetarypy.pds.index_main.Index.download }
+
+```python
+pds.index_main.Index.download(force=False, convert_to_parquet=True)
+```
+
+Download the index files from remote URL.
+
+Args:
+    force: Force download even if local files exist
+    convert_to_parquet: Whether to convert to parquet after download
+
+Returns:
+    True if download was successful
+
+##### ensure_parquet { #planetarypy.pds.index_main.Index.ensure_parquet }
+
+```python
+pds.index_main.Index.ensure_parquet(force=False)
+```
+
+Ensure a parquet cache exists for this index.
+
+- If force is True, reconvert to parquet from existing label+table.
+- If parquet is missing, reconvert when label+table exist.
+- If label or table are missing, perform a clean download.
+
+Returns:
+    True if a download was performed, False otherwise.
+
+##### read_index_data { #planetarypy.pds.index_main.Index.read_index_data }
+
+```python
+pds.index_main.Index.read_index_data(convert_times=True)
+```
+
+Read the index data from label and table files.
+
+##### refresh_remote { #planetarypy.pds.index_main.Index.refresh_remote }
+
+```python
+pds.index_main.Index.refresh_remote()
+```
+
+Force refresh of remote URL information.
+
+### InventoryIndex { #planetarypy.pds.index_main.InventoryIndex }
+
+```python
+pds.index_main.InventoryIndex(
+    index_key,
+    local_dir=None,
+    force_config_update=False,
+)
+```
+
+Index class for inventory-style CSV indexes.
+This class handles CSV files where:
+- First 3 columns are: volume, file_path, observation_id
+- Remaining columns contain comma-separated target names
+
+The data is exploded so each target gets its own row, then grouped back
+by observation_id with targets as lists for efficient querying.
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [tab_extension](#planetarypy.pds.index_main.InventoryIndex.tab_extension) | Get the appropriate table extension. |

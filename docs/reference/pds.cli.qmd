@@ -1,0 +1,49 @@
+# pds.cli { #planetarypy.pds.cli }
+
+`pds.cli`
+
+Command-line interface for PlanetaryPy PDS index management.
+
+## Notes {.doc-section .doc-section-notes}
+
+REVIEW
+
+## Examples {.doc-section .doc-section-examples}
+
+```python
+>>> # REVIEW: example
+```
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [plp_update_indexes](#planetarypy.pds.cli.plp_update_indexes) | Force update check for PDS index configuration and dynamic URL discovery. |
+
+### plp_update_indexes { #planetarypy.pds.cli.plp_update_indexes }
+
+```python
+pds.cli.plp_update_indexes(verbose, config_only, dynamic_only)
+```
+
+Force update check for PDS index configuration and dynamic URL discovery.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name         | Type   | Description   | Default    |
+|--------------|--------|---------------|------------|
+| verbose      | REVIEW | REVIEW        | _required_ |
+| config_only  | REVIEW | REVIEW        | _required_ |
+| dynamic_only | REVIEW | REVIEW        | _required_ |
+
+#### Returns {.doc-section .doc-section-returns}
+
+| Name   | Type   | Description   |
+|--------|--------|---------------|
+|        | REVIEW |               |
+
+#### Examples {.doc-section .doc-section-examples}
+
+```python
+>>> # REVIEW: add example usage
+```

@@ -1,0 +1,78 @@
+# instruments.go_ssi { #planetarypy.instruments.go_ssi }
+
+`instruments.go_ssi`
+
+
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [EDR](#planetarypy.instruments.go_ssi.EDR) | Support class to work with GO SSI EDR data. |
+| [EDRSet](#planetarypy.instruments.go_ssi.EDRSet) | Support class to work with GO SSI EDR data. |
+
+### EDR { #planetarypy.instruments.go_ssi.EDR }
+
+```python
+instruments.go_ssi.EDR(frameno, save_dir=None)
+```
+
+Support class to work with GO SSI EDR data.
+
+Using frameno a.k.a. frame number as the only unique identifier for GO SSI images.
+Index parameters like `IMAGE_ID` or OBSERVATION_ID are not unique and therefore can
+return sets of images. Use `EDRSet` for those.
+
+### EDRSet { #planetarypy.instruments.go_ssi.EDRSet }
+
+```python
+instruments.go_ssi.EDRSet(meta, save_dir=None)
+```
+
+Support class to work with GO SSI EDR data.
+
+The only unique identifier for GO SSI images seems to be what McEwen
+Searching through the FILE_SPECIFICATION_NAME column of the GO.SSI.INDEX for a
+frame number seems really to be the only realiable and sane way to identify a
+specific image.
+McEwen calls these numbers in the filename "frame number", maybe they are defined as
+such in the SIS? (TBchecked), so I will use that term here.
+
+E.g.: edr = EDR("349542200")
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [from_frameno](#planetarypy.instruments.go_ssi.EDRSet.from_frameno) | Alternative constructor to create an EDRSet from a frameno. |
+| [from_image_id](#planetarypy.instruments.go_ssi.EDRSet.from_image_id) | Alternative constructor to create an EDRSet from a frameno. |
+
+##### from_frameno { #planetarypy.instruments.go_ssi.EDRSet.from_frameno }
+
+```python
+instruments.go_ssi.EDRSet.from_frameno(frameno, save_dir=None)
+```
+
+Alternative constructor to create an EDRSet from a frameno.
+
+##### from_image_id { #planetarypy.instruments.go_ssi.EDRSet.from_image_id }
+
+```python
+instruments.go_ssi.EDRSet.from_image_id(image_id, save_dir=None)
+```
+
+Alternative constructor to create an EDRSet from a frameno.
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [get_general_index](#planetarypy.instruments.go_ssi.get_general_index) | add some useful extra columns to the index. |
+
+### get_general_index { #planetarypy.instruments.go_ssi.get_general_index }
+
+```python
+instruments.go_ssi.get_general_index(refresh=False)
+```
+
+add some useful extra columns to the index.

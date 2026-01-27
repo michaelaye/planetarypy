@@ -1,0 +1,75 @@
+# pds.utils { #planetarypy.pds.utils }
+
+`pds.utils`
+
+General utilities for working with PDS data.
+
+This module provides common, general-purpose utility functions for the PDS subpackage.
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [get_index_names](#planetarypy.pds.utils.get_index_names) | Return a sorted list of all index names for a given mission and instrument (from static and dynamic configs). |
+| [get_instrument_names](#planetarypy.pds.utils.get_instrument_names) | Return a sorted list of all instruments for a given mission (from static and dynamic configs). |
+| [get_mission_names](#planetarypy.pds.utils.get_mission_names) | Return a sorted list of all available missions (from static and dynamic configs). |
+| [print_available_indexes](#planetarypy.pds.utils.print_available_indexes) | List available index keys from static config plus dynamic handlers. |
+
+### get_index_names { #planetarypy.pds.utils.get_index_names }
+
+```python
+pds.utils.get_index_names(mission_instrument)
+```
+
+Return a sorted list of all index names for a given mission and instrument (from static and dynamic configs).
+
+### get_instrument_names { #planetarypy.pds.utils.get_instrument_names }
+
+```python
+pds.utils.get_instrument_names(mission)
+```
+
+Return a sorted list of all instruments for a given mission (from static and dynamic configs).
+
+### get_mission_names { #planetarypy.pds.utils.get_mission_names }
+
+```python
+pds.utils.get_mission_names()
+```
+
+Return a sorted list of all available missions (from static and dynamic configs).
+
+### print_available_indexes { #planetarypy.pds.utils.print_available_indexes }
+
+```python
+pds.utils.print_available_indexes(
+    filter_mission=None,
+    filter_instrument=None,
+    *,
+    keys_only=False,
+)
+```
+
+List available index keys from static config plus dynamic handlers.
+
+Combines all dotted index keys found in the remote static configuration
+with the dynamic indexes registered in ``DYNAMIC_URL_HANDLERS``.
+
+When ``keys_only`` is False (default), prints a tree of missions → instruments → indexes,
+optionally filtered by mission/instrument. When ``keys_only`` is True, returns a sorted
+list of dotted index keys instead of printing.
+
+Args:
+    filter_mission: If provided, only include this mission
+    filter_instrument: If provided, only include this instrument (requires filter_mission)
+    keys_only: When True, return a list of keys instead of printing a tree
+
+Returns:
+    - list[str] when ``keys_only`` is True
+    - None when printing a tree (``keys_only`` is False)
+
+Examples:
+    >>> from planetarypy.pds.utils import print_available_indexes
+    >>> print_available_indexes(keys_only=True)  # returns ["cassini.iss.index", ...]
+    >>> print_available_indexes('mro')           # prints tree for mro only
+    >>> print_available_indexes('mro', 'ctx')    # prints tree for mro.ctx only

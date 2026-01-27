@@ -1,0 +1,79 @@
+# pds.static_index { #planetarypy.pds.static_index }
+
+`pds.static_index`
+
+Static index management with configuration-based URLs.
+
+This module handles indexes with fixed URLs that are managed through configuration files.
+Update logic focuses on checking for newer file timestamps at known stable URLs.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [ConfigHandler](#planetarypy.pds.static_index.ConfigHandler) | Handler for the statix index URLs configuration file. |
+| [StaticRemoteHandler](#planetarypy.pds.static_index.StaticRemoteHandler) | Handler for static remote indexes with fixed URLs from configuration. |
+
+### ConfigHandler { #planetarypy.pds.static_index.ConfigHandler }
+
+```python
+pds.static_index.ConfigHandler(local_path=None, force_update=False)
+```
+
+Handler for the statix index URLs configuration file.
+
+- Download from planetarypy config repo if it is not present.
+- Check once per day if there's an updated version available.
+- Read out the URLs for the static indexes, based on dotted keys like "mro.ctx.edr".
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type        | Description                                                  | Default   |
+|------------|-------------|--------------------------------------------------------------|-----------|
+| local_path | str \| None | If needed, a local path with more indexes could be provided. | `None`    |
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [should_update](#planetarypy.pds.static_index.ConfigHandler.should_update) | Check if the config file should be updated (if older than one day). |
+
+### StaticRemoteHandler { #planetarypy.pds.static_index.StaticRemoteHandler }
+
+```python
+pds.static_index.StaticRemoteHandler(index_key, force_config_update=False)
+```
+
+Handler for static remote indexes with fixed URLs from configuration.
+
+This handler deals with all aspects of the status of a remotely stored index file.
+It is a helper class-based attribute for the Index class, to determine if updates are available and if a remote
+check should be performed (limited to once per day).
+This class differs from the DynamicRemoteHandler, as the updates there look for new URLs, not for new files
+at the same URL.
+
+Note: The "helping" here STOPS after providing the right URL to use for an index key and some logical flags that
+indicate if there's new data at the remote - this class does NOT handle downloading or caching the index file itself.
+From the moment of having an URL and a reason to use it, the actual Index class should take over.
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [should_check](#planetarypy.pds.static_index.StaticRemoteHandler.should_check) | Determine if an update check should be performed. |
+| [update_available](#planetarypy.pds.static_index.StaticRemoteHandler.update_available) | Check if an update is available based on remote timestamp. |
+| [url](#planetarypy.pds.static_index.StaticRemoteHandler.url) | Get the URL of the static index. |
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [get_remote_timestamp](#planetarypy.pds.static_index.StaticRemoteHandler.get_remote_timestamp) | Get the last modified timestamp of the remote index file. |
+
+##### get_remote_timestamp { #planetarypy.pds.static_index.StaticRemoteHandler.get_remote_timestamp }
+
+```python
+pds.static_index.StaticRemoteHandler.get_remote_timestamp()
+```
+
+Get the last modified timestamp of the remote index file.

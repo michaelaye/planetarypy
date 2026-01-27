@@ -1,0 +1,67 @@
+# pds.index_logging { #planetarypy.pds.index_logging }
+
+`pds.index_logging`
+
+Logging handlers for PDS index access timestamps and URL discoveries.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [AccessLog](#planetarypy.pds.index_logging.AccessLog) | Handler for index log operations. |
+
+### AccessLog { #planetarypy.pds.index_logging.AccessLog }
+
+```python
+pds.index_logging.AccessLog(key)
+```
+
+Handler for index log operations.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type   | Description                                                   | Default    |
+|--------|--------|---------------------------------------------------------------|------------|
+| key    | str    | Key identifying the index being logged, e.g. "mro.ctx.index". | _required_ |
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [available_url](#planetarypy.pds.index_logging.AccessLog.available_url) | Get the URL of an available update, if any. |
+| [current_url](#planetarypy.pds.index_logging.AccessLog.current_url) | Get the URL of the currently cached index. |
+| [should_check](#planetarypy.pds.index_logging.AccessLog.should_check) | Determine if a check should be performed (if last check was over one day ago). |
+| [time_since_last_check](#planetarypy.pds.index_logging.AccessLog.time_since_last_check) | Return time delta since last check, or None if never checked. |
+| [update_available](#planetarypy.pds.index_logging.AccessLog.update_available) | Get whether an update is available for this key. |
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [log_available_url](#planetarypy.pds.index_logging.AccessLog.log_available_url) | Log the URL of an available update. |
+| [log_current_url](#planetarypy.pds.index_logging.AccessLog.log_current_url) | Log the URL of the currently cached/downloaded index. |
+| [log_update_available](#planetarypy.pds.index_logging.AccessLog.log_update_available) | Log whether an update is available for this key. |
+
+##### log_available_url { #planetarypy.pds.index_logging.AccessLog.log_available_url }
+
+```python
+pds.index_logging.AccessLog.log_available_url(url)
+```
+
+Log the URL of an available update.
+
+##### log_current_url { #planetarypy.pds.index_logging.AccessLog.log_current_url }
+
+```python
+pds.index_logging.AccessLog.log_current_url(url)
+```
+
+Log the URL of the currently cached/downloaded index.
+
+##### log_update_available { #planetarypy.pds.index_logging.AccessLog.log_update_available }
+
+```python
+pds.index_logging.AccessLog.log_update_available(available)
+```
+
+Log whether an update is available for this key.

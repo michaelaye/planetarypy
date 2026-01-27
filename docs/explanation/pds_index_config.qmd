@@ -86,28 +86,21 @@ This separation ensures that:
 - The configuration is clearer and more focused
 
 ## Migration from Old Configuration
-
-The old configuration system combined all settings in a single file, including both general settings and PDS index information. To migrate to the new system, run:
-
+The old configuration system combined all settings in a single file, including both
+general settings and PDS index information. To migrate to the new system, run:
 ```
 planetarypy-migrate-config
 ```
-
 This command:
-
 1. Extracts PDS index URLs and timestamps from the general configuration file
 2. Creates the new URL configuration and access log files
 3. Populates them with the extracted PDS index data
 4. Leaves other general settings (like `storage_root`) in the original config file
-
 For verbose output during migration:
-
 ```
 planetarypy-migrate-config --verbose
 ```
-
 To also refresh dynamic URLs during migration:
-
 ```
 planetarypy-migrate-config --refresh-urls
 ```

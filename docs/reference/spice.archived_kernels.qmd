@@ -1,0 +1,193 @@
+# spice.archived_kernels { #planetarypy.spice.archived_kernels }
+
+`spice.archived_kernels`
+
+SPICE kernels management for archived datasets.
+
+To access subsets of datasets, wrap the NAIF server's subsetds.pl script.
+The Perl script subsetds.pl (see BASE_URL below) requires as input:
+- the dataset name
+- start and stop of the time interval
+- a constant named "Subset" to identify the action for this Perl script
+We can assemble these parameters into a payload dictionary for the
+requests.get call and we manage different potential actions on the zipfile
+with a Subsetter class, that only requires the mission identifier, start and
+stop as parameters.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [Subsetter](#planetarypy.spice.archived_kernels.Subsetter) | Class to manage retrieving subset SPICE kernel lists. |
+
+### Subsetter { #planetarypy.spice.archived_kernels.Subsetter }
+
+```python
+spice.archived_kernels.Subsetter(mission, start, stop=None, save_location=None)
+```
+
+Class to manage retrieving subset SPICE kernel lists.
+
+#### Attributes {.doc-section .doc-section-attributes}
+
+| Name         | Type        | Description                                |
+|--------------|-------------|--------------------------------------------|
+| kernel_names | list\[str\] | Names of kernels for the given time range. |
+
+#### Notes {.doc-section .doc-section-notes}
+
+The following methods are available on this class:
+
+- ``download_kernels()`` – Download SPICE kernels.
+- ``get_metakernel()`` – Get metakernel file from NAIF and adjust paths to match local storage.
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [download_kernels](#planetarypy.spice.archived_kernels.Subsetter.download_kernels) | Download SPICE kernels. |
+| [get_local_path](#planetarypy.spice.archived_kernels.Subsetter.get_local_path) | Return local storage path from Kernel URL. |
+| [get_metakernel](#planetarypy.spice.archived_kernels.Subsetter.get_metakernel) | Download metakernel file from NAIF, adapt paths to match local storage |
+
+##### download_kernels { #planetarypy.spice.archived_kernels.Subsetter.download_kernels }
+
+```python
+spice.archived_kernels.Subsetter.download_kernels(
+    overwrite=False,
+    non_blocking=False,
+    quiet=False,
+)
+```
+
+Download SPICE kernels.
+
+###### Parameters {.doc-section .doc-section-parameters}
+
+| Name         | Type   | Description                                                      | Default   |
+|--------------|--------|------------------------------------------------------------------|-----------|
+| overwrite    | bool   | Overwrite existing kernels. Defaults to False.                   | `False`   |
+| non_blocking | bool   | Use Dask client for parallel download. Defaults to False.        | `False`   |
+| quiet        | bool   | Suppress name and path of downloaded kernels. Defaults to False. | `False`   |
+
+##### get_local_path { #planetarypy.spice.archived_kernels.Subsetter.get_local_path }
+
+```python
+spice.archived_kernels.Subsetter.get_local_path(url)
+```
+
+Return local storage path from Kernel URL.
+
+Uses self.save_location if given.
+
+###### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type   | Description             | Default    |
+|--------|--------|-------------------------|------------|
+| url    | str    | URL of the kernel file. | _required_ |
+
+##### get_metakernel { #planetarypy.spice.archived_kernels.Subsetter.get_metakernel }
+
+```python
+spice.archived_kernels.Subsetter.get_metakernel()
+```
+
+Download metakernel file from NAIF, adapt paths to match local storage
+and return local path to metakernel file.
+
+Uses self.save_location if given, otherwise `planetarypy` archive.
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [download_one_url](#planetarypy.spice.archived_kernels.download_one_url) | Download a single URL to a local path. |
+| [get_metakernel_and_files](#planetarypy.spice.archived_kernels.get_metakernel_and_files) | For a given mission and start/stop times, download the kernels and get metakernel path. |
+| [is_start_valid](#planetarypy.spice.archived_kernels.is_start_valid) | Check if the start time is valid for a given mission. |
+| [is_stop_valid](#planetarypy.spice.archived_kernels.is_stop_valid) | Check if the stop time is valid for a given mission. |
+| [list_kernels_for_day](#planetarypy.spice.archived_kernels.list_kernels_for_day) | List all kernels for a given time range of a mission. |
+
+### download_one_url { #planetarypy.spice.archived_kernels.download_one_url }
+
+```python
+spice.archived_kernels.download_one_url(url, local_path, overwrite=False)
+```
+
+Download a single URL to a local path.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type   | Description                                           | Default    |
+|------------|--------|-------------------------------------------------------|------------|
+| url        | str    | URL to download                                       | _required_ |
+| local_path | Path   | Path where to save the file                           | _required_ |
+| overwrite  | bool   | Whether to overwrite existing files, by default False | `False`    |
+
+### get_metakernel_and_files { #planetarypy.spice.archived_kernels.get_metakernel_and_files }
+
+```python
+spice.archived_kernels.get_metakernel_and_files(
+    mission,
+    start,
+    stop,
+    save_location=None,
+    quiet=False,
+)
+```
+
+For a given mission and start/stop times, download the kernels and get metakernel path.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name          | Type   | Description                                                         | Default    |
+|---------------|--------|---------------------------------------------------------------------|------------|
+| mission       | str    | Mission shorthand in datasets dataframe.                            | _required_ |
+| start         | str    | Start time in either ISO or yyyy-jjj format.                        | _required_ |
+| stop          | str    | Stop time in either ISO or yyyy-jjj format.                         | _required_ |
+| save_location | str    | Overwrite default storing in planetarypy archive. Defaults to None. | `None`     |
+| quiet         | bool   | Suppress download feedback. Defaults to False.                      | `False`    |
+
+### is_start_valid { #planetarypy.spice.archived_kernels.is_start_valid }
+
+```python
+spice.archived_kernels.is_start_valid(mission, start)
+```
+
+Check if the start time is valid for a given mission.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name    | Type         | Description                                    | Default    |
+|---------|--------------|------------------------------------------------|------------|
+| mission | str          | Mission shorthand label of datasets dataframe. | _required_ |
+| start   | astropy.Time | Start time in astropy.Time format.             | _required_ |
+
+### is_stop_valid { #planetarypy.spice.archived_kernels.is_stop_valid }
+
+```python
+spice.archived_kernels.is_stop_valid(mission, stop)
+```
+
+Check if the stop time is valid for a given mission.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name    | Type         | Description                                    | Default    |
+|---------|--------------|------------------------------------------------|------------|
+| mission | str          | Mission shorthand label of datasets dataframe. | _required_ |
+| stop    | astropy.Time | Stop time in astropy.Time format.              | _required_ |
+
+### list_kernels_for_day { #planetarypy.spice.archived_kernels.list_kernels_for_day }
+
+```python
+spice.archived_kernels.list_kernels_for_day(mission, start, stop='')
+```
+
+List all kernels for a given time range of a mission.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name    | Type   | Description                                                   | Default    |
+|---------|--------|---------------------------------------------------------------|------------|
+| mission | str    | Mission shorthand in datasets dataframe.                      | _required_ |
+| start   | str    | Start time in either ISO or yyyy-jjj format.                  | _required_ |
+| stop    | str    | Stop time in either ISO or yyyy-jjj format. Defaults to None. | `''`       |

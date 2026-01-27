@@ -1,0 +1,216 @@
+# instruments.ctx { #planetarypy.instruments.ctx }
+
+`instruments.ctx`
+
+Module for dealing with CTX data.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [CTXCollection](#planetarypy.instruments.ctx.CTXCollection) | These are common ISIS tasks required to coregister CTX data. |
+| [Calib](#planetarypy.instruments.ctx.Calib) | Manage processing of raw PDS files using ISIS tools. |
+
+### CTXCollection { #planetarypy.instruments.ctx.CTXCollection }
+
+```python
+instruments.ctx.CTXCollection(list_of_pids, workdir='.', remove_bad=True)
+```
+
+These are common ISIS tasks required to coregister CTX data.
+
+Args:
+    list_of_pids (list):
+        List of CTX product IDs to process.
+    workdir (str or Path, optional):
+        Working directory for output files. Defaults to current directory (".").
+    remove_bad (bool, optional):
+        If True, remove product IDs marked as bad data based on metadata, warning will be
+        given. Defaults to True.
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [cubpaths](#planetarypy.instruments.ctx.CTXCollection.cubpaths) | get raw import cubes |
+| [geodataframe_path](#planetarypy.instruments.ctx.CTXCollection.geodataframe_path) | get the path to the GeoDataFrame with all footprints |
+| [image_list_lev0_path](#planetarypy.instruments.ctx.CTXCollection.image_list_lev0_path) | get the path to the image list file |
+| [image_list_lev1_path](#planetarypy.instruments.ctx.CTXCollection.image_list_lev1_path) | get the path to the image list file |
+| [image_list_lev2_path](#planetarypy.instruments.ctx.CTXCollection.image_list_lev2_path) | get the path to the image list file |
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [calibrate](#planetarypy.instruments.ctx.CTXCollection.calibrate) | perform the whole import to calibrated level 1 pipeline. |
+| [download](#planetarypy.instruments.ctx.CTXCollection.download) | I/O-bound task, so using ThreadPool |
+| [footprintinit](#planetarypy.instruments.ctx.CTXCollection.footprintinit) | perform ISIS footprint init on the list of files |
+| [overlap_stats](#planetarypy.instruments.ctx.CTXCollection.overlap_stats) | Calculate overlap statistics for the collection. |
+| [read_gml_to_gdf](#planetarypy.instruments.ctx.CTXCollection.read_gml_to_gdf) | Read the GML files from the collection and return a GeoDataFrame. |
+| [remove_bad_data](#planetarypy.instruments.ctx.CTXCollection.remove_bad_data) | use meta data marker to remove bad pids |
+
+##### calibrate { #planetarypy.instruments.ctx.CTXCollection.calibrate }
+
+```python
+instruments.ctx.CTXCollection.calibrate(sample=None, refresh=False)
+```
+
+perform the whole import to calibrated level 1 pipeline.
+
+sample: How many samples of self.pids to process
+
+##### download { #planetarypy.instruments.ctx.CTXCollection.download }
+
+```python
+instruments.ctx.CTXCollection.download(refresh=False)
+```
+
+I/O-bound task, so using ThreadPool
+
+##### footprintinit { #planetarypy.instruments.ctx.CTXCollection.footprintinit }
+
+```python
+instruments.ctx.CTXCollection.footprintinit(map=None, refresh=False)
+```
+
+perform ISIS footprint init on the list of files
+
+##### overlap_stats { #planetarypy.instruments.ctx.CTXCollection.overlap_stats }
+
+```python
+instruments.ctx.CTXCollection.overlap_stats()
+```
+
+Calculate overlap statistics for the collection.
+
+##### read_gml_to_gdf { #planetarypy.instruments.ctx.CTXCollection.read_gml_to_gdf }
+
+```python
+instruments.ctx.CTXCollection.read_gml_to_gdf(refresh=False)
+```
+
+Read the GML files from the collection and return a GeoDataFrame.
+
+##### remove_bad_data { #planetarypy.instruments.ctx.CTXCollection.remove_bad_data }
+
+```python
+instruments.ctx.CTXCollection.remove_bad_data()
+```
+
+use meta data marker to remove bad pids
+
+### Calib { #planetarypy.instruments.ctx.Calib }
+
+```python
+instruments.ctx.Calib(pid, destripe_to_calib=True, prefer_mirror=True)
+```
+
+Manage processing of raw PDS files using ISIS tools.
+
+#### Attributes
+
+| Name | Description |
+| --- | --- |
+| [spatial_summing](#planetarypy.instruments.ctx.Calib.spatial_summing) | Get the spatial summing value from the index file. |
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [calibrate](#planetarypy.instruments.ctx.Calib.calibrate) | Do ISIS `ctxcal`. |
+| [destripe](#planetarypy.instruments.ctx.Calib.destripe) | Do destriping via `ctxevenodd` if allowed by summing status. |
+| [footprintinit](#planetarypy.instruments.ctx.Calib.footprintinit) | Initialize footprint for the calibrated cube. |
+| [isis_import](#planetarypy.instruments.ctx.Calib.isis_import) | Import EDR data into ISIS cube. |
+| [map_project](#planetarypy.instruments.ctx.Calib.map_project) | Perform map projection. |
+| [plot_any](#planetarypy.instruments.ctx.Calib.plot_any) | returns re-usable holoviews plot object |
+| [spiceinit](#planetarypy.instruments.ctx.Calib.spiceinit) | Perform `spiceinit.` |
+
+##### calibrate { #planetarypy.instruments.ctx.Calib.calibrate }
+
+```python
+instruments.ctx.Calib.calibrate(refresh=False)
+```
+
+Do ISIS `ctxcal`.
+
+##### destripe { #planetarypy.instruments.ctx.Calib.destripe }
+
+```python
+instruments.ctx.Calib.destripe()
+```
+
+Do destriping via `ctxevenodd` if allowed by summing status.
+
+##### footprintinit { #planetarypy.instruments.ctx.Calib.footprintinit }
+
+```python
+instruments.ctx.Calib.footprintinit(refresh=False, **kwargs)
+```
+
+Initialize footprint for the calibrated cube.
+
+If map is None, mapping data will be taken
+
+##### isis_import { #planetarypy.instruments.ctx.Calib.isis_import }
+
+```python
+instruments.ctx.Calib.isis_import(refresh=False)
+```
+
+Import EDR data into ISIS cube.
+
+##### map_project { #planetarypy.instruments.ctx.Calib.map_project }
+
+```python
+instruments.ctx.Calib.map_project(mpp=6.25, refresh=False)
+```
+
+Perform map projection.
+
+##### plot_any { #planetarypy.instruments.ctx.Calib.plot_any }
+
+```python
+instruments.ctx.Calib.plot_any(path)
+```
+
+returns re-usable holoviews plot object
+
+##### spiceinit { #planetarypy.instruments.ctx.Calib.spiceinit }
+
+```python
+instruments.ctx.Calib.spiceinit(web='yes', refresh=False)
+```
+
+Perform `spiceinit.`
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [get_edr_index](#planetarypy.instruments.ctx.get_edr_index) | add some useful extra columns to the index. |
+| [process_parallel](#planetarypy.instruments.ctx.process_parallel) | Use ProcessPoolExecutor for CPU-bound tasks, and ThreadPoolExecutor for I/O-bound |
+| [product_id_from_serial_number](#planetarypy.instruments.ctx.product_id_from_serial_number) | Given a serial_number like 'MRO/CTX/1234567890.123', return the matching PRODUCT_ID. |
+
+### get_edr_index { #planetarypy.instruments.ctx.get_edr_index }
+
+```python
+instruments.ctx.get_edr_index(refresh=False)
+```
+
+add some useful extra columns to the index.
+
+### process_parallel { #planetarypy.instruments.ctx.process_parallel }
+
+```python
+instruments.ctx.process_parallel(Executor, task, pids, map=None, refresh=None)
+```
+
+Use ProcessPoolExecutor for CPU-bound tasks, and ThreadPoolExecutor for I/O-bound
+
+### product_id_from_serial_number { #planetarypy.instruments.ctx.product_id_from_serial_number }
+
+```python
+instruments.ctx.product_id_from_serial_number(serial_number, refresh=False)
+```
+
+Given a serial_number like 'MRO/CTX/1234567890.123', return the matching PRODUCT_ID.

@@ -1,0 +1,249 @@
+# utils { #planetarypy.utils }
+
+`utils`
+
+General utility functions for planetarypy.
+
+## Classes
+
+| Name | Description |
+| --- | --- |
+| [NestedTomlDict](#planetarypy.utils.NestedTomlDict) | A wrapper around tomlkit documents that supports dotted key access. |
+
+### NestedTomlDict { #planetarypy.utils.NestedTomlDict }
+
+```python
+utils.NestedTomlDict(file_path)
+```
+
+A wrapper around tomlkit documents that supports dotted key access.
+
+This class automatically creates nested table structures when you use
+dotted keys like "config.indexes.static".
+
+Example:
+    >>> doc = NestedTomlDict(Path("config.toml"))
+    >>> doc.set("config.indexes.static", "last_updated", "2025-10-20")
+    >>> # Creates: [config.indexes.static]
+    >>> #           last_updated = "2025-10-20"
+    >>> doc.save()
+
+#### Methods
+
+| Name | Description |
+| --- | --- |
+| [dumps](#planetarypy.utils.NestedTomlDict.dumps) | Dump to TOML string. |
+| [get](#planetarypy.utils.NestedTomlDict.get) | Get a value using a dotted key path. |
+| [save](#planetarypy.utils.NestedTomlDict.save) | Save to the TOML file. |
+| [set](#planetarypy.utils.NestedTomlDict.set) | Set a value using a dotted key path. |
+| [to_dict](#planetarypy.utils.NestedTomlDict.to_dict) | Convert to a regular Python dict. |
+
+##### dumps { #planetarypy.utils.NestedTomlDict.dumps }
+
+```python
+utils.NestedTomlDict.dumps()
+```
+
+Dump to TOML string.
+
+##### get { #planetarypy.utils.NestedTomlDict.get }
+
+```python
+utils.NestedTomlDict.get(dotted_key, field=None)
+```
+
+Get a value using a dotted key path.
+
+Args:
+    dotted_key: A dot-separated path like "config.indexes.static"
+    field: Optional field name to get from the final nested table.
+           If None, returns the entire nested table.
+
+Returns:
+    The value at the specified path, or None if not found
+
+##### save { #planetarypy.utils.NestedTomlDict.save }
+
+```python
+utils.NestedTomlDict.save()
+```
+
+Save to the TOML file.
+
+##### set { #planetarypy.utils.NestedTomlDict.set }
+
+```python
+utils.NestedTomlDict.set(dotted_key, field, value)
+```
+
+Set a value using a dotted key path.
+
+Args:
+    dotted_key: A dot-separated path like "config.indexes.static"
+    field: The field name to set in the final nested table
+    value: The value to set
+
+##### to_dict { #planetarypy.utils.NestedTomlDict.to_dict }
+
+```python
+utils.NestedTomlDict.to_dict()
+```
+
+Convert to a regular Python dict.
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [calculate_hours_since_timestamp](#planetarypy.utils.calculate_hours_since_timestamp) | Calculate the number of hours since the given timestamp. |
+| [catch_isis_error](#planetarypy.utils.catch_isis_error) | can be used as decorator for any ISIS function |
+| [check_url_exists](#planetarypy.utils.check_url_exists) | Check if a URL exists. |
+| [compare_remote_file](#planetarypy.utils.compare_remote_file) | Compare content from a remote URL with a local file, keeping a temp copy of remote. |
+| [file_variations](#planetarypy.utils.file_variations) | Return list of variations of a file name based on possible extensions. |
+| [get_remote_timestamp](#planetarypy.utils.get_remote_timestamp) | Return the timestamp (last-modified) of a remote file at a URL. |
+| [have_internet](#planetarypy.utils.have_internet) | Fast way to check for active internet connection. |
+| [parse_http_date](#planetarypy.utils.parse_http_date) | Parse date string retrieved via urllib.request. |
+| [replace_all_doy_times](#planetarypy.utils.replace_all_doy_times) | Convert all detected DOY time columns in df to datetimes in place. |
+| [url_retrieve](#planetarypy.utils.url_retrieve) | Downloads a file from url to outfile. |
+
+### calculate_hours_since_timestamp { #planetarypy.utils.calculate_hours_since_timestamp }
+
+```python
+utils.calculate_hours_since_timestamp(timestamp)
+```
+
+Calculate the number of hours since the given timestamp.
+
+### catch_isis_error { #planetarypy.utils.catch_isis_error }
+
+```python
+utils.catch_isis_error(func)
+```
+
+can be used as decorator for any ISIS function
+
+### check_url_exists { #planetarypy.utils.check_url_exists }
+
+```python
+utils.check_url_exists(url)
+```
+
+Check if a URL exists.
+
+### compare_remote_file { #planetarypy.utils.compare_remote_file }
+
+```python
+utils.compare_remote_file(remote_url, local_path, timeout=30)
+```
+
+Compare content from a remote URL with a local file, keeping a temp copy of remote.
+
+Args:
+    remote_url: URL to fetch remote content from
+    local_path: Path to local file to compare against
+    timeout: Timeout in seconds for the HTTP request
+
+Returns:
+    dict: Contains 'has_updates' (bool), 'remote_tmp_path' (Path or None),
+        and 'error' (str or None)
+
+### file_variations { #planetarypy.utils.file_variations }
+
+```python
+utils.file_variations(filename, extensions)
+```
+
+Return list of variations of a file name based on possible extensions.
+
+Generate a list of variations on a filename by replacing the extension with
+the provided list.
+
+Adapted from T. Olsens `file_variations of the pysis module for using pathlib.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type        | Description                               | Default    |
+|------------|-------------|-------------------------------------------|------------|
+| filename   | str or Path | The original filename to use as a base.   | _required_ |
+| extensions | list        | List of extensions to use for variations. | _required_ |
+
+#### Raises {.doc-section .doc-section-raises}
+
+| Name   | Type       | Description                               |
+|--------|------------|-------------------------------------------|
+|        | TypeError  | If extensions is not a list               |
+|        | ValueError | If any extension doesn't start with a dot |
+
+### get_remote_timestamp { #planetarypy.utils.get_remote_timestamp }
+
+```python
+utils.get_remote_timestamp(url)
+```
+
+Return the timestamp (last-modified) of a remote file at a URL.
+
+Useful for checking if there's an updated file available.
+
+### have_internet { #planetarypy.utils.have_internet }
+
+```python
+utils.have_internet()
+```
+
+Fast way to check for active internet connection.
+
+From https://stackoverflow.com/a/29854274/680232
+
+### parse_http_date { #planetarypy.utils.parse_http_date }
+
+```python
+utils.parse_http_date(http_date)
+```
+
+Parse date string retrieved via urllib.request.
+
+### replace_all_doy_times { #planetarypy.utils.replace_all_doy_times }
+
+```python
+utils.replace_all_doy_times(df, timecol='TIME')
+```
+
+Convert all detected DOY time columns in df to datetimes in place.
+
+All columns with timecol in the name will be converted and changes will be
+implemented on incoming dataframe in place (no returned dataframe)!
+
+### url_retrieve { #planetarypy.utils.url_retrieve }
+
+```python
+utils.url_retrieve(
+    url,
+    outfile,
+    chunk_size=4096,
+    user=None,
+    passwd=None,
+    leave_tqdm=True,
+    disable_tqdm=False,
+)
+```
+
+Downloads a file from url to outfile.
+
+Improved urlretrieve with progressbar, timeout and chunker.
+This downloader has built-in progress bar using tqdm and the `requests`
+package. Improves on standard `urllib` by adding time-out capability.
+
+Testing different chunk_sizes, 128 was usually fastest, YMMV.
+
+Inspired by https://stackoverflow.com/a/61575758/680232
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name       | Type            | Description                                                                                                                                 | Default    |
+|------------|-----------------|---------------------------------------------------------------------------------------------------------------------------------------------|------------|
+| url        | str \| yarl.URL | The URL to download                                                                                                                         | _required_ |
+| outfile    | str             | The path where to store the downloaded file.                                                                                                | _required_ |
+| chunk_size | int             | def chunk size for the request.iter_content call                                                                                            | `4096`     |
+| user       | str             | if provided, create HTTPBasicAuth object                                                                                                    | `None`     |
+| passwd     | str             | if provided, create HTTPBasicAuth object                                                                                                    | `None`     |
+| leave_tqdm | bool            | passed to tqdm to leave the progress bar after completion. In mass processing scenarios, you might want to set this to False. Default: True | `True`     |

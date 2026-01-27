@@ -1,0 +1,25 @@
+# cli { #planetarypy.cli }
+
+`cli`
+
+Console script for planetarypy.
+
+## Functions
+
+| Name | Description |
+| --- | --- |
+| [main](#planetarypy.cli.main) | Console script for planetarypy. |
+
+### main { #planetarypy.cli.main }
+
+```python
+cli.main(args=None)
+```
+
+Console script for planetarypy.
+
+Args:
+    args: List of command line arguments. If None, sys.argv[1:] is used.
+
+Returns:
+    int: Return code
