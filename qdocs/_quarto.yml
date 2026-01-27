@@ -22,6 +22,8 @@ website:
         href: explanation/index.qmd
       - text: API Reference
         href: reference/index.qmd
+      - text: Contributing
+        href: ../CONTRIBUTING.md
     right:
       - icon: github
         aria-label: GitHub
