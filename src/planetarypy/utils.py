@@ -4,7 +4,7 @@ import email.utils as eut
 import http.client as httplib
 from pathlib import Path
 from typing import Any
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import pandas as pd
 import requests
@@ -175,7 +175,8 @@ def get_remote_timestamp(url: str) -> dt.datetime:
 
     Useful for checking if there's an updated file available.
     """
-    with urlopen(str(url), timeout=10) as conn:
+    request = Request(str(url), headers={"User-Agent": "planetarypy"})
+    with urlopen(request, timeout=10) as conn:
         t = parse_http_date(conn.headers["last-modified"])
     return t
 
