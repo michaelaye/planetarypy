@@ -5,21 +5,20 @@ to handle URL management."""
 
 __all__ = ["Index", "InventoryIndex"]
 
-from pathlib import Path
 import csv
-import pandas as pd
+from pathlib import Path
 
+import pandas as pd
 from loguru import logger
 from yarl import URL
 
 from ..config import config
-from ..utils import url_retrieve, have_internet
-
-from .index_labels import IndexLabel
+from ..utils import have_internet, url_retrieve
 from .dynamic_index import (
-    DYNAMIC_URL_HANDLERS,
+    DYNAMIC_URL_HANDLERS,  # registry of dynamic index handlers
     DynamicRemoteHandler,
 )
+from .index_labels import IndexLabel
 from .static_index import StaticRemoteHandler
 
 

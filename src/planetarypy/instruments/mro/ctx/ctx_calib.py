@@ -549,10 +549,12 @@ class CTXCollection:
         "get the path to the image list file"
         return self.workdir / "image_list_lev2.lis"
 
-    def write_isis_filelist(self, workdir=None, level=1):
+    def write_isis_filelist(self, workdir=None, fname=None, level=1):
         workdir = self.workdir if workdir is None else Path(workdir)
         logger.debug(f"{self.workdir=}")
-        savepath = workdir / f"image_list_lev{level}.lis"
+        savepath = (
+            workdir / f"image_list_lev{level}.lis" if fname is None else workdir / fname
+        )
         match level:
             case 0:
                 paths = self.cub_paths
