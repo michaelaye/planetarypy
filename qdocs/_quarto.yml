@@ -43,7 +43,6 @@ website:
         - explanation/config_flow_diagram.qmd
         - explanation/pds_index_config.qmd
         - explanation/pds_index_download_flows.qmd
-        - explanation/pds_index_management.qmd
     - title: "API Reference"
       contents: "{{ contents }}"
 
