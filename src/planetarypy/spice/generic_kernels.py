@@ -31,7 +31,7 @@ generic_kernel_names = [
     "pck/pck00010.tpc",
     "pck/de-403-masses.tpc",
     "spk/planets/de430.bsp",
-    "spk/satellites/mar097.bsp",
+    "spk/satellites/mar099s.bsp",
 ]
 generic_kernel_paths = [GENERIC_STORAGE.joinpath(i) for i in generic_kernel_names]
 
