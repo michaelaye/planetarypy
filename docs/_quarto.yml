@@ -9,7 +9,7 @@ execute:
   freeze: auto
 
 website:
-  title: PlanetaryPy (Quarto Docs)
+  title: PlanetaryPy
   repo-url: https://github.com/michaelaye/planetarypy
   repo-actions: [issue]
   navbar:
