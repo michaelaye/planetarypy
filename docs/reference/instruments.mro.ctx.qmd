@@ -1,0 +1,10 @@
+# instruments.mro.ctx { #planetarypy.instruments.mro.ctx }
+
+`instruments.mro.ctx`
+
+CTX instrument package for MRO.
+
+This package provides tools for working with MRO CTX data.
+
+Example usage:
+    from planetarypy.instruments.mro.ctx import CTXCollection, EDR, Calib

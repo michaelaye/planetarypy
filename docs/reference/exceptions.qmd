@@ -46,9 +46,12 @@ exceptions.SomethingNotSetError(where, what)
 
 Exception raised for errors in the input of transformations.
 
-Attributes:
-    where: Where something is missing.
-    what: What is missing.
+#### Parameters {.doc-section .doc-section-parameters}
+
+| Name   | Type   | Description                 | Default    |
+|--------|--------|-----------------------------|------------|
+| where  |        | Where something is missing. | _required_ |
+| what   |        | What is missing.            | _required_ |
 
 ### SpicerError { #planetarypy.exceptions.SpicerError }
 

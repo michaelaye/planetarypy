@@ -1,4 +1,0 @@
-# instruments.hirise { #planetarypy.instruments.hirise }
-
-`instruments.hirise`
-

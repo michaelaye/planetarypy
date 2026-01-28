@@ -27,9 +27,9 @@ website:
       - reference/spice.pckernels.qmd
       section: SPICE Kernels
     - contents:
-      - reference/instruments.ctx.qmd
+      - reference/instruments.mro.ctx.qmd
+      - reference/instruments.mro.hirise.qmd
       - reference/instruments.go_ssi.qmd
-      - reference/instruments.hirise.qmd
       - reference/instruments.utils.qmd
       section: Instruments
     id: reference

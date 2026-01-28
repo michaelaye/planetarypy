@@ -120,7 +120,7 @@ quartodoc:
 
     - title: Instruments
       contents:
-        - instruments.ctx
+        - instruments.mro.ctx
+        - instruments.mro.hirise
         - instruments.go_ssi
-        - instruments.hirise
         - instruments.utils

@@ -102,8 +102,6 @@ Uses self.save_location if given, otherwise `planetarypy` archive.
 | --- | --- |
 | [download_one_url](#planetarypy.spice.archived_kernels.download_one_url) | Download a single URL to a local path. |
 | [get_metakernel_and_files](#planetarypy.spice.archived_kernels.get_metakernel_and_files) | For a given mission and start/stop times, download the kernels and get metakernel path. |
-| [is_start_valid](#planetarypy.spice.archived_kernels.is_start_valid) | Check if the start time is valid for a given mission. |
-| [is_stop_valid](#planetarypy.spice.archived_kernels.is_stop_valid) | Check if the stop time is valid for a given mission. |
 | [list_kernels_for_day](#planetarypy.spice.archived_kernels.list_kernels_for_day) | List all kernels for a given time range of a mission. |
 
 ### download_one_url { #planetarypy.spice.archived_kernels.download_one_url }
@@ -145,36 +143,6 @@ For a given mission and start/stop times, download the kernels and get metakerne
 | stop          | str    | Stop time in either ISO or yyyy-jjj format.                         | _required_ |
 | save_location | str    | Overwrite default storing in planetarypy archive. Defaults to None. | `None`     |
 | quiet         | bool   | Suppress download feedback. Defaults to False.                      | `False`    |
-
-### is_start_valid { #planetarypy.spice.archived_kernels.is_start_valid }
-
-```python
-spice.archived_kernels.is_start_valid(mission, start)
-```
-
-Check if the start time is valid for a given mission.
-
-#### Parameters {.doc-section .doc-section-parameters}
-
-| Name    | Type         | Description                                    | Default    |
-|---------|--------------|------------------------------------------------|------------|
-| mission | str          | Mission shorthand label of datasets dataframe. | _required_ |
-| start   | astropy.Time | Start time in astropy.Time format.             | _required_ |
-
-### is_stop_valid { #planetarypy.spice.archived_kernels.is_stop_valid }
-
-```python
-spice.archived_kernels.is_stop_valid(mission, stop)
-```
-
-Check if the stop time is valid for a given mission.
-
-#### Parameters {.doc-section .doc-section-parameters}
-
-| Name    | Type         | Description                                    | Default    |
-|---------|--------------|------------------------------------------------|------------|
-| mission | str          | Mission shorthand label of datasets dataframe. | _required_ |
-| stop    | astropy.Time | Stop time in astropy.Time format.              | _required_ |
 
 ### list_kernels_for_day { #planetarypy.spice.archived_kernels.list_kernels_for_day }
 

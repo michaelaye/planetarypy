@@ -1,8 +1,4 @@
----
-title: API Reference
----
-
-Welcome to the API Reference. Here you’ll find detailed documentation for all modules and functions in PlanetaryPy.
+# API Reference {.doc .doc-index}
 
 ## Core Modules
 
@@ -47,7 +43,7 @@ Helpers for SPICE kernels and configuration.
 
 | | |
 | --- | --- |
-| [instruments.ctx](instruments.ctx.qmd#planetarypy.instruments.ctx) | Module for dealing with CTX data. |
+| [instruments.mro.ctx](instruments.mro.ctx.qmd#planetarypy.instruments.mro.ctx) | CTX instrument package for MRO. |
+| [instruments.mro.hirise](instruments.mro.hirise.qmd#planetarypy.instruments.mro.hirise) |  |
 | [instruments.go_ssi](instruments.go_ssi.qmd#planetarypy.instruments.go_ssi) |  |
-| [instruments.hirise](instruments.hirise.qmd#planetarypy.instruments.hirise) |  |
 | [instruments.utils](instruments.utils.qmd#planetarypy.instruments.utils) |  |
