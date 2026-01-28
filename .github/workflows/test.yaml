@@ -34,15 +34,14 @@ jobs:
         conda-remove-defaults: true
 
     - name: Cache conda env
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.conda/pkgs
           ~/.conda/envs
-        key: conda-${{ runner.os }}-py${{ matrix.python-version }}-${{ github.sha }}
+        key: conda-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
         restore-keys: |
           conda-${{ runner.os }}-py${{ matrix.python-version }}-
-          conda-${{ runner.os }}-
 
     - name: Install dependencies
       shell: bash -l {0}
