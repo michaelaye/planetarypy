@@ -42,6 +42,8 @@ website:
       contents:
         - howto/index.qmd
         - howto/howto_spice_archived.ipynb
+        - howto/ctx_edr.ipynb
+        - howto/ctx_calib.ipynb
     - title: Explanation
       contents:
         - explanation/index.qmd
