@@ -1,7 +1,7 @@
 # planetarypy
 
 [![PyPI](https://img.shields.io/pypi/v/planetarypy.svg)](https://pypi.python.org/pypi/planetarypy)
-[![Documentation Status](https://readthedocs.org/projects/planetarypy/badge/?version=latest)](https://planetarypy.readthedocs.io/en/latest/?badge=latest)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://michaelaye.github.io/planetarypy/)
 [![codecov](https://codecov.io/gh/planetarypy/planetarypy/branch/main/graph/badge.svg)](https://codecov.io/gh/planetarypy/planetarypy)
 
 Core package for planetary science tools.
@@ -16,10 +16,10 @@ for working in planetary science in Python.
 That package will be open for public contribution and collaboration.
 
 The approximate feature set (also see below) that this package will cover can be checked out at
-https://michaelaye.github.io/nbplanetary where the documentation for the current package lives.
+the [documentation site](https://michaelaye.github.io/planetarypy/).
 
 * Free software: BSD-3 license
-* Documentation (not yet deployed): https://planetarypy.readthedocs.io
+* Documentation: https://michaelaye.github.io/planetarypy/
 * Part of the [PlanetaryPy](https://planetarypy.org/) Organisation.
 
 ## Installation
@@ -170,5 +170,5 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 ## Contributing
 
 Feedback, issues, and contributions are always gratefully welcomed. See the
-contributing guide for details on how to help and setup a development
-environment. 
+[Contributing Guide](https://michaelaye.github.io/planetarypy/contributing.html)
+for details on how to help and set up a development environment. 
