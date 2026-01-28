@@ -61,6 +61,10 @@ dev = [
     "pip-tools",
     "sh",            # For running shell commands from Python
 ]
+# Documentation dependencies (also available via conda)
+docs = [
+    "quartodoc",
+]
 
 [project.scripts]
 planetarypy = "planetarypy.cli:main"

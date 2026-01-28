@@ -5,6 +5,9 @@ project:
     port: 4200
     browser: true
 
+execute:
+  freeze: auto
+
 website:
   title: PlanetaryPy (Quarto Docs)
   repo-url: https://github.com/michaelaye/planetarypy
