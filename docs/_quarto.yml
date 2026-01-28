@@ -62,6 +62,7 @@ format:
     toc-location: right
     code-link: true
     css:
+      - styles.css
       - reference/_styles-quartodoc.css
 
 # Read the generated sidebar definitions

@@ -1,0 +1,22 @@
+/* Custom styles for PlanetaryPy docs */
+
+/* Fix inline code contrast in dark mode headings and cards */
+.quarto-dark h1 code,
+.quarto-dark h2 code,
+.quarto-dark h3 code,
+.quarto-dark h4 code,
+.quarto-dark h5 code,
+.quarto-dark h6 code,
+.quarto-dark .title code,
+.quarto-dark .card-title code,
+.quarto-dark .listing-title code {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #e83e8c;
+}
+
+/* Also fix inline code in regular text for dark mode */
+.quarto-dark p code,
+.quarto-dark li code,
+.quarto-dark td code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
