@@ -20,6 +20,8 @@ PlanetarPy exceptions.
 exceptions.Error()
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/exceptions.py#L16-L19){.source-link target="_blank"}
+
 Base class for exceptions in this module.
 
 ### GeoTransformNotSetError { #planetarypy.exceptions.GeoTransformNotSetError }
@@ -27,6 +29,8 @@ Base class for exceptions in this module.
 ```python
 exceptions.GeoTransformNotSetError(where)
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/exceptions.py#L48-L52){.source-link target="_blank"}
 
 Exception raised when a GeoTransform is not set.
 
@@ -36,6 +40,8 @@ Exception raised when a GeoTransform is not set.
 exceptions.ProjectionNotSetError(where)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/exceptions.py#L41-L45){.source-link target="_blank"}
+
 Exception raised when a projection is not set.
 
 ### SomethingNotSetError { #planetarypy.exceptions.SomethingNotSetError }
@@ -43,6 +49,8 @@ Exception raised when a projection is not set.
 ```python
 exceptions.SomethingNotSetError(where, what)
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/exceptions.py#L22-L38){.source-link target="_blank"}
 
 Exception raised for errors in the input of transformations.
 
@@ -58,5 +66,7 @@ Exception raised for errors in the input of transformations.
 ```python
 exceptions.SpicerError()
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/exceptions.py#L55-L58){.source-link target="_blank"}
 
 Base class for exceptions in this module.

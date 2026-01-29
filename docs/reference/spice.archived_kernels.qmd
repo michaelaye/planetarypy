@@ -26,6 +26,8 @@ stop as parameters.
 spice.archived_kernels.Subsetter(mission, start, stop=None, save_location=None)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/archived_kernels.py#L281-L509){.source-link target="_blank"}
+
 Class to manage retrieving subset SPICE kernel lists.
 
 #### Attributes {.doc-section .doc-section-attributes}
@@ -69,6 +71,8 @@ Download SPICE kernels.
 | non_blocking | bool   | Use Dask client for parallel download. Defaults to False.        | `False`   |
 | quiet        | bool   | Suppress name and path of downloaded kernels. Defaults to False. | `False`   |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/archived_kernels.py#L453-L485){.source-link target="_blank"}
+
 ##### get_local_path { #planetarypy.spice.archived_kernels.Subsetter.get_local_path }
 
 ```python
@@ -85,6 +89,8 @@ Uses self.save_location if given.
 |--------|--------|-------------------------|------------|
 | url    | str    | URL of the kernel file. | _required_ |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/archived_kernels.py#L409-L430){.source-link target="_blank"}
+
 ##### get_metakernel { #planetarypy.spice.archived_kernels.Subsetter.get_metakernel }
 
 ```python
@@ -95,6 +101,8 @@ Download metakernel file from NAIF, adapt paths to match local storage
 and return local path to metakernel file.
 
 Uses self.save_location if given, otherwise `planetarypy` archive.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/archived_kernels.py#L487-L509){.source-link target="_blank"}
 
 ## Functions
 
@@ -120,6 +128,8 @@ Download a single URL to a local path.
 | local_path | Path   | Path where to save the file                           | _required_ |
 | overwrite  | bool   | Whether to overwrite existing files, by default False | `False`    |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/archived_kernels.py#L261-L278){.source-link target="_blank"}
+
 ### get_metakernel_and_files { #planetarypy.spice.archived_kernels.get_metakernel_and_files }
 
 ```python
@@ -144,6 +154,8 @@ For a given mission and start/stop times, download the kernels and get metakerne
 | save_location | str    | Overwrite default storing in planetarypy archive. Defaults to None. | `None`     |
 | quiet         | bool   | Suppress download feedback. Defaults to False.                      | `False`    |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/archived_kernels.py#L512-L534){.source-link target="_blank"}
+
 ### list_kernels_for_day { #planetarypy.spice.archived_kernels.list_kernels_for_day }
 
 ```python
@@ -159,3 +171,5 @@ List all kernels for a given time range of a mission.
 | mission | str    | Mission shorthand in datasets dataframe.                      | _required_ |
 | start   | str    | Start time in either ISO or yyyy-jjj format.                  | _required_ |
 | stop    | str    | Stop time in either ISO or yyyy-jjj format. Defaults to None. | `''`       |
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/archived_kernels.py#L537-L551){.source-link target="_blank"}

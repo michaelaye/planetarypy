@@ -37,6 +37,8 @@ This function is similar to the standard library's
 datetime.datetime.isoformat() function (see that documentation
 for details on *sep* and *timespec*).
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/datetime_format_converters.py#L22-L47){.source-link target="_blank"}
+
 ### fromdoyformat { #planetarypy.datetime_format_converters.fromdoyformat }
 
 ```python
@@ -55,6 +57,8 @@ where * can match any single character.
 This function is similar to the  standard library's
 datetime.datetime.fromisoformat() function.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/datetime_format_converters.py#L50-L79){.source-link target="_blank"}
+
 ### fromisozformat { #planetarypy.datetime_format_converters.fromisozformat }
 
 ```python
@@ -63,6 +67,8 @@ datetime_format_converters.fromisozformat(date_string)
 
 Return a datetime corresponding to *date_string* in one of the formats emitted by
 isozformat().  This datetime will be a timezone-aware datetime.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/datetime_format_converters.py#L82-L92){.source-link target="_blank"}
 
 ### isozformat { #planetarypy.datetime_format_converters.isozformat }
 
@@ -88,3 +94,5 @@ will return a representation that ends in "Z".  Both formats are
 valid ISO 8601 date formats, but the standard library picks one
 string representation, and this function provides the other, which
 is the required format for PDS4 labels.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/datetime_format_converters.py#L95-L123){.source-link target="_blank"}

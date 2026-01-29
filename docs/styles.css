@@ -20,3 +20,17 @@
 .quarto-dark td code {
   background-color: rgba(255, 255, 255, 0.1);
 }
+
+/* Source link styling (nbdev-inspired) */
+.source-link {
+  float: right;
+  font-size: 0.85em;
+  font-family: var(--bs-font-monospace);
+  color: var(--bs-secondary);
+  text-decoration: none;
+}
+
+.source-link:hover {
+  color: var(--bs-primary);
+  text-decoration: underline;
+}

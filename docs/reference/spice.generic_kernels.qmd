@@ -29,6 +29,8 @@ Download all kernels required for basic SPICE operations.
 |-----------|--------|-------------------------------------------------------|-----------|
 | overwrite | bool   | Whether to overwrite existing files, by default False | `False`   |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/generic_kernels.py#L39-L56){.source-link target="_blank"}
+
 ### load_generic_kernels { #planetarypy.spice.generic_kernels.load_generic_kernels }
 
 ```python
@@ -39,6 +41,8 @@ Load all kernels in generic_kernels list.
 
 Loads pure planetary bodies meta-kernel without spacecraft data.
 Downloads any missing generic kernels.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/generic_kernels.py#L59-L68){.source-link target="_blank"}
 
 ### show_loaded_kernels { #planetarypy.spice.generic_kernels.show_loaded_kernels }
 
@@ -53,3 +57,5 @@ Show overview of all currently loaded SPICE kernels.
 | Name   | Type   | Description                                            |
 |--------|--------|--------------------------------------------------------|
 |        | list   | List of loaded kernel paths relative to KERNEL_STORAGE |
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/generic_kernels.py#L71-L95){.source-link target="_blank"}

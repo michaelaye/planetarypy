@@ -23,3 +23,5 @@ Args:
 
 Returns:
     int: Return code
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/cli.py#L7-L22){.source-link target="_blank"}

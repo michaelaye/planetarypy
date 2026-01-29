@@ -19,6 +19,8 @@ volume delivery with a new index file and its URL.
 pds.dynamic_index.DynamicRemoteHandler(index_key)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/dynamic_index.py#L20-L142){.source-link target="_blank"}
+
 Manages dynamic index URLs and their discovery/caching.
 
 It uses the AccessLog to track TWO URLs:
@@ -58,3 +60,5 @@ Discover the latest index URL from the remote source.
 
 This method only discovers and returns the URL - it does NOT update any logs.
 Logging is handled by the caller based on what they want to do with the URL.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/dynamic_index.py#L52-L73){.source-link target="_blank"}

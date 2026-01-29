@@ -17,3 +17,5 @@ instruments.utils.read_image(p)
 ```
 
 Read all cubes or geotiffs in a standardized way.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/instruments/utils.py#L3-L9){.source-link target="_blank"}

@@ -16,6 +16,8 @@ Logging handlers for PDS index access timestamps and URL discoveries.
 pds.index_logging.AccessLog(key)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_logging.py#L13-L133){.source-link target="_blank"}
+
 Handler for index log operations.
 
 #### Parameters {.doc-section .doc-section-parameters}
@@ -50,6 +52,8 @@ pds.index_logging.AccessLog.log_available_url(url)
 
 Log the URL of an available update.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_logging.py#L48-L53){.source-link target="_blank"}
+
 ##### log_current_url { #planetarypy.pds.index_logging.AccessLog.log_current_url }
 
 ```python
@@ -58,6 +62,8 @@ pds.index_logging.AccessLog.log_current_url(url)
 
 Log the URL of the currently cached/downloaded index.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_logging.py#L43-L46){.source-link target="_blank"}
+
 ##### log_update_available { #planetarypy.pds.index_logging.AccessLog.log_update_available }
 
 ```python
@@ -65,3 +71,5 @@ pds.index_logging.AccessLog.log_update_available(available)
 ```
 
 Log whether an update is available for this key.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_logging.py#L75-L79){.source-link target="_blank"}

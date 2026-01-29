@@ -80,6 +80,12 @@ quartodoc:
   package: planetarypy
   # Docstring parser (numpy | google | sphinx)
   parser: numpy
+  # Custom renderer with GitHub source links
+  renderer:
+    style: _renderer.py
+    repo_url: https://github.com/michaelaye/planetarypy
+    branch: main
+    source_dir: src
   # Also write sidebar and default CSS that Quarto should load
   sidebar: reference/_sidebar.yml
   css: reference/_styles-quartodoc.css

@@ -19,6 +19,8 @@ PDS index URLs and timestamps are now managed separately in pds/index_config.py.
 config.Config(config_path=None)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/config.py#L17-L113){.source-link target="_blank"}
+
 Manage general configuration settings.
 
 This class handles general configuration settings for the planetarypy package.
@@ -48,6 +50,8 @@ config.Config.get_value(key)
 
 Get sub-dictionary by nested key.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/config.py#L76-L84){.source-link target="_blank"}
+
 ##### save { #planetarypy.config.Config.save }
 
 ```python
@@ -56,6 +60,8 @@ config.Config.save()
 
 Write the TOML doc to file.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/config.py#L108-L110){.source-link target="_blank"}
+
 ##### set_value { #planetarypy.config.Config.set_value }
 
 ```python
@@ -63,3 +69,5 @@ config.Config.set_value(nested_key, value, save=True)
 ```
 
 Set value in sub-dic using dotted key.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/config.py#L86-L102){.source-link target="_blank"}

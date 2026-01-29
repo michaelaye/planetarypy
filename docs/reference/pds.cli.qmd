@@ -47,3 +47,5 @@ Force update check for PDS index configuration and dynamic URL discovery.
 ```python
 >>> # REVIEW: add example usage
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/cli.py#L19-L109){.source-link target="_blank"}

@@ -23,6 +23,8 @@ pds.utils.get_index_names(mission_instrument)
 
 Return a sorted list of all index names for a given mission and instrument (from static and dynamic configs).
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/utils.py#L69-L78){.source-link target="_blank"}
+
 ### get_instrument_names { #planetarypy.pds.utils.get_instrument_names }
 
 ```python
@@ -31,6 +33,8 @@ pds.utils.get_instrument_names(mission)
 
 Return a sorted list of all instruments for a given mission (from static and dynamic configs).
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/utils.py#L58-L66){.source-link target="_blank"}
+
 ### get_mission_names { #planetarypy.pds.utils.get_mission_names }
 
 ```python
@@ -38,6 +42,8 @@ pds.utils.get_mission_names()
 ```
 
 Return a sorted list of all available missions (from static and dynamic configs).
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/utils.py#L51-L55){.source-link target="_blank"}
 
 ### print_available_indexes { #planetarypy.pds.utils.print_available_indexes }
 
@@ -73,3 +79,5 @@ Examples:
     >>> print_available_indexes(keys_only=True)  # returns ["cassini.iss.index", ...]
     >>> print_available_indexes('mro')           # prints tree for mro only
     >>> print_available_indexes('mro', 'ctx')    # prints tree for mro.ctx only
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/utils.py#L81-L159){.source-link target="_blank"}

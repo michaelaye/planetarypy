@@ -16,6 +16,8 @@ General utility functions for planetarypy.
 utils.NestedTomlDict(file_path)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L48-L131){.source-link target="_blank"}
+
 A wrapper around tomlkit documents that supports dotted key access.
 
 This class automatically creates nested table structures when you use
@@ -46,6 +48,8 @@ utils.NestedTomlDict.dumps()
 
 Dump to TOML string.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L124-L126){.source-link target="_blank"}
+
 ##### get { #planetarypy.utils.NestedTomlDict.get }
 
 ```python
@@ -62,6 +66,8 @@ Args:
 Returns:
     The value at the specified path, or None if not found
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L95-L118){.source-link target="_blank"}
+
 ##### save { #planetarypy.utils.NestedTomlDict.save }
 
 ```python
@@ -69,6 +75,8 @@ utils.NestedTomlDict.save()
 ```
 
 Save to the TOML file.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L128-L131){.source-link target="_blank"}
 
 ##### set { #planetarypy.utils.NestedTomlDict.set }
 
@@ -83,6 +91,8 @@ Args:
     field: The field name to set in the final nested table
     value: The value to set
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L75-L93){.source-link target="_blank"}
+
 ##### to_dict { #planetarypy.utils.NestedTomlDict.to_dict }
 
 ```python
@@ -90,6 +100,8 @@ utils.NestedTomlDict.to_dict()
 ```
 
 Convert to a regular Python dict.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L120-L122){.source-link target="_blank"}
 
 ## Functions
 
@@ -114,6 +126,8 @@ utils.calculate_hours_since_timestamp(timestamp)
 
 Calculate the number of hours since the given timestamp.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L141-L151){.source-link target="_blank"}
+
 ### catch_isis_error { #planetarypy.utils.catch_isis_error }
 
 ```python
@@ -122,6 +136,8 @@ utils.catch_isis_error(func)
 
 can be used as decorator for any ISIS function
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L339-L353){.source-link target="_blank"}
+
 ### check_url_exists { #planetarypy.utils.check_url_exists }
 
 ```python
@@ -129,6 +145,8 @@ utils.check_url_exists(url)
 ```
 
 Check if a URL exists.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L184-L187){.source-link target="_blank"}
 
 ### compare_remote_file { #planetarypy.utils.compare_remote_file }
 
@@ -146,6 +164,8 @@ Args:
 Returns:
     dict: Contains 'has_updates' (bool), 'remote_tmp_path' (Path or None),
         and 'error' (str or None)
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L190-L233){.source-link target="_blank"}
 
 ### file_variations { #planetarypy.utils.file_variations }
 
@@ -174,6 +194,8 @@ Adapted from T. Olsens `file_variations of the pysis module for using pathlib.
 |        | TypeError  | If extensions is not a list               |
 |        | ValueError | If any extension doesn't start with a dot |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L310-L336){.source-link target="_blank"}
+
 ### get_remote_timestamp { #planetarypy.utils.get_remote_timestamp }
 
 ```python
@@ -183,6 +205,8 @@ utils.get_remote_timestamp(url)
 Return the timestamp (last-modified) of a remote file at a URL.
 
 Useful for checking if there's an updated file available.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L172-L181){.source-link target="_blank"}
 
 ### have_internet { #planetarypy.utils.have_internet }
 
@@ -194,6 +218,8 @@ Fast way to check for active internet connection.
 
 From https://stackoverflow.com/a/29854274/680232
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L294-L307){.source-link target="_blank"}
+
 ### parse_http_date { #planetarypy.utils.parse_http_date }
 
 ```python
@@ -201,6 +227,8 @@ utils.parse_http_date(http_date)
 ```
 
 Parse date string retrieved via urllib.request.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L167-L169){.source-link target="_blank"}
 
 ### replace_all_doy_times { #planetarypy.utils.replace_all_doy_times }
 
@@ -212,6 +240,8 @@ Convert all detected DOY time columns in df to datetimes in place.
 
 All columns with timecol in the name will be converted and changes will be
 implemented on incoming dataframe in place (no returned dataframe)!
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L154-L163){.source-link target="_blank"}
 
 ### url_retrieve { #planetarypy.utils.url_retrieve }
 
@@ -247,3 +277,5 @@ Inspired by https://stackoverflow.com/a/61575758/680232
 | user       | str             | if provided, create HTTPBasicAuth object                                                                                                    | `None`     |
 | passwd     | str             | if provided, create HTTPBasicAuth object                                                                                                    | `None`     |
 | leave_tqdm | bool            | passed to tqdm to leave the progress bar after completion. In mass processing scenarios, you might want to set this to False. Default: True | `True`     |
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/utils.py#L236-L291){.source-link target="_blank"}

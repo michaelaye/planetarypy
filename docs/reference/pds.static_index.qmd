@@ -20,6 +20,8 @@ Update logic focuses on checking for newer file timestamps at known stable URLs.
 pds.static_index.ConfigHandler(local_path=None, force_update=False)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/static_index.py#L18-L113){.source-link target="_blank"}
+
 Handler for the statix index URLs configuration file.
 
 - Download from planetarypy config repo if it is not present.
@@ -43,6 +45,8 @@ Handler for the statix index URLs configuration file.
 ```python
 pds.static_index.StaticRemoteHandler(index_key, force_config_update=False)
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/static_index.py#L116-L191){.source-link target="_blank"}
 
 Handler for static remote indexes with fixed URLs from configuration.
 
@@ -77,3 +81,5 @@ pds.static_index.StaticRemoteHandler.get_remote_timestamp()
 ```
 
 Get the last modified timestamp of the remote index file.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/static_index.py#L149-L159){.source-link target="_blank"}

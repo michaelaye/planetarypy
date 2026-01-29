@@ -19,6 +19,8 @@ spice.pckernels.download_file(url, local_path, overwrite=False)
 
 Download a file from a URL to a local path.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/pckernels.py#L6-L26){.source-link target="_blank"}
+
 ### get_kernel { #planetarypy.spice.pckernels.get_kernel }
 
 ```python
@@ -26,3 +28,5 @@ spice.pckernels.get_kernel(version='v11', data_dir=Path('.') / 'pck_kernels')
 ```
 
 Get the path to a PCK kernel file, downloading it if necessary.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/spice/pckernels.py#L43-L53){.source-link target="_blank"}

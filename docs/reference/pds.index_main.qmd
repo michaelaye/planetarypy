@@ -20,6 +20,8 @@ to handle URL management.
 pds.index_main.Index(index_key, local_dir=None, force_config_update=False)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_main.py#L25-L287){.source-link target="_blank"}
+
 Unified Index class using composition with Remote classes.
 
 This class provides file management operations while delegating URL management
@@ -71,6 +73,8 @@ pds.index_main.Index.convert_to_parquet()
 
 Convert the downloaded index files to parquet format.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_main.py#L243-L253){.source-link target="_blank"}
+
 ##### download { #planetarypy.pds.index_main.Index.download }
 
 ```python
@@ -85,6 +89,8 @@ Args:
 
 Returns:
     True if download was successful
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_main.py#L171-L216){.source-link target="_blank"}
 
 ##### ensure_parquet { #planetarypy.pds.index_main.Index.ensure_parquet }
 
@@ -101,6 +107,8 @@ Ensure a parquet cache exists for this index.
 Returns:
     True if a download was performed, False otherwise.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_main.py#L218-L241){.source-link target="_blank"}
+
 ##### read_index_data { #planetarypy.pds.index_main.Index.read_index_data }
 
 ```python
@@ -109,6 +117,8 @@ pds.index_main.Index.read_index_data(convert_times=True)
 
 Read the index data from label and table files.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_main.py#L255-L263){.source-link target="_blank"}
+
 ##### refresh_remote { #planetarypy.pds.index_main.Index.refresh_remote }
 
 ```python
@@ -116,6 +126,8 @@ pds.index_main.Index.refresh_remote()
 ```
 
 Force refresh of remote URL information.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_main.py#L270-L275){.source-link target="_blank"}
 
 ### InventoryIndex { #planetarypy.pds.index_main.InventoryIndex }
 
@@ -126,6 +138,8 @@ pds.index_main.InventoryIndex(
     force_config_update=False,
 )
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_main.py#L290-L343){.source-link target="_blank"}
 
 Index class for inventory-style CSV indexes.
 This class handles CSV files where:

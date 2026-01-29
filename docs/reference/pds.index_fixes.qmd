@@ -36,6 +36,8 @@ Apply a file-level fixer for the given index key if registered.
 | index_key  | str         | The dotted index key (e.g. "go.ssi.index"). | _required_ |
 | table_path | str or Path | Path to the table file to fix.              | _required_ |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_fixes.py#L158-L173){.source-link target="_blank"}
+
 ### apply_pre_time_df_fixer { #planetarypy.pds.index_fixes.apply_pre_time_df_fixer }
 
 ```python
@@ -57,6 +59,8 @@ Apply a DataFrame-level fixer prior to time conversion if registered.
 |--------|------------------|---------------------------------|
 |        | pandas.DataFrame | Potentially modified DataFrame. |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_fixes.py#L176-L198){.source-link target="_blank"}
+
 ### fix_go_ssi_file { #planetarypy.pds.index_fixes.fix_go_ssi_file }
 
 ```python
@@ -67,6 +71,8 @@ File-level fix for Galileo SSI index before parsing.
 
 The GO SSI index has a malformed value with a quote instead of a comma that
 must be fixed in the raw table file prior to parsing.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_fixes.py#L113-L120){.source-link target="_blank"}
 
 ### fix_lro_lola_rdr_df { #planetarypy.pds.index_fixes.fix_lro_lola_rdr_df }
 
@@ -92,6 +98,8 @@ full datetime.
 |--------|------------------|------------------------------------------------------------------------|
 |        | pandas.DataFrame | Modified DataFrame with ``PRODUCT_CREATION_TIME`` parsed to datetimes. |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_fixes.py#L123-L155){.source-link target="_blank"}
+
 ### fix_mer_rdr_df { #planetarypy.pds.index_fixes.fix_mer_rdr_df }
 
 ```python
@@ -115,6 +123,8 @@ the end of time strings and non-numeric values like "TBD" in the
 | Name   | Type             | Description      |
 |--------|------------------|------------------|
 |        | pandas.DataFrame | Fixed DataFrame. |
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_fixes.py#L83-L110){.source-link target="_blank"}
 
 ### replace_in_dataframe { #planetarypy.pds.index_fixes.replace_in_dataframe }
 
@@ -148,6 +158,8 @@ Replace text in a pandas DataFrame string columns.
 |--------|------------------|--------------------------------------|
 |        | pandas.DataFrame | DataFrame with replacements applied. |
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_fixes.py#L15-L56){.source-link target="_blank"}
+
 ### replace_in_file { #planetarypy.pds.index_fixes.replace_in_file }
 
 ```python
@@ -163,3 +175,5 @@ Simple in-place text replacement in a file.
 | filename | str or Path | Path to the file to modify. | _required_ |
 | old_text | str         | Text to replace.            | _required_ |
 | new_text | str         | Replacement text.           | _required_ |
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_fixes.py#L59-L80){.source-link target="_blank"}

@@ -17,6 +17,8 @@
 instruments.go_ssi.EDR(frameno, save_dir=None)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/instruments/go_ssi.py#L33-L135){.source-link target="_blank"}
+
 Support class to work with GO SSI EDR data.
 
 Using frameno a.k.a. frame number as the only unique identifier for GO SSI images.
@@ -28,6 +30,8 @@ return sets of images. Use `EDRSet` for those.
 ```python
 instruments.go_ssi.EDRSet(meta, save_dir=None)
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/instruments/go_ssi.py#L138-L299){.source-link target="_blank"}
 
 Support class to work with GO SSI EDR data.
 
@@ -55,6 +59,8 @@ instruments.go_ssi.EDRSet.from_frameno(frameno, save_dir=None)
 
 Alternative constructor to create an EDRSet from a frameno.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/instruments/go_ssi.py#L151-L167){.source-link target="_blank"}
+
 ##### from_image_id { #planetarypy.instruments.go_ssi.EDRSet.from_image_id }
 
 ```python
@@ -62,6 +68,8 @@ instruments.go_ssi.EDRSet.from_image_id(image_id, save_dir=None)
 ```
 
 Alternative constructor to create an EDRSet from a frameno.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/instruments/go_ssi.py#L169-L185){.source-link target="_blank"}
 
 ## Functions
 
@@ -76,3 +84,5 @@ instruments.go_ssi.get_general_index(refresh=False)
 ```
 
 add some useful extra columns to the index.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/instruments/go_ssi.py#L20-L30){.source-link target="_blank"}

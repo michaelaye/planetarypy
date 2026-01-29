@@ -20,6 +20,8 @@ parsing index files, and converting them to convenient data structures.
 pds.index_labels.IndexLabel(labelpath, index_key=None)
 ```
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_labels.py#L102-L173){.source-link target="_blank"}
+
 Support working with label files of PDS Index tables.
 
 #### Attributes
@@ -34,6 +36,8 @@ Support working with label files of PDS Index tables.
 ```python
 pds.index_labels.PVLColumn(pvlobj)
 ```
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_labels.py#L30-L99){.source-link target="_blank"}
 
 Manages just one of the columns in a table that is described via PVL.
 
@@ -66,6 +70,8 @@ pds.index_labels.decode_line(linedata, labelpath)
 
 Decode one line of tabbed data with the appropriate label file.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_labels.py#L257-L265){.source-link target="_blank"}
+
 ### find_mixed_type_cols { #planetarypy.pds.index_labels.find_mixed_type_cols }
 
 ```python
@@ -77,6 +83,8 @@ For a given dataframe, find the columns that are of mixed type.
 Tool to help with the performance warning when trying to save a pandas DataFrame as a HDF.
 When a column changes datatype somewhere, pickling occurs, slowing down the reading process of the HDF file.
 
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_labels.py#L268-L291){.source-link target="_blank"}
+
 ### index_to_df { #planetarypy.pds.index_labels.index_to_df }
 
 ```python
@@ -87,3 +95,5 @@ The main reader function for PDS Index files.
 
 In conjunction with an IndexLabel object that figures out the column widths,
 this reader should work for all PDS TAB files.
+
+[[source]](https://github.com/michaelaye/planetarypy/blob/main/src/planetarypy/pds/index_labels.py#L203-L254){.source-link target="_blank"}
