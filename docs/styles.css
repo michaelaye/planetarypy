@@ -34,3 +34,12 @@
   color: var(--bs-primary);
   text-decoration: underline;
 }
+
+/* Better contrast for source links in dark mode */
+.quarto-dark .source-link {
+  color: #8ab4f8;  /* Light blue - good contrast on dark backgrounds */
+}
+
+.quarto-dark .source-link:hover {
+  color: #aecbfa;  /* Lighter blue on hover */
+}
