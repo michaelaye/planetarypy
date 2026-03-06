@@ -1,14 +1,27 @@
 """Tests for planetarypy.pds.index_labels module.
 
-Covers PVLColumn, _convert_times, and find_mixed_type_cols with pure unit tests
-(no network, no config, no real PDS files).
+Covers PVLColumn, _convert_times, find_mixed_type_cols, IndexLabel, index_to_df,
+and decode_line using both pure unit tests and synthetic PDS fixture files.
 """
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from planetarypy.pds.index_labels import PVLColumn, _convert_times, find_mixed_type_cols
+from planetarypy.pds.index_labels import (
+    IndexLabel,
+    PVLColumn,
+    _convert_times,
+    decode_line,
+    find_mixed_type_cols,
+    index_to_df,
+)
+
+DATA_DIR = Path(__file__).parent / "data"
+LABEL_PATH = DATA_DIR / "test_index.lbl"
+TABLE_PATH = DATA_DIR / "test_index.tab"
 
 
 # ---------------------------------------------------------------------------
@@ -255,3 +268,119 @@ class TestFindMixedTypeCols:
         assert "a" in result
         assert "b" in result
         assert "c" not in result
+
+
+# ===================================================================
+# IndexLabel tests (synthetic PDS fixture files)
+# ===================================================================
+
+class TestIndexLabel:
+    """Tests using synthetic test_index.lbl + test_index.tab fixtures."""
+
+    @pytest.fixture()
+    def label(self):
+        return IndexLabel(LABEL_PATH)
+
+    def test_tablename(self, label):
+        assert label.tablename == "INDEX_TABLE"
+
+    def test_index_name(self, label):
+        assert label.index_name == "test_index.tab"
+
+    def test_pvl_lbl_loads(self, label):
+        lbl = label.pvl_lbl
+        assert lbl["PDS_VERSION_ID"] == "PDS3"
+
+    def test_colnames(self, label):
+        assert label.colnames == ["VOLUME_ID", "FILE_NAME", "IMAGE_TIME", "EXPOSURE"]
+
+    def test_colspecs(self, label):
+        specs = label.colspecs
+        assert len(specs) == 4
+        # START_BYTE=2 → index 1, BYTES=10 → (1, 11)
+        assert specs[0] == (1, 11)
+        assert specs[1] == (14, 34)
+        assert specs[2] == (37, 60)
+        assert specs[3] == (62, 72)
+
+    def test_columns_dic(self, label):
+        d = label.columns_dic
+        assert set(d.keys()) == {"VOLUME_ID", "FILE_NAME", "IMAGE_TIME", "EXPOSURE"}
+
+    def test_index_path(self, label):
+        assert label.index_path == TABLE_PATH
+
+    def test_pvl_columns_count(self, label):
+        assert len(label.pvl_columns) == 4
+
+    def test_read_index_data_shape(self, label):
+        df = label.read_index_data(convert_times=True)
+        assert len(df) == 5
+        assert list(df.columns) == ["VOLUME_ID", "FILE_NAME", "IMAGE_TIME", "EXPOSURE"]
+
+    def test_read_index_data_datetime_conversion(self, label):
+        df = label.read_index_data(convert_times=True)
+        assert pd.api.types.is_datetime64_any_dtype(df["IMAGE_TIME"])
+
+    def test_read_index_data_unk_is_nat(self, label):
+        df = label.read_index_data(convert_times=True)
+        assert pd.isna(df["IMAGE_TIME"].iloc[2])
+
+    def test_read_index_data_values(self, label):
+        df = label.read_index_data(convert_times=True)
+        assert df["VOLUME_ID"].iloc[0] == "VOL_001"
+        assert df["FILE_NAME"].iloc[0] == "img_00001.fits"
+        assert df["EXPOSURE"].iloc[0] == pytest.approx(12.5)
+
+    def test_read_index_data_no_time_conversion(self, label):
+        df = label.read_index_data(convert_times=False)
+        assert not pd.api.types.is_datetime64_any_dtype(df["IMAGE_TIME"])
+
+
+# ===================================================================
+# index_to_df tests (synthetic fixture files)
+# ===================================================================
+
+class TestIndexToDf:
+    @pytest.fixture()
+    def label(self):
+        return IndexLabel(LABEL_PATH)
+
+    def test_returns_dataframe(self, label):
+        df = index_to_df(TABLE_PATH, label, convert_times=False)
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 5
+
+    def test_convert_times_true(self, label):
+        df = index_to_df(TABLE_PATH, label, convert_times=True)
+        assert pd.api.types.is_datetime64_any_dtype(df["IMAGE_TIME"])
+        # Row 2 has UNK → NaT
+        assert pd.isna(df["IMAGE_TIME"].iloc[2])
+        # Row 0 has a valid time
+        assert not pd.isna(df["IMAGE_TIME"].iloc[0])
+
+    def test_convert_times_false(self, label):
+        df = index_to_df(TABLE_PATH, label, convert_times=False)
+        assert not pd.api.types.is_datetime64_any_dtype(df["IMAGE_TIME"])
+
+    def test_strings_are_stripped(self, label):
+        df = index_to_df(TABLE_PATH, label, convert_times=False)
+        # Fixture has padded strings like "VOL_001   " which should be stripped
+        assert df["VOLUME_ID"].iloc[0] == "VOL_001"
+        assert df["FILE_NAME"].iloc[3] == "img_00004.fits"
+
+
+# ===================================================================
+# decode_line test (synthetic fixture)
+# ===================================================================
+
+class TestDecodeLine:
+    def test_decode_line_prints_columns(self, capsys):
+        with open(TABLE_PATH, "r") as f:
+            line = f.readline().rstrip("\r\n")
+        decode_line(line, LABEL_PATH)
+        captured = capsys.readouterr()
+        assert "VOLUME_ID" in captured.out
+        assert "FILE_NAME" in captured.out
+        assert "IMAGE_TIME" in captured.out
+        assert "EXPOSURE" in captured.out

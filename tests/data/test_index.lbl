@@ -1,0 +1,52 @@
+PDS_VERSION_ID          = PDS3
+RECORD_TYPE             = FIXED_LENGTH
+RECORD_BYTES            = 74
+FILE_RECORDS            = 5
+^INDEX_TABLE            = "test_index.tab"
+
+PRODUCT_CREATION_TIME   = 2024-03-01T12:00:00
+
+OBJECT                  = INDEX_TABLE
+  INTERCHANGE_FORMAT    = ASCII
+  ROWS                  = 5
+  ROW_BYTES             = 74
+  COLUMNS               = 4
+
+  OBJECT            = COLUMN
+    NAME            = VOLUME_ID
+    DATA_TYPE       = CHARACTER
+    START_BYTE      = 2
+    BYTES           = 10
+    FORMAT          = A10
+    DESCRIPTION     = "Volume identifier."
+  END_OBJECT        = COLUMN
+
+  OBJECT            = COLUMN
+    NAME            = FILE_NAME
+    DATA_TYPE       = CHARACTER
+    START_BYTE      = 15
+    BYTES           = 20
+    FORMAT          = A20
+    DESCRIPTION     = "Image file name."
+  END_OBJECT        = COLUMN
+
+  OBJECT            = COLUMN
+    NAME            = IMAGE_TIME
+    DATA_TYPE       = CHARACTER
+    START_BYTE      = 38
+    BYTES           = 23
+    FORMAT          = A23
+    DESCRIPTION     = "Time of image acquisition."
+  END_OBJECT        = COLUMN
+
+  OBJECT            = COLUMN
+    NAME            = EXPOSURE
+    DATA_TYPE       = ASCII_REAL
+    START_BYTE      = 63
+    BYTES           = 10
+    FORMAT          = F10.3
+    DESCRIPTION     = "Exposure duration in seconds."
+  END_OBJECT        = COLUMN
+
+END_OBJECT          = INDEX_TABLE
+END
