@@ -7,7 +7,7 @@ Usage in _quarto.yml:
     quartodoc:
       renderer:
         style: _renderer.py
-        repo_url: https://github.com/michaelaye/planetarypy
+        repo_url: https://github.com/planetarypy/planetarypy
         branch: main
         source_dir: src
 """
@@ -43,7 +43,7 @@ class SourceLinkMdRenderer(MdRenderer):
 
     def __init__(
         self,
-        repo_url: str = "https://github.com/michaelaye/planetarypy",
+        repo_url: str = "https://github.com/planetarypy/planetarypy",
         branch: str = "main",
         source_dir: str = "src",
         **kwargs,

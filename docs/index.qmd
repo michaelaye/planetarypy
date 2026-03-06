@@ -5,7 +5,7 @@ page-layout: article
 
 Welcome to the documentation site for the PlanetaryPy package. 
 
-- Project repository: <https://github.com/michaelaye/planetarypy>
+- Project repository: <https://github.com/planetarypy/planetarypy>
 - API reference (generated): [API Reference](reference/index.qmd)
 
 ## About
