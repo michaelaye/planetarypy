@@ -33,7 +33,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install package and dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,docs]"
 
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
