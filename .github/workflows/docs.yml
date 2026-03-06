@@ -42,7 +42,8 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build API reference
-        run: python -m quartodoc build --config docs/_quarto.yml
+        working-directory: docs
+        run: python -m quartodoc build
 
       - name: Render Quarto site
         run: quarto render docs

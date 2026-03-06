@@ -10,7 +10,7 @@ execute:
 
 website:
   title: PlanetaryPy
-  repo-url: https://github.com/michaelaye/planetarypy
+  repo-url: https://github.com/planetarypy/planetarypy
   repo-actions: [issue]
   navbar:
     search: true
@@ -30,7 +30,7 @@ website:
     right:
       - icon: github
         aria-label: GitHub
-        href: https://github.com/michaelaye/planetarypy
+        href: https://github.com/planetarypy/planetarypy
   sidebar:
     - title: "Tutorials"
       style: "docked"
@@ -83,7 +83,7 @@ quartodoc:
   # Custom renderer with GitHub source links
   renderer:
     style: _renderer.py
-    repo_url: https://github.com/michaelaye/planetarypy
+    repo_url: https://github.com/planetarypy/planetarypy
     branch: main
     source_dir: src
   # Also write sidebar and default CSS that Quarto should load
@@ -105,7 +105,6 @@ quartodoc:
     - title: PDS Utilities and CLI
       desc: Tools for managing and working with Planetary Data System indexes.
       contents:
-        - pds.cli
         - pds.dynamic_index
         - pds.dynamic_url_handlers
         - pds.index_fixes
@@ -121,7 +120,6 @@ quartodoc:
         - spice.archived_kernels
         - spice.config
         - spice.generic_kernels
-        - spice.pckernels
 
     # - title: ISIS
     #   contents:
@@ -130,6 +128,5 @@ quartodoc:
     - title: Instruments
       contents:
         - instruments.mro.ctx
-        - instruments.mro.hirise
         - instruments.go_ssi
         - instruments.utils
