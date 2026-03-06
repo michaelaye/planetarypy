@@ -510,6 +510,11 @@ class CTXCollection:
     def calibs(self):
         return [Calib(pid) for pid in self.pids]
 
+    @cached_property
+    def metadata(self):
+        """Merged metadata DataFrame from all Calib EDR objects."""
+        return pd.DataFrame([cal.edr.meta for cal in self.calibs])
+
     @property
     def cub_paths(self):
         "get EDR cubes"
@@ -592,7 +597,7 @@ class CTXCollection:
 
     @property
     def overlap_list_path(self):
-        return self.workdir / "overlap_list.lis"
+        return self.workdir / "overlap_list.bin"
 
     def findimageoverlaps(self):
         with fromlist.temp(self.cal_paths) as f:
