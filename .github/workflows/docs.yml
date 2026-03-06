@@ -41,6 +41,9 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Build API reference
+        run: quartodoc build --config docs/_quarto.yml
+
       - name: Render Quarto site
         run: quarto render docs
 
