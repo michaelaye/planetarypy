@@ -11,15 +11,14 @@ from pathlib import Path
 )
 def test_get_datasets_uses_cache_when_fresh(tmp_path, monkeypatch):
     """Test that get_datasets returns cached data when cache is fresh."""
-    # Redirect user home for cache and log locations to a temp dir BEFORE import
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-
-    # Now import AccessLog so it picks up the patched home dir
     from planetarypy.pds.index_logging import AccessLog
+    import planetarypy.spice.archived_kernels as ak_mod
 
-    # Prepare a small cached dataframe with the CORRECT filename and schema
-    cache_path = tmp_path / ".planetarypy_cache" / "archived_spice_datasets.csv"
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    # Redirect cache and log file to tmp_path (module-level DATASETS_CACHE
+    # is evaluated at import time, so we must patch it directly)
+    cache_path = tmp_path / "archived_spice_datasets.csv"
+    monkeypatch.setattr(ak_mod, "DATASETS_CACHE", cache_path)
+    monkeypatch.setattr(AccessLog, "FILE_PATH", tmp_path / "index_log.toml")
     df = pd.DataFrame(
         {
             "Mission Name": ["Mars Reconnaissance Orbiter", "Mars Express"],
@@ -50,8 +49,8 @@ def test_get_datasets_uses_cache_when_fresh(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pd, "read_html", fail_read_html)
 
-    # Import get_datasets directly to test it (not the module-level datasets variable)
     from planetarypy.spice.archived_kernels import get_datasets
+
 
     # Act
     out = get_datasets()
