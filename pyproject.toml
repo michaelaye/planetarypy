@@ -69,8 +69,6 @@ docs = [
 ]
 
 [project.scripts]
-planetarypy = "planetarypy.cli:main"
-planetarypy-migrate-config = "planetarypy.scripts.migrate_pds_config:main"
 plp_update_indexes = "planetarypy.pds.cli:plp_update_indexes"
 
 [tool.hatch.build.targets.wheel]

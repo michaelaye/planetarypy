@@ -96,7 +96,6 @@ quartodoc:
     - title: Core Modules
       desc: Core interfaces and utilities.
       contents:
-        - cli
         - config
         - datetime_format_converters
         - exceptions
