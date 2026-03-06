@@ -149,6 +149,11 @@ docs/objects.json
 docs/README_files/
 docs/presentations/
 
+# Generated quartodoc API reference
+docs/reference/*.qmd
+docs/reference/_sidebar.yml
+docs/reference/_styles-quartodoc.css
+
 # Scratch/temp artifacts
 current_diffs*
 current_diffs_files/
