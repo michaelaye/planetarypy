@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tqdm.auto import tqdm
 
-from planetarypy.instruments.go_ssi import EDR, get_edr_index
+from planetarypy.instruments.go.ssi import EDR, get_edr_index
 
 
 def download_data(save_folder):

@@ -128,5 +128,5 @@ quartodoc:
     - title: Instruments
       contents:
         - instruments.mro.ctx
-        - instruments.go_ssi
+        - instruments.go.ssi
         - instruments.utils
