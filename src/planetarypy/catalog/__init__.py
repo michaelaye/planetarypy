@@ -135,6 +135,12 @@ def build_catalog(force: bool = False) -> dict:
 
     con.close()
 
+    # Step 4: Rewrite broken USGS URLs to working mirrors
+    from planetarypy.catalog._url_rewrite import rewrite_catalog_urls
+    rewrite_counts = rewrite_catalog_urls(storage_root)
+    stats["urls_rewritten"] = rewrite_counts.get("rewritten", 0)
+    stats["urls_no_rule"] = rewrite_counts.get("no_rule", 0)
+
     # Report
     logger.info(
         f"Catalog built: {stats['instruments']} instruments, "
