@@ -52,6 +52,10 @@ spice = [
     "matplotlib",     # For plotting
     "planets>=0.8",   # For planetary calculations
 ]
+# Optional dependencies for PDS catalog functionality
+catalog = [
+    "duckdb",         # For catalog database
+]
 # Development dependencies
 dev = [
     "pytest",
@@ -70,6 +74,7 @@ docs = [
 
 [project.scripts]
 plp_update_indexes = "planetarypy.pds.cli:plp_update_indexes"
+plp_build_catalog = "planetarypy.catalog.cli:plp_build_catalog"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/planetarypy"]
