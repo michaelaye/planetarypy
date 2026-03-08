@@ -172,6 +172,35 @@ def get_catalog() -> "duckdb.DuckDBPyConnection":
     return get_connection(config.storage_root)
 
 
+def _parse_dotted_key(key: str, expected_parts: int) -> tuple[str, ...]:
+    """Parse a dotted key like 'lro.diviner' or 'cassini.iss.edr_sat'.
+
+    Parameters
+    ----------
+    key : str
+        Dotted key string
+    expected_parts : int
+        Expected number of parts (2 for mission.instrument, 3 for mission.instrument.product)
+
+    Returns
+    -------
+    tuple[str, ...]
+        The split parts
+
+    Raises
+    ------
+    ValueError
+        If the key doesn't have the expected number of parts
+    """
+    parts = key.split(".")
+    if len(parts) != expected_parts:
+        raise ValueError(
+            f"Expected {expected_parts} dot-separated parts, "
+            f"got {len(parts)}: '{key}'"
+        )
+    return tuple(parts)
+
+
 def list_missions() -> list[str]:
     """List all missions in the catalog."""
     con = get_catalog()
@@ -183,7 +212,13 @@ def list_missions() -> list[str]:
 
 
 def list_instruments(mission: str) -> list[str]:
-    """List all instruments for a given mission."""
+    """List all instruments for a given mission.
+
+    Parameters
+    ----------
+    mission : str
+        Mission name (e.g. 'cassini')
+    """
     con = get_catalog()
     result = con.execute(
         "SELECT DISTINCT instrument FROM instruments WHERE mission = ? ORDER BY instrument",
@@ -193,8 +228,24 @@ def list_instruments(mission: str) -> list[str]:
     return [r[0] for r in result]
 
 
-def list_product_types(mission: str, instrument: str) -> list[str]:
-    """List all product types for a given mission and instrument."""
+def list_product_types(key: str, instrument: str | None = None) -> list[str]:
+    """List all product types for a given mission and instrument.
+
+    Accepts either dotted key or separate arguments:
+        list_product_types("lro.diviner")
+        list_product_types("lro", "diviner")
+
+    Parameters
+    ----------
+    key : str
+        Either a dotted key 'mission.instrument' or just the mission name
+    instrument : str, optional
+        Instrument name, required if key is not a dotted key
+    """
+    if instrument is None:
+        mission, instrument = _parse_dotted_key(key, 2)
+    else:
+        mission = key
     con = get_catalog()
     result = con.execute(
         """SELECT pt.product_key
@@ -209,24 +260,36 @@ def list_product_types(mission: str, instrument: str) -> list[str]:
 
 
 def get_products(
-    mission: str, instrument: str, product_key: str
+    key: str,
+    instrument: str | None = None,
+    product_key: str | None = None,
 ) -> pd.DataFrame:
     """Get all product entries for a given mission/instrument/product type.
 
+    Accepts either dotted key or separate arguments:
+        get_products("cassini.iss.edr_sat")
+        get_products("cassini", "iss", "edr_sat")
+
     Parameters
     ----------
-    mission : str
-        Mission name (e.g. 'cassini')
-    instrument : str
-        Instrument name (e.g. 'iss')
-    product_key : str
-        Product type key (e.g. 'edr_sat')
+    key : str
+        Either a dotted key 'mission.instrument.product' or just the mission name
+    instrument : str, optional
+        Instrument name, required if key is not a dotted key
+    product_key : str, optional
+        Product type key, required if key is not a dotted key
 
     Returns
     -------
     pd.DataFrame
         Product entries with columns: product_id, label_file, url_stem, etc.
     """
+    if instrument is None and product_key is None:
+        mission, instrument, product_key = _parse_dotted_key(key, 3)
+    elif instrument is not None and product_key is not None:
+        mission = key
+    else:
+        raise ValueError("Provide either a dotted key or all three arguments")
     con = get_catalog()
     df = con.execute(
         """SELECT p.*
