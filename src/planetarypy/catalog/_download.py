@@ -106,15 +106,28 @@ def resolve_product(
     if resolved:
         return resolved
 
-    # Tier 2: Index lookup (future)
-    # resolved = _resolve_from_index(mission, instrument, product_key, product_id)
-    # if resolved:
-    #     return resolved
+    # Tier 2: Index lookup
+    from planetarypy.catalog._index_bridge import resolve_from_index, has_index
+
+    resolved = resolve_from_index(mission, instrument, product_key, product_id)
+    if resolved:
+        return resolved
+
+    # Build a helpful error message
+    if has_index(mission, instrument):
+        hint = (
+            f"The product was not found in either the catalog samples or "
+            f"the PDS index. Check the product_id spelling."
+        )
+    else:
+        hint = (
+            f"No PDS index is registered for {mission}.{instrument}. "
+            f"Only sample products from the catalog are available."
+        )
 
     raise ProductNotFoundError(
-        f"Product '{product_id}' not found for {mission}.{instrument}.{product_key}. "
-        f"Currently only sample products from the catalog are supported. "
-        f"For arbitrary product IDs, a PDS index is needed for this instrument."
+        f"Product '{product_id}' not found for "
+        f"{mission}.{instrument}.{product_key}. {hint}"
     )
 
 

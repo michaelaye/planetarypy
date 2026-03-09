@@ -1,0 +1,293 @@
+"""Tests for the catalog index bridge module."""
+
+import pytest
+import pandas as pd
+
+from planetarypy.catalog._index_bridge import (
+    IndexConfig,
+    INDEX_REGISTRY,
+    PRODUCT_KEY_OVERRIDES,
+    get_index_config,
+    has_index,
+    list_indexed_instruments,
+    resolve_from_index,
+    _find_product_in_index,
+    _build_url_stem,
+    _extract_files,
+)
+
+
+class TestIndexConfig:
+    def test_default_columns(self):
+        cfg = IndexConfig(index_key="mro.ctx.edr")
+        assert cfg.product_id_col == "PRODUCT_ID"
+        assert cfg.file_spec_col == "FILE_SPECIFICATION_NAME"
+        assert cfg.volume_id_col == "VOLUME_ID"
+
+    def test_frozen(self):
+        cfg = IndexConfig(index_key="mro.ctx.edr")
+        with pytest.raises(AttributeError):
+            cfg.index_key = "other"
+
+
+class TestRegistry:
+    def test_ctx_registered(self):
+        assert ("mro", "ctx") in INDEX_REGISTRY
+
+    def test_cassini_iss_registered(self):
+        assert ("cassini", "iss") in INDEX_REGISTRY
+
+    def test_galileo_ssi_uses_go_index(self):
+        cfg = INDEX_REGISTRY[("galileo", "ssi")]
+        assert cfg.index_key == "go.ssi.index"
+
+    def test_all_configs_have_index_key(self):
+        for key, cfg in INDEX_REGISTRY.items():
+            assert cfg.index_key, f"{key} missing index_key"
+
+    def test_seti_or_archive_url_set(self):
+        for key, cfg in INDEX_REGISTRY.items():
+            assert cfg.archive_url or cfg.seti_volume_group, (
+                f"{key} needs either archive_url or seti_volume_group"
+            )
+
+
+class TestGetIndexConfig:
+    def test_basic_lookup(self):
+        cfg = get_index_config("mro", "ctx")
+        assert cfg is not None
+        assert cfg.index_key == "mro.ctx.edr"
+
+    def test_product_key_override(self):
+        cfg = get_index_config("mro", "hirise", "rdr")
+        assert cfg is not None
+        assert cfg.index_key == "mro.hirise.rdr"
+
+    def test_product_key_fallback_to_default(self):
+        cfg = get_index_config("mro", "hirise", "edr")
+        assert cfg is not None
+        assert cfg.index_key == "mro.hirise.edr"
+
+    def test_unknown_instrument(self):
+        cfg = get_index_config("unknown", "instrument")
+        assert cfg is None
+
+
+class TestHasIndex:
+    def test_known(self):
+        assert has_index("mro", "ctx") is True
+
+    def test_unknown(self):
+        assert has_index("unknown", "instrument") is False
+
+
+class TestListIndexedInstruments:
+    def test_returns_tuples(self):
+        result = list_indexed_instruments()
+        assert len(result) > 0
+        assert all(len(t) == 3 for t in result)
+
+    def test_includes_ctx(self):
+        result = list_indexed_instruments()
+        assert ("mro", "ctx", "mro.ctx.edr") in result
+
+
+class TestFindProductInIndex:
+    @pytest.fixture
+    def sample_df(self):
+        return pd.DataFrame({
+            "PRODUCT_ID": [
+                "B01_009942_1894_XI_09N202W",
+                "P01_001503_1853_XI_05N213W",
+                "D14_032794_1989_XN_18N282W",
+            ],
+            "VOLUME_ID": ["MROX_0042", "MROX_0001", "MROX_2601"],
+            "FILE_SPECIFICATION_NAME": [
+                "DATA/B01_009942_1894_XI_09N202W.IMG",
+                "DATA/P01_001503_1853_XI_05N213W.IMG",
+                "DATA/D14_032794_1989_XN_18N282W.IMG",
+            ],
+        })
+
+    def test_exact_match(self, sample_df):
+        cfg = IndexConfig(index_key="mro.ctx.edr")
+        row = _find_product_in_index(
+            sample_df, "B01_009942_1894_XI_09N202W", cfg
+        )
+        assert row is not None
+        assert row["VOLUME_ID"] == "MROX_0042"
+
+    def test_case_insensitive(self, sample_df):
+        cfg = IndexConfig(index_key="mro.ctx.edr")
+        row = _find_product_in_index(
+            sample_df, "b01_009942_1894_xi_09n202w", cfg
+        )
+        assert row is not None
+
+    def test_not_found(self, sample_df):
+        cfg = IndexConfig(index_key="mro.ctx.edr")
+        row = _find_product_in_index(sample_df, "NONEXISTENT", cfg)
+        assert row is None
+
+    def test_whitespace_padded(self):
+        df = pd.DataFrame({
+            "PRODUCT_ID": ["  B01_009942  ", "  P01_001503  "],
+            "VOLUME_ID": ["MROX_0042", "MROX_0001"],
+        })
+        cfg = IndexConfig(index_key="mro.ctx.edr")
+        row = _find_product_in_index(df, "B01_009942", cfg)
+        assert row is not None
+
+    def test_fallback_column(self):
+        df = pd.DataFrame({
+            "FILE_NAME": ["N1455098340_1.LBL", "N1455098341_1.LBL"],
+            "VOLUME_ID": ["COISS_2001", "COISS_2001"],
+        })
+        cfg = IndexConfig(
+            index_key="cassini.iss.index",
+            product_id_col="FILE_NAME",
+        )
+        row = _find_product_in_index(df, "N1455098340_1.LBL", cfg)
+        assert row is not None
+
+
+class TestBuildUrlStem:
+    def test_jpl_archive(self):
+        row = pd.Series({
+            "VOLUME_ID": "MROX_0042",
+            "FILE_SPECIFICATION_NAME": "DATA/B01_009942_1894_XI_09N202W.IMG",
+        })
+        cfg = IndexConfig(
+            index_key="mro.ctx.edr",
+            archive_url="https://planetarydata.jpl.nasa.gov/img/data/mro/ctx",
+        )
+        url = _build_url_stem(row, cfg)
+        assert url == (
+            "https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/"
+            "MROX_0042/DATA"
+        )
+
+    def test_seti_archive(self):
+        row = pd.Series({
+            "VOLUME_ID": "COISS_2001",
+            "FILE_SPECIFICATION_NAME": "data/N1455098340_1.LBL",
+        })
+        cfg = IndexConfig(
+            index_key="cassini.iss.index",
+            seti_volume_group="COISS_2xxx",
+        )
+        url = _build_url_stem(row, cfg)
+        assert url == (
+            "https://pds-rings.seti.org/holdings/volumes/"
+            "COISS_2xxx/COISS_2001/data"
+        )
+
+    def test_no_subdirectory(self):
+        row = pd.Series({
+            "VOLUME_ID": "MROX_0042",
+            "FILE_SPECIFICATION_NAME": "product.IMG",
+        })
+        cfg = IndexConfig(
+            index_key="mro.ctx.edr",
+            archive_url="https://example.com/data",
+        )
+        url = _build_url_stem(row, cfg)
+        assert url == "https://example.com/data/MROX_0042"
+
+    def test_trailing_slash_stripped(self):
+        row = pd.Series({
+            "VOLUME_ID": "VOL_001",
+            "FILE_SPECIFICATION_NAME": "DATA/file.IMG",
+        })
+        cfg = IndexConfig(
+            index_key="test.index",
+            archive_url="https://example.com/data/",
+        )
+        url = _build_url_stem(row, cfg)
+        assert "data//VOL_001" not in url
+
+
+class TestExtractFiles:
+    def test_img_file_adds_label(self):
+        row = pd.Series({
+            "FILE_SPECIFICATION_NAME": "DATA/B01_009942.IMG",
+        })
+        cfg = IndexConfig(index_key="mro.ctx.edr")
+        files, label = _extract_files(row, cfg)
+        assert "B01_009942.IMG" in files
+        assert "B01_009942.LBL" in files
+        assert label == "B01_009942.LBL"
+
+    def test_lbl_file_adds_data(self):
+        row = pd.Series({
+            "FILE_SPECIFICATION_NAME": "data/N1455098340_1.LBL",
+        })
+        cfg = IndexConfig(index_key="cassini.iss.index")
+        files, label = _extract_files(row, cfg)
+        assert "N1455098340_1.LBL" in files
+        assert "N1455098340_1.IMG" in files
+        assert label == "N1455098340_1.LBL"
+
+    def test_empty_spec(self):
+        row = pd.Series({"FILE_SPECIFICATION_NAME": ""})
+        cfg = IndexConfig(index_key="test")
+        files, label = _extract_files(row, cfg)
+        assert files == []
+        assert label is None
+
+
+class TestResolveFromIndex:
+    def test_no_index_returns_none(self):
+        result = resolve_from_index("unknown", "inst", "edr", "PROD_001")
+        assert result is None
+
+    def test_with_mocked_index(self, monkeypatch):
+        mock_df = pd.DataFrame({
+            "PRODUCT_ID": ["TEST_PRODUCT_001"],
+            "VOLUME_ID": ["VOL_001"],
+            "FILE_SPECIFICATION_NAME": ["DATA/TEST_PRODUCT_001.IMG"],
+        })
+        monkeypatch.setattr(
+            "planetarypy.catalog._index_bridge._load_index_df",
+            lambda config: mock_df,
+        )
+        # Register a test instrument
+        from planetarypy.catalog._index_bridge import INDEX_REGISTRY
+        INDEX_REGISTRY[("test_mission", "test_instr")] = IndexConfig(
+            index_key="test.instr.edr",
+            archive_url="https://example.com/data",
+        )
+        try:
+            result = resolve_from_index(
+                "test_mission", "test_instr", "edr", "TEST_PRODUCT_001"
+            )
+            assert result is not None
+            assert result.product_id == "TEST_PRODUCT_001"
+            assert result.source == "index"
+            assert "VOL_001" in result.url_stem
+            assert "TEST_PRODUCT_001.IMG" in result.files
+        finally:
+            del INDEX_REGISTRY[("test_mission", "test_instr")]
+
+    def test_product_not_in_index(self, monkeypatch):
+        mock_df = pd.DataFrame({
+            "PRODUCT_ID": ["OTHER_PRODUCT"],
+            "VOLUME_ID": ["VOL_001"],
+            "FILE_SPECIFICATION_NAME": ["DATA/OTHER.IMG"],
+        })
+        monkeypatch.setattr(
+            "planetarypy.catalog._index_bridge._load_index_df",
+            lambda config: mock_df,
+        )
+        from planetarypy.catalog._index_bridge import INDEX_REGISTRY
+        INDEX_REGISTRY[("test_mission", "test_instr")] = IndexConfig(
+            index_key="test.instr.edr",
+            archive_url="https://example.com/data",
+        )
+        try:
+            result = resolve_from_index(
+                "test_mission", "test_instr", "edr", "NONEXISTENT"
+            )
+            assert result is None
+        finally:
+            del INDEX_REGISTRY[("test_mission", "test_instr")]
