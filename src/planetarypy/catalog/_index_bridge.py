@@ -129,14 +129,14 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
         seti_volume_group="GO_0xxx",
     ),
     # ── MER ──
-    ("mer", "spirit_pancam", "rdr"): IndexConfig(
+    ("mer_spirit", "pancam", "rdr"): IndexConfig(
         index_key="mer.spirit.pancam_rdr",
         archive_url=(
             "https://pds-geosciences.wustl.edu/mer/"
             "mer2-m-pancam-3-radcal-sci-v2"
         ),
     ),
-    ("mer", "opportunity_pancam", "rdr"): IndexConfig(
+    ("mer_opportunity", "pancam", "rdr"): IndexConfig(
         index_key="mer.opportunity.pancam_rdr",
         archive_url=(
             "https://pds-geosciences.wustl.edu/mer/"
