@@ -132,10 +132,37 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
         index_key="cassini.uvis.index",
         seti_volume_group="COUVIS_0xxx",
     ),
+    ("cassini", "vims", "edr"): IndexConfig(
+        index_key="cassini.vims.index",
+        seti_volume_group="COVIMS_0xxx",
+    ),
     # ── Galileo (catalog uses 'galileo', index uses 'go') ──
     ("galileo", "ssi", "edr"): IndexConfig(
         index_key="go.ssi.index",
         seti_volume_group="GO_0xxx",
+    ),
+    # ── Voyager (SETI Rings) ──
+    ("voyager1", "iss", "edr"): IndexConfig(
+        index_key="voyager1.iss.index",
+        seti_volume_group="VGISS_5xxx",
+    ),
+    ("voyager2", "iss", "edr"): IndexConfig(
+        index_key="voyager2.iss.index",
+        seti_volume_group="VGISS_6xxx",
+    ),
+    # ── Juno (SETI Rings) ──
+    ("juno", "junocam", "edr"): IndexConfig(
+        index_key="juno.junocam.index",
+        seti_volume_group="JNOJNC_0xxx",
+    ),
+    # ── New Horizons (SETI Rings) ──
+    ("new_horizons", "lorri", "edr"): IndexConfig(
+        index_key="new_horizons.lorri.edr",
+        seti_volume_group="NHxxLO_xxxx",
+    ),
+    ("new_horizons", "lorri", "rdr"): IndexConfig(
+        index_key="new_horizons.lorri.rdr",
+        seti_volume_group="NHxxLO_xxxx",
     ),
     # ── MER ──
     ("mer_spirit", "pancam", "rdr"): IndexConfig(
