@@ -111,6 +111,18 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
             "https://pds-geosciences.wustl.edu/lro/lro-l-dlre-4-rdr-v1"
         ),
     ),
+    ("lro", "lamp", "edr"): IndexConfig(
+        index_key="lro.lamp.edr",
+        archive_url=(
+            "https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/edr"
+        ),
+    ),
+    ("lro", "lamp", "rdr"): IndexConfig(
+        index_key="lro.lamp.rdr",
+        archive_url=(
+            "https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/rdr"
+        ),
+    ),
     ("lro", "lola", "edr"): IndexConfig(
         index_key="lro.lola.edr",
         archive_url=(
@@ -127,6 +139,18 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
     ("cassini", "iss", "edr_sat"): IndexConfig(
         index_key="cassini.iss.index",
         seti_volume_group="COISS_2xxx",
+    ),
+    ("cassini", "iss", "edr_evj"): IndexConfig(
+        index_key="cassini.iss_cruise.index",
+        seti_volume_group="COISS_1xxx",
+    ),
+    ("cassini", "cirs", "jupiter"): IndexConfig(
+        index_key="cassini.cirs.cube_point_index",
+        seti_volume_group="COCIRS_0xxx",
+    ),
+    ("cassini", "occultation", "rss"): IndexConfig(
+        index_key="cassini.rss.index",
+        seti_volume_group="CORSS_8xxx",
     ),
     ("cassini", "uvis", "edr"): IndexConfig(
         index_key="cassini.uvis.index",
@@ -164,7 +188,231 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
         index_key="new_horizons.lorri.rdr",
         seti_volume_group="NHxxLO_xxxx",
     ),
+    # ── MGS ──
+    ("mgs", "moc", "edr"): IndexConfig(
+        index_key="mgs.moc.edr",
+        archive_url="https://planetarydata.jpl.nasa.gov/img/data/mgs/moc",
+    ),
+    ("mgs", "moc", "rdr"): IndexConfig(
+        index_key="mgs.moc.rdr",
+        archive_url="https://planetarydata.jpl.nasa.gov/img/data/mgs/moc/rdr",
+    ),
+    # ── Viking Orbiter ──
+    # vo_1064 cumindex covers both VO1 and VO2 (~50,500 images)
+    ("viking", "vis", "edr"): IndexConfig(
+        index_key="viking.vis.edr",
+        archive_url=(
+            "https://planetarydata.jpl.nasa.gov/img/data/viking/viking_orbiter"
+        ),
+    ),
+    # ── MESSENGER ──
+    ("messenger", "mdis", "edr"): IndexConfig(
+        index_key="messenger.mdis.edr",
+        archive_url=(
+            "https://planetarydata.jpl.nasa.gov/img/data/messenger"
+        ),
+    ),
+    ("messenger", "mdis", "cdr"): IndexConfig(
+        index_key="messenger.mdis.cdr",
+        archive_url=(
+            "https://planetarydata.jpl.nasa.gov/img/data/messenger"
+        ),
+    ),
+    # ── Phoenix (MECA instruments share one index, filter by INSTRUMENT_ID) ──
+    ("phoenix", "wcl", "edr"): IndexConfig(
+        index_key="phoenix.meca.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/phx/"
+            "phx-m-meca-2-niedr-v1"
+        ),
+    ),
+    ("phoenix", "wcl", "rdr"): IndexConfig(
+        index_key="phoenix.meca.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/phx/"
+            "phx-m-meca-4-nirdr-v1"
+        ),
+    ),
+    ("phoenix", "tecp", "rdr"): IndexConfig(
+        index_key="phoenix.meca.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/phx/"
+            "phx-m-meca-4-nirdr-v1"
+        ),
+    ),
+    ("phoenix", "elec", "edr"): IndexConfig(
+        index_key="phoenix.meca.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/phx/"
+            "phx-m-meca-2-niedr-v1"
+        ),
+    ),
+    ("phoenix", "afm", "edr"): IndexConfig(
+        index_key="phoenix.meca.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/phx/"
+            "phx-m-meca-2-niedr-v1"
+        ),
+    ),
+    ("phoenix", "afm", "rdr"): IndexConfig(
+        index_key="phoenix.meca.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/phx/"
+            "phx-m-meca-4-nirdr-v1"
+        ),
+    ),
     # ── MER ──
+    # ── MSL (single-volume archives — index.tab IS the cumulative index) ──
+    # APXS
+    ("msl", "apxs", "APXS_SCIENCE_EDR"): IndexConfig(
+        index_key="msl.apxs.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-apxs-2-edr-v1"
+        ),
+    ),
+    ("msl", "apxs", "APXS_OXIDE_RDR"): IndexConfig(
+        index_key="msl.apxs.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-apxs-4_5-rdr-v1"
+        ),
+    ),
+    ("msl", "apxs", "APXS_SPECTRUM_RDR"): IndexConfig(
+        index_key="msl.apxs.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-apxs-4_5-rdr-v1"
+        ),
+    ),
+    # ChemCam EDR (shared index covers LIBS+RMI+SOH)
+    ("msl", "ccam", "CCAM_LIBS_EDR"): IndexConfig(
+        index_key="msl.ccam.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/"
+            "msl-m-chemcam-libs-2-edr-v1"
+        ),
+    ),
+    ("msl", "ccam", "CCAM_RMI_EDR"): IndexConfig(
+        index_key="msl.ccam.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/"
+            "msl-m-chemcam-libs-2-edr-v1"
+        ),
+    ),
+    ("msl", "ccam", "CCAM_SOH_EDR"): IndexConfig(
+        index_key="msl.ccam.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/"
+            "msl-m-chemcam-libs-2-edr-v1"
+        ),
+    ),
+    # ChemCam RDR (separate LIBS and RMI indexes)
+    ("msl", "ccam", "CCAM_LIBS_L1B"): IndexConfig(
+        index_key="msl.ccam.libs_rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/"
+            "msl-m-chemcam-libs-4_5-rdr-v1"
+        ),
+    ),
+    ("msl", "ccam", "CCAM_LIBS_L2"): IndexConfig(
+        index_key="msl.ccam.libs_rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/"
+            "msl-m-chemcam-libs-4_5-rdr-v1"
+        ),
+    ),
+    ("msl", "ccam", "CCAM_RMI_RDR"): IndexConfig(
+        index_key="msl.ccam.rmi_rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/"
+            "msl-m-chemcam-libs-4_5-rdr-v1"
+        ),
+    ),
+    # CheMin EDR (all EDR types share one index)
+    ("msl", "cmn", "CCD_FRAME"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "DIFFRACTION_SINGLE"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "DIFFRACTION_SPLIT"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "DIFFRACTION_ALL"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "ENERGY_SINGLE"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "ENERGY_SPLIT"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "ENERGY_ALL"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "FILM"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "HOUSEKEEPING"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    ("msl", "cmn", "TRANSMIT_RAW"): IndexConfig(
+        index_key="msl.cmn.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1"
+        ),
+    ),
+    # CheMin RDR
+    ("msl", "cmn", "DIFFRACTION_ALL_RDR"): IndexConfig(
+        index_key="msl.cmn.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-4-rdr-v1"
+        ),
+    ),
+    ("msl", "cmn", "ENERGY_SINGLE_RDR"): IndexConfig(
+        index_key="msl.cmn.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-4-rdr-v1"
+        ),
+    ),
+    ("msl", "cmn", "MINERAL_TABLES"): IndexConfig(
+        index_key="msl.cmn.rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-4-rdr-v1"
+        ),
+    ),
+    # SAM (per-level indexes)
+    ("msl", "sam", "l2_qms"): IndexConfig(
+        index_key="msl.sam.l2",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1"
+        ),
+    ),
     ("mer_spirit", "pancam", "rdr"): IndexConfig(
         index_key="mer_spirit.pancam.rdr",
         archive_url=(

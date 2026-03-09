@@ -56,6 +56,21 @@ class TestRegistry:
                 f"{key} needs either archive_url or seti_volume_group"
             )
 
+    def test_mgs_moc_edr_registered(self):
+        assert ("mgs", "moc", "edr") in INDEX_REGISTRY
+
+    def test_mgs_moc_rdr_registered(self):
+        assert ("mgs", "moc", "rdr") in INDEX_REGISTRY
+
+    def test_viking_vis_edr_registered(self):
+        assert ("viking", "vis", "edr") in INDEX_REGISTRY
+
+    def test_messenger_mdis_edr_registered(self):
+        assert ("messenger", "mdis", "edr") in INDEX_REGISTRY
+
+    def test_messenger_mdis_cdr_registered(self):
+        assert ("messenger", "mdis", "cdr") in INDEX_REGISTRY
+
     def test_no_instrument_level_keys(self):
         """Registry must use (mission, instrument, product_key) triples."""
         for key in INDEX_REGISTRY:

@@ -5,18 +5,17 @@ Resolution strategy (chain of responsibility):
 1. **Catalog lookup**: If the product_id matches a sample product in the DB,
    use its url_stem + files directly. Works for ~1,948 sample products.
 
-2. **Index lookup**: If a PDS index exists for this mission.instrument,
-   look up the product_id in the index to get volume/path info, then
-   construct the URL. Requires an IndexBridge configuration.
+2. **Index lookup**: For product types with a registered PDS cumulative
+   index, look up the product_id to get volume/path info. Authoritative
+   for instruments spanning many volumes (CTX, HiRISE, Cassini ISS, etc.).
 
-3. **Fail with guidance**: Raise ProductNotFoundError explaining what's
-   needed (index not available, product not in catalog, etc.).
+3. **Pattern-based**: For types WITHOUT an index, if catalog samples all
+   share the same url_stem, derive the URL from the fixed stem + product_id.
+   Skipped when an index exists (single-sample types can look "fixed" when
+   they actually span many volumes).
 
-URL construction patterns vary across the PDS:
-- Static: same base URL for all products, just append filename
-- Volume-based: URL includes volume ID (e.g., coiss_2022) → need index
-- Date/orbit-based: URL includes date path (e.g., 2018193/WAC) → need index
-- For sample products, url_stem + filename always works regardless of pattern.
+4. **Fail with guidance**: Raise ProductNotFoundError explaining what's
+   needed (variable URL, no index available, etc.).
 """
 
 import json
@@ -106,12 +105,24 @@ def resolve_product(
     if resolved:
         return resolved
 
-    # Tier 2: Index lookup
+    # Tier 2: Index lookup (authoritative — covers variable url_stems)
     from planetarypy.catalog._index_bridge import resolve_from_index, has_index
 
     resolved = resolve_from_index(mission, instrument, product_key, product_id)
     if resolved:
         return resolved
+
+    # Tier 3: Pattern-based (for types with fixed url_stem, no index needed)
+    # Skipped when an index exists, since single-sample types can appear
+    # "fixed" when they actually span many volumes.
+    from planetarypy.catalog._url_patterns import resolve_by_pattern, has_pattern
+
+    if not has_index(mission, instrument, product_key):
+        resolved = resolve_by_pattern(
+            mission, instrument, product_key, product_id,
+        )
+        if resolved:
+            return resolved
 
     # Build a helpful error message
     if has_index(mission, instrument, product_key):
@@ -119,9 +130,15 @@ def resolve_product(
             f"The product was not found in either the catalog samples or "
             f"the PDS index. Check the product_id spelling."
         )
+    elif has_pattern(mission, instrument, product_key):
+        hint = (
+            f"A URL pattern exists but the product may not exist at the "
+            f"constructed URL. Check the product_id spelling."
+        )
     else:
         hint = (
-            f"No PDS index is registered for {mission}.{instrument}.{product_key}. "
+            f"No URL pattern or PDS index is available for "
+            f"{mission}.{instrument}.{product_key}. "
             f"Only sample products from the catalog are available."
         )
 
@@ -144,8 +161,9 @@ def _resolve_from_catalog(
            JOIN product_types pt USING (folder_name, product_key)
            JOIN instruments i USING (folder_name)
            WHERE i.mission = ? AND i.instrument = ?
-             AND pt.product_key = ? AND p.product_id = ?""",
-        [mission, instrument, product_key, product_id],
+             AND (pt.normalized_type = ? OR pt.product_key = ?)
+             AND p.product_id = ?""",
+        [mission, instrument, product_key, product_key, product_id],
     ).fetchone()
 
     if row is None:
