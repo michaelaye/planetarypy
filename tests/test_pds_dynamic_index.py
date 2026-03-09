@@ -8,7 +8,7 @@ import pytest
 from yarl import URL
 
 from planetarypy.pds.dynamic_index import DYNAMIC_URL_HANDLERS, DynamicRemoteHandler
-from planetarypy.pds.dynamic_url_handlers import CTXIndex, LROCIndex
+from planetarypy.pds.dynamic_url_handlers import CTXIndex, LROCIndex, LAMPEDRIndex, LAMPRDRIndex
 from planetarypy.pds.index_logging import AccessLog
 
 
@@ -159,6 +159,114 @@ class TestLROCIndex:
 
 
 # ---------------------------------------------------------------------------
+# LAMPEDRIndex / LAMPRDRIndex tests
+# ---------------------------------------------------------------------------
+
+
+def _make_lamp_tables(volume_folders: list[str]) -> list[pd.DataFrame]:
+    """Build the 4-table structure that JPL planetarydata pages return.
+
+    Table 0: header ("PDS Imaging Node: Data Archive")
+    Table 1: file listing with Name, Last modified, Size, Description columns
+    Table 2/3: footer tables
+    """
+    rows = [{"Name": "Parent Directory", "Last modified": None, "Size": "-", "Description": None}]
+    for folder in volume_folders:
+        rows.append({"Name": folder, "Last modified": "2025-01-01", "Size": "-", "Description": None})
+        md5_name = folder.rstrip("/") + "_md5.txt"
+        rows.append({"Name": md5_name, "Last modified": "2025-01-01", "Size": "400K", "Description": None})
+
+    table0 = pd.DataFrame({"0": ["PDS Imaging Node: Data Archive"]})
+    table1 = pd.DataFrame(rows)
+    table2 = pd.DataFrame({"0": [None], "4": ["footer"]})
+    table3 = pd.DataFrame({"0": ["NASA Officials:"], "1": ["Someone"]})
+    return [table0, table1, table2, table3]
+
+
+class TestLAMPEDRIndex:
+    """Tests for the LAMPEDRIndex handler class."""
+
+    FOLDERS = ["LROLAM_0060/", "LROLAM_0061/", "LROLAM_0062/"]
+
+    def _patch_read_html(self, monkeypatch, folders=None):
+        folders = folders or self.FOLDERS
+        tables = _make_lamp_tables(folders)
+        monkeypatch.setattr(pd, "read_html", lambda url: tables)
+
+    def test_volumes_table_filters_to_dirs_only(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPEDRIndex()
+        assert len(idx.volumes_table) == 3
+        assert all(idx.volumes_table["Name"].str.match(r"LROLAM_\d{4}/"))
+
+    def test_volumes_table_caches(self, monkeypatch):
+        call_count = 0
+
+        def counting_read_html(url):
+            nonlocal call_count
+            call_count += 1
+            return _make_lamp_tables(self.FOLDERS)
+
+        monkeypatch.setattr(pd, "read_html", counting_read_html)
+        idx = LAMPEDRIndex()
+        _ = idx.volumes_table
+        _ = idx.volumes_table
+        assert call_count == 1
+
+    def test_latest_release_folder(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPEDRIndex()
+        assert idx.latest_release_folder == "LROLAM_0062/"
+
+    def test_latest_release_number(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPEDRIndex()
+        assert idx.latest_release_number == "0062"
+
+    def test_latest_index_label_url(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPEDRIndex()
+        result = idx.latest_index_label_url
+        assert isinstance(result, URL)
+        assert str(result).endswith("LROLAM_0062/INDEX/CUMINDEX.LBL")
+        assert str(result).startswith(LAMPEDRIndex.url)
+
+
+class TestLAMPRDRIndex:
+    """Tests for the LAMPRDRIndex handler class."""
+
+    FOLDERS = ["LROLAM_1060/", "LROLAM_1061/", "LROLAM_1062/"]
+
+    def _patch_read_html(self, monkeypatch, folders=None):
+        folders = folders or self.FOLDERS
+        tables = _make_lamp_tables(folders)
+        monkeypatch.setattr(pd, "read_html", lambda url: tables)
+
+    def test_latest_release_folder(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPRDRIndex()
+        assert idx.latest_release_folder == "LROLAM_1062/"
+
+    def test_latest_release_number(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPRDRIndex()
+        assert idx.latest_release_number == "1062"
+
+    def test_latest_index_label_url(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPRDRIndex()
+        result = idx.latest_index_label_url
+        assert isinstance(result, URL)
+        assert str(result).endswith("LROLAM_1062/INDEX/CUMINDEX.LBL")
+        assert str(result).startswith(LAMPRDRIndex.url)
+
+    def test_uses_rdr_base_url(self, monkeypatch):
+        self._patch_read_html(monkeypatch)
+        idx = LAMPRDRIndex()
+        assert "lamp/rdr/" in str(idx.latest_index_label_url)
+
+
+# ---------------------------------------------------------------------------
 # DYNAMIC_URL_HANDLERS registry tests
 # ---------------------------------------------------------------------------
 
@@ -171,6 +279,14 @@ class TestRegistry:
     def test_lroc_registered(self):
         assert "lro.lroc.edr" in DYNAMIC_URL_HANDLERS
         assert DYNAMIC_URL_HANDLERS["lro.lroc.edr"] is LROCIndex
+
+    def test_lamp_edr_registered(self):
+        assert "lro.lamp.edr" in DYNAMIC_URL_HANDLERS
+        assert DYNAMIC_URL_HANDLERS["lro.lamp.edr"] is LAMPEDRIndex
+
+    def test_lamp_rdr_registered(self):
+        assert "lro.lamp.rdr" in DYNAMIC_URL_HANDLERS
+        assert DYNAMIC_URL_HANDLERS["lro.lamp.rdr"] is LAMPRDRIndex
 
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Dynamic URL handlers for LRO LAMP EDR and RDR indexes (volume-based URLs at JPL)
 - Backup URL fallback for CTX index (pdsimage2.wr.usgs.gov)
 - Quarto documentation with Diátaxis framework structure
 - New how-to guides: CTX calibration, CTX EDR, ISIS autoseed

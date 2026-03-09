@@ -7,13 +7,15 @@ __all__ = ["DYNAMIC_URL_HANDLERS", "DynamicRemoteHandler"]
 
 from loguru import logger
 
-from .dynamic_url_handlers import CTXIndex, LROCIndex
+from .dynamic_url_handlers import CTXIndex, LROCIndex, LAMPEDRIndex, LAMPRDRIndex
 from .index_logging import AccessLog
 
 # Dynamic URL handlers registry
 DYNAMIC_URL_HANDLERS = {
     "mro.ctx.edr": CTXIndex,
     "lro.lroc.edr": LROCIndex,
+    "lro.lamp.edr": LAMPEDRIndex,
+    "lro.lamp.rdr": LAMPRDRIndex,
 }
 
 
