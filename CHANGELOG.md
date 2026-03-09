@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **PDS Catalog module** (`planetarypy.catalog`): comprehensive index of ~2000 product types across 200+ instruments from the entire PDS archive, built from MillionConcepts pdr-tests repository into a local DuckDB database
+  - `build_catalog()` to clone pdr-tests and populate the database
+  - Query API: `list_missions()`, `list_instruments()`, `list_product_types()`, `get_products()`, `search()`, `summary()`
+  - Dotted key access: `list_product_types("mro.hirise")`, `get_products("cassini.iss.edr_sat")`
+  - 150+ manual mission/instrument mappings for pdr-tests folder names
+  - AST-based parser for selection_rules.py (no code execution)
+  - Multi-instrument folder splitting: folders like `mro` correctly split into `ctx`, `hirise`, `marci`, `mcs` instruments based on product key prefixes
+  - URL rewrite for broken USGS Imaging Node URLs (60 of 69 rewritten to SETI Rings and JPL Planetary Data mirrors)
+  - Tutorial notebook in `docs/tutorials/pds_catalog_tutorial.ipynb`
+  - CLI command `plp_build_catalog`
+  - Optional dependency: `pip install planetarypy[catalog]`
 - Dynamic URL handlers for LRO LAMP EDR and RDR indexes (volume-based URLs at JPL)
 - Backup URL fallback for CTX index (pdsimage2.wr.usgs.gov)
 - Quarto documentation with Diátaxis framework structure

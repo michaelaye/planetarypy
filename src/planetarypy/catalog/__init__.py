@@ -51,7 +51,10 @@ def build_catalog(force: bool = False) -> dict:
         find_test_csvs,
         parse_test_csv,
     )
-    from planetarypy.catalog._mission_map import resolve_mission_instrument
+    from planetarypy.catalog._mission_map import (
+        resolve_mission_instrument,
+        split_product_key,
+    )
     from planetarypy.catalog._schema import (
         get_connection,
         reset_schema,
@@ -110,28 +113,66 @@ def build_catalog(force: bool = False) -> dict:
         # Find matching CSV test files
         csv_matches = find_test_csvs(defdir, list(file_info.keys()))
 
-        # Insert instrument
-        insert_instrument(con, folder_name, mission, instrument,
-                          mapping_status, len(file_info))
-        stats["instruments"] += 1
+        if instrument == "_split":
+            # Multi-instrument folder: split product keys by prefix
+            # Group product keys by their resolved instrument
+            from collections import defaultdict
+            instr_groups: dict[str, list[str]] = defaultdict(list)
+            for product_key in file_info:
+                instr_name, _ = split_product_key(folder_name, product_key)
+                instr_groups[instr_name].append(product_key)
 
-        # Insert product types and their CSV data
-        for product_key, metadata in file_info.items():
-            if not isinstance(metadata, dict):
-                logger.warning(
-                    f"Skipping {folder_name}/{product_key}: "
-                    f"metadata is {type(metadata).__name__}, not dict"
+            for instr_name, product_keys in instr_groups.items():
+                # Synthetic folder_name for this instrument
+                synth_folder = f"{folder_name}__{instr_name}"
+                insert_instrument(
+                    con, synth_folder, mission, instr_name,
+                    "split", len(product_keys),
                 )
-                continue
-            has_csv = product_key in csv_matches
-            insert_product_type(con, folder_name, product_key, metadata, has_csv)
-            stats["product_types"] += 1
+                stats["instruments"] += 1
 
-            if has_csv:
-                rows = parse_test_csv(csv_matches[product_key])
-                for row in rows:
-                    insert_product(con, folder_name, product_key, row)
-                    stats["products"] += 1
+                for product_key in product_keys:
+                    metadata = file_info[product_key]
+                    if not isinstance(metadata, dict):
+                        logger.warning(
+                            f"Skipping {folder_name}/{product_key}: "
+                            f"metadata is {type(metadata).__name__}, not dict"
+                        )
+                        continue
+                    _, stripped_key = split_product_key(folder_name, product_key)
+                    has_csv = product_key in csv_matches
+                    insert_product_type(
+                        con, synth_folder, stripped_key, metadata, has_csv,
+                    )
+                    stats["product_types"] += 1
+
+                    if has_csv:
+                        rows = parse_test_csv(csv_matches[product_key])
+                        for row in rows:
+                            insert_product(con, synth_folder, stripped_key, row)
+                            stats["products"] += 1
+        else:
+            # Single-instrument folder: insert directly
+            insert_instrument(con, folder_name, mission, instrument,
+                              mapping_status, len(file_info))
+            stats["instruments"] += 1
+
+            for product_key, metadata in file_info.items():
+                if not isinstance(metadata, dict):
+                    logger.warning(
+                        f"Skipping {folder_name}/{product_key}: "
+                        f"metadata is {type(metadata).__name__}, not dict"
+                    )
+                    continue
+                has_csv = product_key in csv_matches
+                insert_product_type(con, folder_name, product_key, metadata, has_csv)
+                stats["product_types"] += 1
+
+                if has_csv:
+                    rows = parse_test_csv(csv_matches[product_key])
+                    for row in rows:
+                        insert_product(con, folder_name, product_key, row)
+                        stats["products"] += 1
 
     con.close()
 

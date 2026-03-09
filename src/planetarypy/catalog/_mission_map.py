@@ -5,6 +5,11 @@ Maps folder names like 'cassini_iss', 'diviner', 'gal_ssi' to
 1. Manual map for known ambiguous cases
 2. Auto-split on first underscore
 3. Ambiguous flag for anything unresolved
+
+For folders that bundle multiple instruments (previously mapped to 'multi'),
+MULTI_INSTRUMENT_SPLIT defines how to extract instrument names from product
+key prefixes. During ingestion, these folders get split into separate
+instrument entries with synthetic folder names like 'mro__ctx'.
 """
 
 # Manual mapping for folder names that don't split cleanly on underscore,
@@ -16,21 +21,21 @@ MANUAL_MISSION_MAP: dict[str, tuple[str, str]] = {
     "lroc": ("lro", "lroc"),
     "sharad": ("mro", "sharad"),
     "themis": ("mars_odyssey", "themis"),
-    # Multi-instrument bundled definitions
-    "mro": ("mro", "multi"),
+    # Multi-instrument bundled definitions (split by MULTI_INSTRUMENT_SPLIT)
+    "mro": ("mro", "_split"),
     # Apollo
-    "apollo": ("apollo", "multi"),
+    "apollo": ("apollo", "_split"),
     # Dawn
-    "dawn": ("dawn", "multi"),
+    "dawn": ("dawn", "_split"),
     "dawn_certified": ("dawn", "certified"),
     # Deep Impact
     "di_ground": ("deep_impact", "ground"),
     "di_nav": ("deep_impact", "nav"),
     "di_science": ("deep_impact", "science"),
     # Deep Space 1
-    "ds1": ("deep_space_1", "multi"),
+    "ds1": ("deep_space_1", "_split"),
     # EPOXI (Deep Impact extended mission)
-    "epoxi": ("epoxi", "multi"),
+    "epoxi": ("epoxi", "_split"),
     # ESA
     "esa_smart": ("esa", "smart"),
     # Galileo (gal_ prefix)
@@ -42,39 +47,39 @@ MANUAL_MISSION_MAP: dict[str, tuple[str, str]] = {
     "gal_probe": ("galileo", "probe"),
     "gal_ssi": ("galileo", "ssi"),
     # Giotto
-    "giotto": ("giotto", "multi"),
+    "giotto": ("giotto", "_split"),
     # GRAIL
-    "grail": ("grail", "multi"),
+    "grail": ("grail", "_split"),
     # Ground-based observations
-    "ground_based": ("ground_based", "multi"),
-    "grsfe": ("grsfe", "multi"),
+    "ground_based": ("ground_based", "_split"),
+    "grsfe": ("grsfe", "_split"),
     # Hayabusa
-    "hayabusa": ("hayabusa", "multi"),
+    "hayabusa": ("hayabusa", "_split"),
     # Hubble
-    "hst": ("hst", "multi"),
+    "hst": ("hst", "_split"),
     # ICE (International Cometary Explorer)
-    "ice": ("ice", "multi"),
+    "ice": ("ice", "_split"),
     # International Halley Watch
-    "ihw": ("ihw", "multi"),
+    "ihw": ("ihw", "_split"),
     "ihw_irsn": ("ihw", "irsn"),
     "ihw_ppn": ("ihw", "ppn"),
     "ihw_rss": ("ihw", "rss"),
     # IUE (International Ultraviolet Explorer)
-    "iue": ("iue", "multi"),
+    "iue": ("iue", "_split"),
     # Kaguya (SELENE)
-    "kaguya": ("kaguya", "multi"),
+    "kaguya": ("kaguya", "_split"),
     "kaguya_jaxa": ("kaguya", "jaxa"),
     # LASP Mars data
     "lasp_mars": ("lasp", "mars"),
     # LOIRP (Lunar Orbiter Image Recovery Project)
-    "loirp": ("loirp", "multi"),
+    "loirp": ("loirp", "_split"),
     # Lunar observations
     "lunar_earth_based": ("lunar", "earth_based"),
-    "lunar_prospector": ("lunar_prospector", "multi"),
+    "lunar_prospector": ("lunar_prospector", "_split"),
     # Clementine
     "clem_GEO": ("clementine", "geo"),
     # Chandrayaan
-    "ch1": ("chandrayaan_1", "multi"),
+    "ch1": ("chandrayaan_1", "_split"),
     "ch1_esa": ("chandrayaan_1", "esa"),
     "ch2_isro": ("chandrayaan_2", "isro"),
     "ch3_isro": ("chandrayaan_3", "isro"),
@@ -106,15 +111,15 @@ MANUAL_MISSION_MAP: dict[str, tuple[str, str]] = {
     "mgs_tes": ("mgs", "tes"),
     "mgs_tes_GEO": ("mgs", "tes_geo"),
     # Mariner
-    "mariner": ("mariner", "multi"),
+    "mariner": ("mariner", "_split"),
     # Mars
     "mars_model": ("mars", "model"),
-    "mars_odyssey": ("mars_odyssey", "multi"),
-    "mars_pathfinder": ("mars_pathfinder", "multi"),
+    "mars_odyssey": ("mars_odyssey", "_split"),
+    "mars_pathfinder": ("mars_pathfinder", "_split"),
     # MRO RSS (separate from main mro folder)
     "mro_rss": ("mro", "rss"),
     # MSX
-    "msx": ("msx", "multi"),
+    "msx": ("msx", "_split"),
     # NEAR (Near Earth Asteroid Rendezvous)
     "near_mag": ("near", "mag"),
     "near_msi": ("near", "msi"),
@@ -132,41 +137,41 @@ MANUAL_MISSION_MAP: dict[str, tuple[str, str]] = {
     "nh_sdc": ("new_horizons", "sdc"),
     "nh_swap": ("new_horizons", "swap"),
     # Phoenix
-    "phoenix": ("phoenix", "multi"),
+    "phoenix": ("phoenix", "_split"),
     "phoenix_atm": ("phoenix", "atm"),
     "phoenix_tega": ("phoenix", "tega"),
     # Pioneer
-    "pioneer": ("pioneer", "multi"),
+    "pioneer": ("pioneer", "_split"),
     # Pre-Magellan Venus data
-    "pre_magellan": ("pre_magellan", "multi"),
+    "pre_magellan": ("pre_magellan", "_split"),
     # Pioneer Venus Orbiter
-    "pvo": ("pvo", "multi"),
+    "pvo": ("pvo", "_split"),
     "pvo_omag": ("pvo", "omag"),
     # Sakigake
-    "sakigake": ("sakigake", "multi"),
+    "sakigake": ("sakigake", "_split"),
     # Saturn ring plane crossing
     "saturn_rpx": ("saturn", "rpx"),
     # Shoemaker-Levy 9
     "sl9_jupiter_impact": ("sl9", "jupiter_impact"),
     # SOHO
-    "soho": ("soho", "multi"),
+    "soho": ("soho", "_split"),
     # Stardust
-    "stardust": ("stardust", "multi"),
+    "stardust": ("stardust", "_split"),
     "stardust_next": ("stardust", "next"),
     # Suisei
-    "suisei": ("suisei", "multi"),
+    "suisei": ("suisei", "_split"),
     # Ulysses
-    "ulysses": ("ulysses", "multi"),
+    "ulysses": ("ulysses", "_split"),
     # Venus Climate Orbiter (Akatsuki)
-    "vco": ("vco", "multi"),
+    "vco": ("vco", "_split"),
     # Vega
-    "vega": ("vega", "multi"),
+    "vega": ("vega", "_split"),
     # Venera
-    "venera": ("venera", "multi"),
+    "venera": ("venera", "_split"),
     # Venus radar
     "venus_radar": ("venus", "radar"),
     # Venus Express (vex_ prefix)
-    "vex": ("venus_express", "multi"),
+    "vex": ("venus_express", "_split"),
     "vex_aspera": ("venus_express", "aspera"),
     "vex_mag": ("venus_express", "mag"),
     "vex_spicav": ("venus_express", "spicav"),
@@ -187,11 +192,189 @@ MANUAL_MISSION_MAP: dict[str, tuple[str, str]] = {
     "vg_rss": ("voyager", "rss"),
     "vg_spectrometers": ("voyager", "spectrometers"),
     # Viking
-    "viking": ("viking", "multi"),
+    "viking": ("viking", "_split"),
     # Wallops Flight Facility atmospheric data
     "wff_atm": ("wff", "atm"),
     # BepiColombo
-    "bepi_colombo": ("bepi_colombo", "multi"),
+    "bepi_colombo": ("bepi_colombo", "_split"),
+}
+
+
+# Maps folder_name -> {product_key_prefix: instrument_name}.
+# Product keys matching a prefix get that instrument assigned, with the prefix
+# stripped from the product_key. Keys not matching any prefix go into a
+# "_misc" fallback instrument.
+MULTI_INSTRUMENT_SPLIT: dict[str, dict[str, str]] = {
+    "mro": {
+        "ctx": "ctx",
+        "hirise": "hirise",
+        "marci": "marci",
+        "mcs": "mcs",
+    },
+    "phoenix": {
+        "afm": "afm",
+        "elec": "elec",
+        "om": "om",
+        "rac": "rac",
+        "ssi": "ssi",
+        "tecp": "tecp",
+        "wcl": "wcl",
+    },
+    "dawn": {
+        "fc": "fc",
+        "vir": "vir",
+    },
+    "bepi_colombo": {
+        "cam1": "cam1",
+        "cam2": "cam2",
+        "mag": "mag",
+    },
+    "epoxi": {
+        "hrii": "hrii",
+        "hriv": "hriv",
+        "mri": "mri",
+    },
+    "ds1": {
+        "micas": "micas",
+        "ids": "ids",
+        "pepe": "pepe",
+    },
+    "grail": {
+        "lgrs": "lgrs",
+        "rss": "rss",
+    },
+    "mars_pathfinder": {
+        "apxs": "apxs",
+        "imp": "imp",
+        "rvrcam": "rvrcam",
+        "eng": "eng",
+        "rss": "rss",
+        "3d": "3d",
+    },
+    "mars_odyssey": {
+        "edr": "grs",
+        "marie": "marie",
+    },
+    "apollo": {
+        "A12": "sws",
+        "A14_15": "ccig",
+        "A15_16_SMSS": "smss",
+        "A15_16_XRFS": "xrfs",
+        "A15_SWS": "sws",
+        "A17": "tg",
+    },
+    "ch1": {
+        "M3": "m3",
+    },
+    "giotto": {
+        "hmc": "hmc",
+        "ims": "ims",
+        "jpa": "jpa",
+        "mag": "mag",
+        "nms": "nms",
+        "ope": "ope",
+        "pia": "pia",
+        "did": "did",
+        "gre": "gre",
+    },
+    "hayabusa": {
+        "amica": "amica",
+        "lidar": "lidar",
+        "nirs": "nirs",
+    },
+    "ice": {
+        "epas": "epas",
+        "ici": "ici",
+        "mag": "mag",
+        "plawav": "plawav",
+        "radwav": "radwav",
+        "swp": "swp",
+        "uleca": "uleca",
+    },
+    "loirp": {
+        "lo": "lo",
+    },
+    "lunar_prospector": {
+        "er": "er",
+        "mag": "mag",
+        "los": "grs",
+    },
+    "mariner": {
+        "iris": "iris",
+        "iss": "iss",
+        "mag": "mag",
+        "pls": "pls",
+    },
+    "pvo": {
+        "oefd": "oefd",
+        "oetp": "oetp",
+        "oims": "oims",
+        "onms": "onms",
+        "orpa": "orpa",
+        "orse": "orse",
+        "pos": "pos",
+    },
+    "stardust": {
+        "cida": "cida",
+        "dfmi": "dfmi",
+        "dse": "dse",
+        "keck": "keck",
+        "nav": "navcam",
+        "src": "src",
+    },
+    "ulysses": {
+        "cospin": "cospin",
+        "dds": "dds",
+        "epac": "epac",
+        "gas": "gas",
+        "grb": "grb",
+        "hiscale": "hiscale",
+        "mag": "mag",
+        "sce": "sce",
+        "swoops": "swoops",
+        "urap": "urap",
+    },
+    "vco": {
+        "ir": "ir",
+        "lir": "lir",
+        "uvi": "uvi",
+    },
+    "vega": {
+        "balloon": "balloon",
+        "ducma": "ducma",
+        "iks": "iks",
+        "mischa": "mischa",
+        "pm1": "pm1",
+        "puma": "puma",
+        "sp1": "sp1",
+        "sp2": "sp2",
+        "tnm": "tnm",
+        "tvs": "tvs",
+    },
+    "viking": {
+        "irtm": "irtm",
+        "lcs": "lcs",
+        "lr": "lr",
+        "seis": "seis",
+    },
+    "vex": {
+        # VEX multi folder is all RSO (Radio Science) data types
+    },
+    # These folders have products without clear instrument prefixes.
+    # Each product_key becomes its own instrument entry.
+    "hst": {},
+    "ihw": {},
+    "iue": {},
+    "grsfe": {},
+    "ground_based": {},
+    "kaguya": {},
+    "msx": {},
+    "pioneer": {},
+    "pre_magellan": {},
+    "sakigake": {},
+    "soho": {},
+    "suisei": {},
+    "venera": {},
 }
 
 
@@ -207,7 +390,9 @@ def resolve_mission_instrument(folder_name: str) -> tuple[str, str, str]:
     -------
     tuple[str, str, str]
         (mission, instrument, mapping_status) where mapping_status is one of
-        'manual', 'auto', or 'ambiguous'
+        'manual', 'auto', '_split', or 'ambiguous'.
+        '_split' means the folder contains multiple instruments and product
+        keys need to be split via split_product_key().
     """
     if folder_name in MANUAL_MISSION_MAP:
         m, i = MANUAL_MISSION_MAP[folder_name]
@@ -215,4 +400,41 @@ def resolve_mission_instrument(folder_name: str) -> tuple[str, str, str]:
     if "_" in folder_name:
         parts = folder_name.split("_", 1)
         return parts[0], parts[1], "auto"
-    return folder_name, "multi", "ambiguous"
+    return folder_name, folder_name, "ambiguous"
+
+
+def split_product_key(folder_name: str, product_key: str) -> tuple[str, str]:
+    """Split a product key into (instrument, stripped_key) for multi-instrument folders.
+
+    Parameters
+    ----------
+    folder_name : str
+        The pdr-tests folder name
+    product_key : str
+        The original product key (e.g. 'ctx_edr')
+
+    Returns
+    -------
+    tuple[str, str]
+        (instrument_name, stripped_product_key). If no split is defined,
+        returns (product_key, product_key) — the key itself becomes the instrument.
+    """
+    if folder_name not in MULTI_INSTRUMENT_SPLIT:
+        return product_key, product_key
+
+    prefix_map = MULTI_INSTRUMENT_SPLIT[folder_name]
+    if not prefix_map:
+        # Empty map: each product_key is its own instrument
+        return product_key, product_key
+
+    # Try longest prefix first to avoid partial matches
+    for prefix in sorted(prefix_map, key=len, reverse=True):
+        if product_key == prefix:
+            # Exact match (e.g. 'gas', 'mag', 'swoops')
+            return prefix_map[prefix], prefix
+        if product_key.startswith(prefix + "_"):
+            stripped = product_key[len(prefix) + 1:]
+            return prefix_map[prefix], stripped
+
+    # No prefix matched — put in _misc
+    return "_misc", product_key
