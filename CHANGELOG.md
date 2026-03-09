@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **PDS Catalog module** (`planetarypy.catalog`): comprehensive index of ~2000 product types across 200+ instruments from the entire PDS archive, built from MillionConcepts pdr-tests repository into a local DuckDB database
   - `build_catalog()` to clone pdr-tests and populate the database
-  - Query API: `list_missions()`, `list_instruments()`, `list_product_types()`, `browse_products()`, `search()`, `summary()`
-  - Dotted key access: `list_product_types("mro.hirise")`, `browse_products("cassini.iss.edr_sat")`
+  - Query API: `list_missions()`, `list_instruments()`, `list_product_types()`, `example_products()`, `search()`, `summary()`
+  - Dotted key access: `list_product_types("mro.hirise")`, `example_products("cassini.iss.edr_sat")`
   - 150+ manual mission/instrument mappings for pdr-tests folder names
   - AST-based parser for selection_rules.py (no code execution)
   - Multi-instrument folder splitting: folders like `mro` correctly split into `ctx`, `hirise`, `marci`, `mcs` instruments based on product key prefixes
