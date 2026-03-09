@@ -312,3 +312,47 @@ class TestResolveFromIndex:
             assert result is None
         finally:
             del INDEX_REGISTRY[("test_mission", "test_instr", "edr")]
+
+
+class TestExtraIndexKeys:
+    def test_diviner_edr_has_extra_keys(self):
+        cfg = INDEX_REGISTRY[("lro", "diviner", "edr")]
+        assert cfg.extra_index_keys == ("lro.diviner.edr2",)
+
+    def test_diviner_rdr_has_extra_keys(self):
+        cfg = INDEX_REGISTRY[("lro", "diviner", "rdr")]
+        assert cfg.extra_index_keys == ("lro.diviner.rdr2",)
+
+    def test_normal_config_has_no_extra_keys(self):
+        cfg = INDEX_REGISTRY[("mro", "ctx", "edr")]
+        assert cfg.extra_index_keys == ()
+
+    def test_load_concatenates_multiple_indexes(self, monkeypatch):
+        """_load_index_df concatenates primary + extra index DataFrames."""
+        from planetarypy.catalog._index_bridge import _load_index_df
+
+        df1 = pd.DataFrame({
+            "PRODUCT_ID": ["PROD_A"],
+            "VOLUME_ID": ["VOL_001"],
+        })
+        df2 = pd.DataFrame({
+            "PRODUCT_ID": ["PROD_B"],
+            "VOLUME_ID": ["VOL_002"],
+        })
+        call_log = []
+
+        def mock_get_index(key):
+            call_log.append(key)
+            return {"test.edr1": df1, "test.edr2": df2}[key]
+
+        monkeypatch.setattr(
+            "planetarypy.pds.get_index", mock_get_index
+        )
+        cfg = IndexConfig(
+            index_key="test.edr1",
+            extra_index_keys=("test.edr2",),
+        )
+        result = _load_index_df(cfg)
+        assert len(result) == 2
+        assert set(result["PRODUCT_ID"]) == {"PROD_A", "PROD_B"}
+        assert call_log == ["test.edr1", "test.edr2"]

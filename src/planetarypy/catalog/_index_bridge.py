@@ -31,7 +31,14 @@ class IndexConfig:
     """Configuration for resolving products via a PDS cumulative index."""
 
     index_key: str
-    """PDS index dotted key (e.g. 'mro.ctx.edr')."""
+    """Primary PDS index dotted key (e.g. 'mro.ctx.edr')."""
+
+    extra_index_keys: tuple[str, ...] = ()
+    """Additional index keys to concatenate with the primary.
+
+    Used when an archive splits the same data set across multiple volumes
+    with separate index files (e.g. Diviner edr1 + edr2).
+    """
 
     product_id_col: str = "PRODUCT_ID"
     """Column to match the requested product_id against."""
@@ -92,12 +99,14 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
     ),
     ("lro", "diviner", "edr"): IndexConfig(
         index_key="lro.diviner.edr1",
+        extra_index_keys=("lro.diviner.edr2",),
         archive_url=(
             "https://pds-geosciences.wustl.edu/lro/lro-l-dlre-2-edr-v1"
         ),
     ),
     ("lro", "diviner", "rdr"): IndexConfig(
         index_key="lro.diviner.rdr1",
+        extra_index_keys=("lro.diviner.rdr2",),
         archive_url=(
             "https://pds-geosciences.wustl.edu/lro/lro-l-dlre-4-rdr-v1"
         ),
@@ -224,10 +233,19 @@ def resolve_from_index(
 
 
 def _load_index_df(config: IndexConfig) -> pd.DataFrame:
-    """Load the index DataFrame, downloading if necessary."""
+    """Load the index DataFrame, downloading if necessary.
+
+    When extra_index_keys are set, loads all indexes and concatenates them.
+    """
     from planetarypy.pds import get_index
 
-    return get_index(config.index_key)
+    df = get_index(config.index_key)
+    if config.extra_index_keys:
+        dfs = [df]
+        for key in config.extra_index_keys:
+            dfs.append(get_index(key))
+        df = pd.concat(dfs, ignore_index=True)
+    return df
 
 
 def _find_product_in_index(
