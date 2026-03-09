@@ -114,14 +114,14 @@ def resolve_product(
         return resolved
 
     # Build a helpful error message
-    if has_index(mission, instrument):
+    if has_index(mission, instrument, product_key):
         hint = (
             f"The product was not found in either the catalog samples or "
             f"the PDS index. Check the product_id spelling."
         )
     else:
         hint = (
-            f"No PDS index is registered for {mission}.{instrument}. "
+            f"No PDS index is registered for {mission}.{instrument}.{product_key}. "
             f"Only sample products from the catalog are available."
         )
 

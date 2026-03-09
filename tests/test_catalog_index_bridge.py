@@ -6,10 +6,9 @@ import pandas as pd
 from planetarypy.catalog._index_bridge import (
     IndexConfig,
     INDEX_REGISTRY,
-    PRODUCT_KEY_OVERRIDES,
     get_index_config,
     has_index,
-    list_indexed_instruments,
+    list_indexed_products,
     resolve_from_index,
     _find_product_in_index,
     _build_url_stem,
@@ -31,14 +30,20 @@ class TestIndexConfig:
 
 
 class TestRegistry:
-    def test_ctx_registered(self):
-        assert ("mro", "ctx") in INDEX_REGISTRY
+    def test_ctx_edr_registered(self):
+        assert ("mro", "ctx", "edr") in INDEX_REGISTRY
 
-    def test_cassini_iss_registered(self):
-        assert ("cassini", "iss") in INDEX_REGISTRY
+    def test_hirise_edr_registered(self):
+        assert ("mro", "hirise", "edr") in INDEX_REGISTRY
+
+    def test_hirise_rdr_registered(self):
+        assert ("mro", "hirise", "rdr") in INDEX_REGISTRY
+
+    def test_cassini_iss_edr_sat_registered(self):
+        assert ("cassini", "iss", "edr_sat") in INDEX_REGISTRY
 
     def test_galileo_ssi_uses_go_index(self):
-        cfg = INDEX_REGISTRY[("galileo", "ssi")]
+        cfg = INDEX_REGISTRY[("galileo", "ssi", "edr")]
         assert cfg.index_key == "go.ssi.index"
 
     def test_all_configs_have_index_key(self):
@@ -51,45 +56,61 @@ class TestRegistry:
                 f"{key} needs either archive_url or seti_volume_group"
             )
 
+    def test_no_instrument_level_keys(self):
+        """Registry must use (mission, instrument, product_key) triples."""
+        for key in INDEX_REGISTRY:
+            assert len(key) == 3, f"Key {key} is not a triple"
+
 
 class TestGetIndexConfig:
     def test_basic_lookup(self):
-        cfg = get_index_config("mro", "ctx")
+        cfg = get_index_config("mro", "ctx", "edr")
         assert cfg is not None
         assert cfg.index_key == "mro.ctx.edr"
 
-    def test_product_key_override(self):
+    def test_hirise_rdr(self):
         cfg = get_index_config("mro", "hirise", "rdr")
         assert cfg is not None
         assert cfg.index_key == "mro.hirise.rdr"
 
-    def test_product_key_fallback_to_default(self):
+    def test_hirise_edr(self):
         cfg = get_index_config("mro", "hirise", "edr")
         assert cfg is not None
         assert cfg.index_key == "mro.hirise.edr"
 
+    def test_unknown_product_type(self):
+        cfg = get_index_config("mro", "ctx", "nonexistent")
+        assert cfg is None
+
     def test_unknown_instrument(self):
-        cfg = get_index_config("unknown", "instrument")
+        cfg = get_index_config("unknown", "instrument", "edr")
         assert cfg is None
 
 
 class TestHasIndex:
     def test_known(self):
-        assert has_index("mro", "ctx") is True
+        assert has_index("mro", "ctx", "edr") is True
 
-    def test_unknown(self):
-        assert has_index("unknown", "instrument") is False
+    def test_unknown_product_key(self):
+        assert has_index("mro", "ctx", "nonexistent") is False
+
+    def test_unknown_instrument(self):
+        assert has_index("unknown", "instrument", "edr") is False
 
 
-class TestListIndexedInstruments:
+class TestListIndexedProducts:
     def test_returns_tuples(self):
-        result = list_indexed_instruments()
+        result = list_indexed_products()
         assert len(result) > 0
-        assert all(len(t) == 3 for t in result)
+        assert all(len(t) == 4 for t in result)
 
-    def test_includes_ctx(self):
-        result = list_indexed_instruments()
-        assert ("mro", "ctx", "mro.ctx.edr") in result
+    def test_includes_ctx_edr(self):
+        result = list_indexed_products()
+        assert ("mro", "ctx", "edr", "mro.ctx.edr") in result
+
+    def test_includes_hirise_rdr(self):
+        result = list_indexed_products()
+        assert ("mro", "hirise", "rdr", "mro.hirise.rdr") in result
 
 
 class TestFindProductInIndex:
@@ -251,9 +272,9 @@ class TestResolveFromIndex:
             "planetarypy.catalog._index_bridge._load_index_df",
             lambda config: mock_df,
         )
-        # Register a test instrument
+        # Register a test entry
         from planetarypy.catalog._index_bridge import INDEX_REGISTRY
-        INDEX_REGISTRY[("test_mission", "test_instr")] = IndexConfig(
+        INDEX_REGISTRY[("test_mission", "test_instr", "edr")] = IndexConfig(
             index_key="test.instr.edr",
             archive_url="https://example.com/data",
         )
@@ -267,7 +288,7 @@ class TestResolveFromIndex:
             assert "VOL_001" in result.url_stem
             assert "TEST_PRODUCT_001.IMG" in result.files
         finally:
-            del INDEX_REGISTRY[("test_mission", "test_instr")]
+            del INDEX_REGISTRY[("test_mission", "test_instr", "edr")]
 
     def test_product_not_in_index(self, monkeypatch):
         mock_df = pd.DataFrame({
@@ -280,7 +301,7 @@ class TestResolveFromIndex:
             lambda config: mock_df,
         )
         from planetarypy.catalog._index_bridge import INDEX_REGISTRY
-        INDEX_REGISTRY[("test_mission", "test_instr")] = IndexConfig(
+        INDEX_REGISTRY[("test_mission", "test_instr", "edr")] = IndexConfig(
             index_key="test.instr.edr",
             archive_url="https://example.com/data",
         )
@@ -290,4 +311,4 @@ class TestResolveFromIndex:
             )
             assert result is None
         finally:
-            del INDEX_REGISTRY[("test_mission", "test_instr")]
+            del INDEX_REGISTRY[("test_mission", "test_instr", "edr")]

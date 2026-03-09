@@ -5,7 +5,7 @@ enables resolving arbitrary product IDs (not just the ~1,948 sample
 products in the catalog DB).
 
 Flow:
-    1. Look up (mission, instrument) in INDEX_REGISTRY → IndexConfig
+    1. Look up (mission, instrument, product_key) in INDEX_REGISTRY → IndexConfig
     2. Load the index DataFrame via planetarypy.pds.get_index()
     3. Search for product_id in the configured column
     4. Construct download URL from volume_id + file_spec + archive base
@@ -57,76 +57,19 @@ class IndexConfig:
 
 
 # ── Registry ──────────────────────────────────────────────────────────
-# Maps catalog (mission, instrument) → IndexConfig.
-# Only instruments with registered PDS indexes appear here.
+# Maps catalog (mission, instrument, product_key) → IndexConfig.
+# Every entry is explicit — no defaults, no fallbacks.
 
-INDEX_REGISTRY: dict[tuple[str, str], IndexConfig] = {
+INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
     # ── MRO ──
-    ("mro", "ctx"): IndexConfig(
+    ("mro", "ctx", "edr"): IndexConfig(
         index_key="mro.ctx.edr",
         archive_url="https://planetarydata.jpl.nasa.gov/img/data/mro/ctx",
     ),
-    ("mro", "hirise"): IndexConfig(
+    ("mro", "hirise", "edr"): IndexConfig(
         index_key="mro.hirise.edr",
         archive_url="https://hirise-pds.lpl.arizona.edu/PDS",
     ),
-    ("mro", "crism"): IndexConfig(
-        index_key="mro.crism.mtrdr",
-        archive_url=(
-            "https://pds-geosciences.wustl.edu/mro/"
-            "mro-m-crism-5-rdr-mptargeted-v1"
-        ),
-    ),
-    # ── LRO ──
-    ("lro", "lroc"): IndexConfig(
-        index_key="lro.lroc.edr",
-        archive_url="https://pds.lroc.asu.edu/data/LRO-L-LROC-2-EDR-V1.0",
-    ),
-    ("lro", "diviner"): IndexConfig(
-        index_key="lro.diviner.edr1",
-        archive_url=(
-            "https://pds-geosciences.wustl.edu/lro/lro-l-dlre-2-edr-v1"
-        ),
-    ),
-    ("lro", "lola"): IndexConfig(
-        index_key="lro.lola.edr",
-        archive_url=(
-            "https://pds-geosciences.wustl.edu/lro/lro-l-lola-2-edr-v1"
-        ),
-    ),
-    # ── Cassini (SETI Rings) ──
-    ("cassini", "iss"): IndexConfig(
-        index_key="cassini.iss.index",
-        seti_volume_group="COISS_2xxx",
-    ),
-    ("cassini", "uvis"): IndexConfig(
-        index_key="cassini.uvis.index",
-        seti_volume_group="COUVIS_0xxx",
-    ),
-    # ── Galileo (catalog uses 'galileo', index uses 'go') ──
-    ("galileo", "ssi"): IndexConfig(
-        index_key="go.ssi.index",
-        seti_volume_group="GO_0xxx",
-    ),
-    # ── MER ──
-    ("mer", "spirit_pancam"): IndexConfig(
-        index_key="mer.spirit.pancam_rdr",
-        archive_url=(
-            "https://pds-geosciences.wustl.edu/mer/"
-            "mer2-m-pancam-3-radcal-sci-v2"
-        ),
-    ),
-    ("mer", "opportunity_pancam"): IndexConfig(
-        index_key="mer.opportunity.pancam_rdr",
-        archive_url=(
-            "https://pds-geosciences.wustl.edu/mer/"
-            "mer1-m-pancam-3-radcal-sci-v2"
-        ),
-    ),
-}
-
-# Product-key-specific overrides for instruments with multiple indexes.
-PRODUCT_KEY_OVERRIDES: dict[tuple[str, str, str], IndexConfig] = {
     ("mro", "hirise", "rdr"): IndexConfig(
         index_key="mro.hirise.rdr",
         archive_url="https://hirise-pds.lpl.arizona.edu/PDS",
@@ -135,16 +78,69 @@ PRODUCT_KEY_OVERRIDES: dict[tuple[str, str, str], IndexConfig] = {
         index_key="mro.hirise.dtm",
         archive_url="https://hirise-pds.lpl.arizona.edu/PDS",
     ),
+    ("mro", "crism", "mtrdr"): IndexConfig(
+        index_key="mro.crism.mtrdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/mro/"
+            "mro-m-crism-5-rdr-mptargeted-v1"
+        ),
+    ),
+    # ── LRO ──
+    ("lro", "lroc", "edr"): IndexConfig(
+        index_key="lro.lroc.edr",
+        archive_url="https://pds.lroc.asu.edu/data/LRO-L-LROC-2-EDR-V1.0",
+    ),
+    ("lro", "diviner", "edr"): IndexConfig(
+        index_key="lro.diviner.edr1",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/lro/lro-l-dlre-2-edr-v1"
+        ),
+    ),
     ("lro", "diviner", "rdr"): IndexConfig(
         index_key="lro.diviner.rdr1",
         archive_url=(
             "https://pds-geosciences.wustl.edu/lro/lro-l-dlre-4-rdr-v1"
         ),
     ),
+    ("lro", "lola", "edr"): IndexConfig(
+        index_key="lro.lola.edr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/lro/lro-l-lola-2-edr-v1"
+        ),
+    ),
     ("lro", "lola", "rdr"): IndexConfig(
         index_key="lro.lola.rdr",
         archive_url=(
             "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1"
+        ),
+    ),
+    # ── Cassini (SETI Rings) ──
+    ("cassini", "iss", "edr_sat"): IndexConfig(
+        index_key="cassini.iss.index",
+        seti_volume_group="COISS_2xxx",
+    ),
+    ("cassini", "uvis", "edr"): IndexConfig(
+        index_key="cassini.uvis.index",
+        seti_volume_group="COUVIS_0xxx",
+    ),
+    # ── Galileo (catalog uses 'galileo', index uses 'go') ──
+    ("galileo", "ssi", "edr"): IndexConfig(
+        index_key="go.ssi.index",
+        seti_volume_group="GO_0xxx",
+    ),
+    # ── MER ──
+    ("mer", "spirit_pancam", "rdr"): IndexConfig(
+        index_key="mer.spirit.pancam_rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/mer/"
+            "mer2-m-pancam-3-radcal-sci-v2"
+        ),
+    ),
+    ("mer", "opportunity_pancam", "rdr"): IndexConfig(
+        index_key="mer.opportunity.pancam_rdr",
+        archive_url=(
+            "https://pds-geosciences.wustl.edu/mer/"
+            "mer1-m-pancam-3-radcal-sci-v2"
         ),
     ),
 }
@@ -156,33 +152,25 @@ PRODUCT_KEY_OVERRIDES: dict[tuple[str, str, str], IndexConfig] = {
 def get_index_config(
     mission: str,
     instrument: str,
-    product_key: str | None = None,
+    product_key: str,
 ) -> IndexConfig | None:
-    """Look up the IndexConfig for a catalog instrument.
-
-    Checks product-key-specific overrides first, then the general registry.
-    """
-    if product_key:
-        override = PRODUCT_KEY_OVERRIDES.get(
-            (mission, instrument, product_key)
-        )
-        if override:
-            return override
-    return INDEX_REGISTRY.get((mission, instrument))
+    """Look up the IndexConfig for a specific product type."""
+    return INDEX_REGISTRY.get((mission, instrument, product_key))
 
 
-def has_index(mission: str, instrument: str) -> bool:
-    """Check if a PDS index is registered for this instrument."""
-    return (mission, instrument) in INDEX_REGISTRY
+def has_index(mission: str, instrument: str, product_key: str) -> bool:
+    """Check if a PDS index is registered for this product type."""
+    return (mission, instrument, product_key) in INDEX_REGISTRY
 
 
-def list_indexed_instruments() -> list[tuple[str, str, str]]:
-    """List all instruments with registered PDS indexes.
+def list_indexed_products() -> list[tuple[str, str, str, str]]:
+    """List all product types with registered PDS indexes.
 
-    Returns list of (mission, instrument, index_key) tuples.
+    Returns list of (mission, instrument, product_key, index_key) tuples.
     """
     return [
-        (m, i, cfg.index_key) for (m, i), cfg in INDEX_REGISTRY.items()
+        (m, i, pk, cfg.index_key)
+        for (m, i, pk), cfg in INDEX_REGISTRY.items()
     ]
 
 
