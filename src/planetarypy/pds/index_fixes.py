@@ -205,8 +205,8 @@ FILE_FIXES = {
 }
 # DataFrame-level fixes to apply BEFORE time conversion
 DF_PRETIME_FIXES = {
-    "mer.opportunity.pancam_rdr": fix_mer_rdr_df,
-    "mer.spirit.pancam_rdr": fix_mer_rdr_df,
+    "mer_opportunity.pancam.rdr": fix_mer_rdr_df,
+    "mer_spirit.pancam.rdr": fix_mer_rdr_df,
     "lro.lola.rdr": fix_lro_lola_rdr_df,
 }
 

@@ -223,12 +223,12 @@ class TestApplyFileFixer:
 class TestApplyPreTimeDfFixer:
     def test_dispatches_mer_opportunity(self):
         df = pd.DataFrame({"START_TIME": ["2004-01-05T12:00:00"]})
-        result = apply_pre_time_df_fixer("mer.opportunity.pancam_rdr", df)
+        result = apply_pre_time_df_fixer("mer_opportunity.pancam.rdr", df)
         assert result["START_TIME"].iloc[0] == "2004-01-05T12:00:00Z"
 
     def test_dispatches_mer_spirit(self):
         df = pd.DataFrame({"STOP_TIME": ["2004-01-05T12:00:00"]})
-        result = apply_pre_time_df_fixer("mer.spirit.pancam_rdr", df)
+        result = apply_pre_time_df_fixer("mer_spirit.pancam.rdr", df)
         assert result["STOP_TIME"].iloc[0] == "2004-01-05T12:00:00Z"
 
     def test_dispatches_lro_lola_rdr(self):
