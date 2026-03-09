@@ -14,7 +14,7 @@ Usage:
     list_missions()
     list_instruments("cassini")
     list_product_types("cassini", "iss")
-    get_products("cassini", "iss", "edr_sat")
+    browse_products("cassini", "iss", "edr_sat")
 
     # Review ambiguous mission mappings
     ambiguous_mappings()
@@ -306,7 +306,7 @@ def list_product_types(key: str, instrument: str | None = None) -> list[str]:
     return [r[0] for r in result]
 
 
-def get_products(
+def browse_products(
     key: str,
     instrument: str | None = None,
     product_key: str | None = None,
@@ -314,8 +314,8 @@ def get_products(
     """Get all product entries for a given mission/instrument/product type.
 
     Accepts either dotted key or separate arguments:
-        get_products("cassini.iss.edr_sat")
-        get_products("cassini", "iss", "edr_sat")
+        browse_products("cassini.iss.edr_sat")
+        browse_products("cassini", "iss", "edr_sat")
 
     Parameters
     ----------
@@ -403,7 +403,7 @@ def summary() -> pd.DataFrame:
     return df
 
 
-def get_product(
+def fetch_product(
     key: str,
     product_id: str,
     *,
