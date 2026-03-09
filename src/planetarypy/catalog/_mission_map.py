@@ -887,6 +887,19 @@ BODY_MAP: dict[str, str] = {
     "early": "early_mission",
     "late": "late_mission",
     "pre_jup": "pre_jupiter",
+    # New Horizons mission phases
+    "pluto": "pluto",
+    "arrokoth": "arrokoth",
+    "launch": "launch",
+    "kem_cruise": "kem_cruise",
+    # Target bodies (flyby targets, moons, minor bodies)
+    "ceres": "ceres",
+    "vesta": "vesta",
+    "gaspra": "gaspra",
+    "ida": "ida",
+    "halley": "halley",
+    "phobos": "phobos",
+    "earth": "earth",
 }
 
 # Product keys where the ENTIRE key is a body/phase name.
@@ -896,6 +909,7 @@ BODY_MAP: dict[str, str] = {
 # (e.g. Voyager POS = ephemeris data) can override.
 STANDALONE_BODY_KEYS: set[str] = {
     "jupiter", "neptune", "saturn", "uranus", "cruise",
+    "gaspra", "ida",
 }
 
 # Product keys that should NOT be decomposed despite matching patterns.

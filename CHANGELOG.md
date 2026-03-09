@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 150+ manual mission/instrument mappings for pdr-tests folder names
   - AST-based parser for selection_rules.py (no code execution)
   - Multi-instrument folder splitting: folders like `mro` correctly split into `ctx`, `hirise`, `marci`, `mcs` instruments based on product key prefixes; infix matching for Rosetta-style `EDR_instrument` keys
-  - Product key normalization: decompose keys like `edr_sat`, `sat_rdr_asc` into 3 dimensions — `normalized_type` (data type), `phase` (target body/mission phase), `format` (ascii/binary/coordinate system)
+  - Product key normalization: decompose keys like `edr_sat`, `sat_rdr_asc` into 3 dimensions — `normalized_type` (data type), `phase` (target body/mission phase), `format` (ascii/binary/coordinate system). Recognized phases include planets (saturn, jupiter, neptune, uranus, earth, pluto), minor bodies (ceres, vesta, gaspra, ida, arrokoth, phobos, halley), and mission phases (cruise, launch, kem_cruise)
   - `Mission` and `Instrument` objects with human-readable full names for all 65 missions and ~180 instruments (e.g. `Mission("mro").full_name` → "Mars Reconnaissance Orbiter", `mro["ctx"]` → "Context Camera")
   - Rosetta Lander (Philae) as separate mission entry with 8 properly split instruments
   - Voyager POS ephemeris override: standalone body keys normalized to `"ephemeris"` for pre-SPICE position data
