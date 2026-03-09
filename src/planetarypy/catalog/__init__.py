@@ -403,6 +403,129 @@ def summary() -> pd.DataFrame:
     return df
 
 
+def get_product(
+    key: str,
+    product_id: str,
+    *,
+    instrument: str | None = None,
+    product_key: str | None = None,
+    files: list[str] | None = None,
+    label_only: bool = False,
+    force: bool = False,
+) -> Path:
+    """Download a product and return the local directory path.
+
+    Parameters
+    ----------
+    key : str
+        Either a dotted key 'mission.instrument.product_type' or just mission
+    product_id : str
+        Product identifier (e.g. '1_N1523786525.118')
+    instrument : str, optional
+        Instrument name, required if key is not a dotted key
+    product_key : str, optional
+        Product type key, required if key is not a dotted key
+    files : list[str] | None
+        Specific filenames to download. None = all files.
+    label_only : bool
+        If True, download only the label file.
+    force : bool
+        If True, re-download even if files exist locally.
+
+    Returns
+    -------
+    Path
+        Local directory containing the downloaded product files
+    """
+    from planetarypy.catalog._download import (
+        resolve_product,
+        download_product,
+        _local_product_dir,
+    )
+
+    if instrument is None and product_key is None:
+        mission, instrument, product_key = _parse_dotted_key(key, 3)
+    elif instrument is not None and product_key is not None:
+        mission = key
+    else:
+        raise ValueError("Provide either a dotted key or all three arguments")
+
+    resolved = resolve_product(mission, instrument, product_key, product_id)
+    local_dir = _local_product_dir(mission, instrument, product_key, product_id)
+    download_product(
+        resolved, local_dir, files=files, label_only=label_only, force=force,
+    )
+    return local_dir
+
+
+def get_product_url(
+    key: str,
+    product_id: str,
+    *,
+    instrument: str | None = None,
+    product_key: str | None = None,
+) -> str:
+    """Return the remote base URL for a product without downloading.
+
+    Parameters
+    ----------
+    key : str
+        Either a dotted key 'mission.instrument.product_type' or just mission
+    product_id : str
+        Product identifier
+
+    Returns
+    -------
+    str
+        The url_stem for this product
+    """
+    from planetarypy.catalog._download import resolve_product
+
+    if instrument is None and product_key is None:
+        mission, instrument, product_key = _parse_dotted_key(key, 3)
+    elif instrument is not None and product_key is not None:
+        mission = key
+    else:
+        raise ValueError("Provide either a dotted key or all three arguments")
+
+    resolved = resolve_product(mission, instrument, product_key, product_id)
+    return resolved.url_stem
+
+
+def list_product_files(
+    key: str,
+    product_id: str,
+    *,
+    instrument: str | None = None,
+    product_key: str | None = None,
+) -> dict[str, str]:
+    """Return the files and their URLs for a product.
+
+    Parameters
+    ----------
+    key : str
+        Dotted key 'mission.instrument.product_type' or just mission
+    product_id : str
+        Product identifier
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of filename -> full URL
+    """
+    from planetarypy.catalog._download import resolve_product
+
+    if instrument is None and product_key is None:
+        mission, instrument, product_key = _parse_dotted_key(key, 3)
+    elif instrument is not None and product_key is not None:
+        mission = key
+    else:
+        raise ValueError("Provide either a dotted key or all three arguments")
+
+    resolved = resolve_product(mission, instrument, product_key, product_id)
+    return resolved.file_urls
+
+
 def _get_summary(storage_root: Path) -> dict:
     """Get summary counts from an existing catalog."""
     from planetarypy.catalog._schema import get_connection
