@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - AST-based parser for selection_rules.py (no code execution)
   - Multi-instrument folder splitting: folders like `mro` correctly split into `ctx`, `hirise`, `marci`, `mcs` instruments based on product key prefixes
   - URL rewrite for broken USGS Imaging Node URLs (60 of 69 rewritten to SETI Rings and JPL Planetary Data mirrors)
+  - Product download API: `get_product("mission.instrument.type", product_id)` downloads files and returns local path, `get_product_url()` returns remote URL, `list_product_files()` returns file-to-URL mapping
   - Tutorial notebook in `docs/tutorials/pds_catalog_tutorial.ipynb`
   - CLI command `plp_build_catalog`
   - Optional dependency: `pip install planetarypy[catalog]`
