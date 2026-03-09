@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS instruments (
 CREATE TABLE IF NOT EXISTS product_types (
     folder_name      VARCHAR,
     product_key      VARCHAR,
+    normalized_type  VARCHAR,
+    phase            VARCHAR DEFAULT '',
+    format           VARCHAR DEFAULT '',
     manifest         VARCHAR,
     fn_must_contain  VARCHAR,
     fn_ends_with     VARCHAR,
@@ -61,6 +64,9 @@ SELECT
     i.instrument,
     i.folder_name,
     pt.product_key,
+    pt.normalized_type,
+    pt.phase,
+    pt.format,
     pt.manifest,
     pt.label_type,
     pt.support_np,
@@ -140,16 +146,23 @@ def insert_product_type(
     product_key: str,
     metadata: dict,
     has_test_csv: bool = False,
+    normalized_type: str = "",
+    phase: str = "",
+    fmt: str = "",
 ) -> None:
     """Insert a product type record from parsed selection_rules metadata."""
     con.execute(
         """INSERT OR REPLACE INTO product_types
-           (folder_name, product_key, manifest, fn_must_contain, fn_ends_with,
+           (folder_name, product_key, normalized_type, phase, format,
+            manifest, fn_must_contain, fn_ends_with,
             fn_regex, url_must_contain, url_regex, label_type, support_np, has_test_csv)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             folder_name,
             product_key,
+            normalized_type or product_key,
+            phase,
+            fmt,
             metadata.get("manifest"),
             _to_json(metadata.get("fn_must_contain")),
             _to_json(metadata.get("fn_ends_with")),

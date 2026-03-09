@@ -14,7 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dotted key access: `list_product_types("mro.hirise")`, `example_products("cassini.iss.edr_sat")`
   - 150+ manual mission/instrument mappings for pdr-tests folder names
   - AST-based parser for selection_rules.py (no code execution)
-  - Multi-instrument folder splitting: folders like `mro` correctly split into `ctx`, `hirise`, `marci`, `mcs` instruments based on product key prefixes
+  - Multi-instrument folder splitting: folders like `mro` correctly split into `ctx`, `hirise`, `marci`, `mcs` instruments based on product key prefixes; infix matching for Rosetta-style `EDR_instrument` keys
+  - Product key normalization: decompose keys like `edr_sat`, `sat_rdr_asc` into 3 dimensions — `normalized_type` (data type), `phase` (target body/mission phase), `format` (ascii/binary/coordinate system)
+  - `Mission` and `Instrument` objects with human-readable full names for all 65 missions and ~180 instruments (e.g. `Mission("mro").full_name` → "Mars Reconnaissance Orbiter", `mro["ctx"]` → "Context Camera")
+  - Rosetta Lander (Philae) as separate mission entry with 8 properly split instruments
+  - Voyager POS ephemeris override: standalone body keys normalized to `"ephemeris"` for pre-SPICE position data
+  - Generic instrument groupings (spectrometers, particles, plasma, probe, dust, lander) decomposed into real instrument names across Galileo, NEAR, Rosetta, Voyager, Dawn, Deep Impact
+  - `_misc` instruments hidden from `list_instruments()` by default; accessible via `include_misc=True` or `Mission.misc`
   - URL rewrite for broken USGS Imaging Node URLs (60 of 69 rewritten to SETI Rings and JPL Planetary Data mirrors)
   - Product download API: `fetch_product("mission.instrument.type", product_id)` downloads files and returns local path, `get_product_url()` returns remote URL, `list_product_files()` returns file-to-URL mapping
   - Index-backed resolution (Tier 2): arbitrary product IDs resolved via PDS cumulative indexes for CTX, HiRISE, Cassini ISS, Galileo SSI, LROC, Diviner, CRISM, LOLA, Cassini UVIS, and MER Pancam

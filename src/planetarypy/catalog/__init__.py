@@ -23,6 +23,8 @@ Usage:
 from pathlib import Path
 
 import pandas as pd
+
+from planetarypy.catalog._objects import Mission, Instrument  # noqa: F401
 from loguru import logger
 
 from planetarypy.config import config
@@ -54,6 +56,8 @@ def build_catalog(force: bool = False) -> dict:
     from planetarypy.catalog._mission_map import (
         resolve_mission_instrument,
         split_product_key,
+        normalize_product_key,
+        apply_instrument_overrides,
     )
     from planetarypy.catalog._schema import (
         get_connection,
@@ -140,9 +144,14 @@ def build_catalog(force: bool = False) -> dict:
                         )
                         continue
                     _, stripped_key = split_product_key(folder_name, product_key)
+                    norm_type, phase, fmt = normalize_product_key(stripped_key)
+                    norm_type, phase, fmt = apply_instrument_overrides(
+                        norm_type, phase, fmt, mission, instr_name,
+                    )
                     has_csv = product_key in csv_matches
                     insert_product_type(
                         con, synth_folder, stripped_key, metadata, has_csv,
+                        normalized_type=norm_type, phase=phase, fmt=fmt,
                     )
                     stats["product_types"] += 1
 
@@ -164,8 +173,15 @@ def build_catalog(force: bool = False) -> dict:
                         f"metadata is {type(metadata).__name__}, not dict"
                     )
                     continue
+                norm_type, phase, fmt = normalize_product_key(product_key)
+                norm_type, phase, fmt = apply_instrument_overrides(
+                    norm_type, phase, fmt, mission, instrument,
+                )
                 has_csv = product_key in csv_matches
-                insert_product_type(con, folder_name, product_key, metadata, has_csv)
+                insert_product_type(
+                    con, folder_name, product_key, metadata, has_csv,
+                    normalized_type=norm_type, phase=phase, fmt=fmt,
+                )
                 stats["product_types"] += 1
 
                 if has_csv:
@@ -258,29 +274,48 @@ def list_missions() -> list[str]:
     return [r[0] for r in result]
 
 
-def list_instruments(mission: str) -> list[str]:
+def list_instruments(mission: str, *, include_misc: bool = False) -> list[str]:
     """List all instruments for a given mission.
 
     Parameters
     ----------
     mission : str
         Mission name (e.g. 'cassini')
+    include_misc : bool
+        If True, include the '_misc' catch-all instrument that holds
+        unclassified product types. Default False.
     """
     con = get_catalog()
-    result = con.execute(
-        "SELECT DISTINCT instrument FROM instruments WHERE mission = ? ORDER BY instrument",
-        [mission],
-    ).fetchall()
+    if include_misc:
+        result = con.execute(
+            "SELECT DISTINCT instrument FROM instruments WHERE mission = ? ORDER BY instrument",
+            [mission],
+        ).fetchall()
+    else:
+        result = con.execute(
+            "SELECT DISTINCT instrument FROM instruments "
+            "WHERE mission = ? AND instrument != '_misc' ORDER BY instrument",
+            [mission],
+        ).fetchall()
     con.close()
     return [r[0] for r in result]
 
 
-def list_product_types(key: str, instrument: str | None = None) -> list[str]:
+def list_product_types(
+    key: str,
+    instrument: str | None = None,
+    *,
+    include_phases: bool = False,
+) -> list[str] | pd.DataFrame:
     """List all product types for a given mission and instrument.
 
+    By default, returns normalized product type names (e.g. 'edr' instead
+    of 'edr_sat'). Use ``include_phases=True`` to see the phase breakdown.
+
     Accepts either dotted key or separate arguments:
-        list_product_types("lro.diviner")
-        list_product_types("lro", "diviner")
+        list_product_types("cassini.iss")
+        list_product_types("cassini", "iss")
+        list_product_types("cassini.iss", include_phases=True)
 
     Parameters
     ----------
@@ -288,34 +323,55 @@ def list_product_types(key: str, instrument: str | None = None) -> list[str]:
         Either a dotted key 'mission.instrument' or just the mission name
     instrument : str, optional
         Instrument name, required if key is not a dotted key
+    include_phases : bool
+        If True, return a DataFrame with normalized_type, phase, and product_key columns.
+        If False (default), return a deduplicated list of normalized type names.
     """
     if instrument is None:
         mission, instrument = _parse_dotted_key(key, 2)
     else:
         mission = key
     con = get_catalog()
-    result = con.execute(
-        """SELECT pt.product_key
-           FROM product_types pt
-           JOIN instruments i USING (folder_name)
-           WHERE i.mission = ? AND i.instrument = ?
-           ORDER BY pt.product_key""",
-        [mission, instrument],
-    ).fetchall()
-    con.close()
-    return [r[0] for r in result]
+    if include_phases:
+        df = con.execute(
+            """SELECT pt.normalized_type, pt.phase, pt.format, pt.product_key
+               FROM product_types pt
+               JOIN instruments i USING (folder_name)
+               WHERE i.mission = ? AND i.instrument = ?
+               ORDER BY pt.normalized_type, pt.phase, pt.format""",
+            [mission, instrument],
+        ).fetchdf()
+        con.close()
+        return df
+    else:
+        result = con.execute(
+            """SELECT DISTINCT pt.normalized_type
+               FROM product_types pt
+               JOIN instruments i USING (folder_name)
+               WHERE i.mission = ? AND i.instrument = ?
+               ORDER BY pt.normalized_type""",
+            [mission, instrument],
+        ).fetchall()
+        con.close()
+        return [r[0] for r in result]
 
 
 def example_products(
     key: str,
     instrument: str | None = None,
     product_key: str | None = None,
+    *,
+    phase: str | None = None,
 ) -> pd.DataFrame:
     """Get all product entries for a given mission/instrument/product type.
 
     Accepts either dotted key or separate arguments:
-        example_products("cassini.iss.edr_sat")
-        example_products("cassini", "iss", "edr_sat")
+        example_products("cassini.iss.edr")       # all EDR phases
+        example_products("cassini.iss.edr", phase="saturn")  # Saturn only
+        example_products("cassini", "iss", "edr")
+
+    The product type is matched against the normalized_type column first,
+    then falls back to exact product_key match for backward compatibility.
 
     Parameters
     ----------
@@ -325,6 +381,9 @@ def example_products(
         Instrument name, required if key is not a dotted key
     product_key : str, optional
         Product type key, required if key is not a dotted key
+    phase : str, optional
+        Filter by mission phase (e.g. 'saturn', 'jupiter', 'cruise').
+        Only used when matching by normalized_type.
 
     Returns
     -------
@@ -338,14 +397,27 @@ def example_products(
     else:
         raise ValueError("Provide either a dotted key or all three arguments")
     con = get_catalog()
-    df = con.execute(
-        """SELECT p.*
-           FROM products p
-           JOIN product_types pt USING (folder_name, product_key)
-           JOIN instruments i USING (folder_name)
-           WHERE i.mission = ? AND i.instrument = ? AND pt.product_key = ?""",
-        [mission, instrument, product_key],
-    ).fetchdf()
+    # Try normalized_type first, fall back to exact product_key
+    if phase is not None:
+        df = con.execute(
+            """SELECT p.*
+               FROM products p
+               JOIN product_types pt USING (folder_name, product_key)
+               JOIN instruments i USING (folder_name)
+               WHERE i.mission = ? AND i.instrument = ?
+                 AND pt.normalized_type = ? AND pt.phase = ?""",
+            [mission, instrument, product_key, phase],
+        ).fetchdf()
+    else:
+        df = con.execute(
+            """SELECT p.*
+               FROM products p
+               JOIN product_types pt USING (folder_name, product_key)
+               JOIN instruments i USING (folder_name)
+               WHERE i.mission = ? AND i.instrument = ?
+                 AND (pt.normalized_type = ? OR pt.product_key = ?)""",
+            [mission, instrument, product_key, product_key],
+        ).fetchdf()
     con.close()
     return df
 
@@ -369,18 +441,22 @@ def ambiguous_mappings() -> pd.DataFrame:
 def search(query: str) -> pd.DataFrame:
     """Search the catalog for products matching a query string.
 
-    Searches across mission, instrument, product_key, and product_id.
+    Searches across mission, instrument, normalized_type, product_key,
+    and product_id. Searching for 'edr' will find both 'edr_sat' and
+    'edr_evj' variants.
     """
     con = get_catalog()
     pattern = f"%{query}%"
     df = con.execute(
-        """SELECT mission, instrument, product_key, product_id, url_stem
+        """SELECT mission, instrument, normalized_type, phase, format,
+                  product_key, product_id, url_stem
            FROM catalog
            WHERE mission ILIKE ? OR instrument ILIKE ?
-              OR product_key ILIKE ? OR product_id ILIKE ?
-           ORDER BY mission, instrument, product_key
+              OR normalized_type ILIKE ? OR product_key ILIKE ?
+              OR product_id ILIKE ?
+           ORDER BY mission, instrument, normalized_type, phase, format
            LIMIT 100""",
-        [pattern, pattern, pattern, pattern],
+        [pattern, pattern, pattern, pattern, pattern],
     ).fetchdf()
     con.close()
     return df

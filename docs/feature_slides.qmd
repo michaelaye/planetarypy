@@ -1,0 +1,271 @@
+---
+title: "PlanetaryPy"
+subtitle: "Core Tools for Planetary Science Data"
+format:
+  revealjs:
+    theme: [dark, custom-slides.scss]
+    transition: fade
+    transition-speed: slow
+    auto-animate: true
+    loop: true
+    # auto-slide: 10000
+    # auto-slide-stoppable: false
+    controls: false
+    progress: true
+    center: true
+    hash: true
+    code-line-numbers: false
+    highlight-style: monokai
+    width: 1280
+    height: 720
+---
+
+## 90+ PDS Indexes {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy import pds
+
+pds.print_available_indexes()
+```
+
+```text
+mro.ctx.edr
+mro.hirise.edr
+cassini.iss.ring_summary
+lro.lroc.edr
+go.ssi.raw
+...
+```
+
+## One Line to a DataFrame {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+df = pds.get_index("mro.ctx.edr")
+cols = ["PRODUCT_ID", "IMAGE_TIME", "CENTER_LATITUDE", "CENTER_LONGITUDE"]
+df[cols].tail()
+```
+
+<table style="font-size: 0.55em; font-family: 'JetBrains Mono', monospace; border-collapse: collapse; width: 100%;">
+<thead>
+<tr style="border-bottom: 2px solid #666;">
+<th style="color: #e6db74; padding: 4px 12px; text-align: left;">PRODUCT_ID</th>
+<th style="color: #66d9ef; padding: 4px 12px; text-align: left;">IMAGE_TIME</th>
+<th style="color: #a6e22e; padding: 4px 12px; text-align: right;">CENTER_LATITUDE</th>
+<th style="color: #fd971f; padding: 4px 12px; text-align: right;">CENTER_LONGITUDE</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="color: #e6db74;">W04_090683_1413_XI_38S223W</td><td style="color: #66d9ef;">2025-11-30 08:58:40</td><td style="color: #a6e22e; text-align: right;">-38.81</td><td style="color: #fd971f; text-align: right;">223.11</td></tr>
+<tr><td style="color: #e6db74;">W04_090685_1983_XN_18N282W</td><td style="color: #66d9ef;">2025-11-30 13:00:19</td><td style="color: #a6e22e; text-align: right;">18.32</td><td style="color: #fd971f; text-align: right;">282.56</td></tr>
+<tr><td style="color: #e6db74;">W04_090687_2127_XI_32N341W</td><td style="color: #66d9ef;">2025-11-30 16:49:16</td><td style="color: #a6e22e; text-align: right;">32.68</td><td style="color: #fd971f; text-align: right;">341.34</td></tr>
+<tr><td style="color: #e6db74;">W04_090688_1833_XN_03N002W</td><td style="color: #66d9ef;">2025-11-30 18:32:21</td><td style="color: #a6e22e; text-align: right;">3.28</td><td style="color: #fd971f; text-align: right;">2.18</td></tr>
+<tr><td style="color: #e6db74;">W04_090690_1977_XI_17N060W</td><td style="color: #66d9ef;">2025-11-30 22:20:59</td><td style="color: #a6e22e; text-align: right;">17.70</td><td style="color: #fd971f; text-align: right;">60.23</td></tr>
+</tbody>
+</table>
+
+::: {style="font-size: 0.5em; color: #888; margin-top: 0.3em;"}
+164,103 rows x 51 columns — most recent: [W04_090690_1977_XI_17N060W.IMG](https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_5508/data/W04_090690_1977_XI_17N060W.IMG)
+:::
+
+## Auto-Updating Cache {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+# Checked daily, refreshed when stale
+df = pds.get_index("mro.ctx.edr")
+
+# Force refresh
+df = pds.get_index("mro.ctx.edr",
+                    allow_refresh=True)
+```
+
+::: {.highlight-box}
+Parquet format: fast reads, datetime support, cloud-ready.
+:::
+
+## Dynamic URL Discovery {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy.pds import Index
+
+idx = Index("mro.ctx.edr")
+
+# discovered automatically by scraping the PDS archive
+idx.url
+```
+```text
+'[...]/mro/ctx/mrox_5508/index/cumindex.lbl'
+```
+
+::: {.highlight-box}
+No manual URL tracking needed.
+:::
+
+## PDS Catalog: 65 Missions {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy.catalog import summary
+
+summary()
+```
+
+<table style="font-size: 0.55em; font-family: 'JetBrains Mono', monospace; border-collapse: collapse; width: 100%;">
+<thead>
+<tr style="border-bottom: 2px solid #666;">
+<th style="color: #e6db74; padding: 4px 12px; text-align: left;">mission</th>
+<th style="color: #66d9ef; padding: 4px 12px; text-align: right;">instruments</th>
+<th style="color: #a6e22e; padding: 4px 12px; text-align: right;">product_types</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="color: #e6db74;">voyager</td><td style="color: #66d9ef; text-align: right;">12</td><td style="color: #a6e22e; text-align: right;">181</td></tr>
+<tr><td style="color: #e6db74;">cassini</td><td style="color: #66d9ef; text-align: right;">16</td><td style="color: #a6e22e; text-align: right;">159</td></tr>
+<tr><td style="color: #e6db74;">new_horizons</td><td style="color: #66d9ef; text-align: right;">9</td><td style="color: #a6e22e; text-align: right;">112</td></tr>
+<tr><td style="color: #e6db74;">rosetta</td><td style="color: #66d9ef; text-align: right;">13</td><td style="color: #a6e22e; text-align: right;">103</td></tr>
+<tr><td style="color: #e6db74;">lro</td><td style="color: #66d9ef; text-align: right;">8</td><td style="color: #a6e22e; text-align: right;">81</td></tr>
+<tr><td style="color: #e6db74;">mro</td><td style="color: #66d9ef; text-align: right;">7</td><td style="color: #a6e22e; text-align: right;">44</td></tr>
+<tr><td style="color: #e6db74;">...</td><td style="color: #66d9ef;"></td><td style="color: #a6e22e;"></td></tr>
+</tbody>
+</table>
+
+::: {style="font-size: 0.5em; color: #888; margin-top: 0.3em;"}
+65 missions, 420 instruments, 2042 product types
+:::
+
+## Mission Objects {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy.catalog import Mission
+
+mro = Mission("mro")
+mro
+```
+```text
+Mission('mro', 'Mars Reconnaissance Orbiter')
+```
+
+```{.python}
+mro.instruments
+```
+```text
+['crism', 'ctx', 'hirise', 'marci', 'mcs', 'rss', 'sharad']
+```
+
+```{.python}
+mro["ctx"]
+```
+```text
+Instrument('mro.ctx', 'Context Camera')
+```
+
+## Fetch Any Product {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy.catalog import fetch_product
+
+path = fetch_product(
+    "mro.ctx.edr",
+    "P01_001234_1800_XI_00N042W",
+)
+```
+```text
+~/planetarypy_data/mro/ctx/edr/P01_001234_1800_XI_00N042W
+```
+
+::: {.highlight-box}
+DuckDB-backed. Search across all missions instantly.
+:::
+
+## 37 Archived SPICE Missions {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy.spice import archived_kernels as ak
+
+cols = ["Mission Name", "PDS3 or PDS4", "Start Time", "Stop Time"]
+ak.datasets[cols].head()
+```
+
+<table style="font-size: 0.55em; font-family: 'JetBrains Mono', monospace; border-collapse: collapse; width: 100%;">
+<thead>
+<tr style="border-bottom: 2px solid #666;">
+<th style="color: #f92672; padding: 4px 12px; text-align: left;">shorthand</th>
+<th style="color: #e6db74; padding: 4px 12px; text-align: left;">Mission Name</th>
+<th style="color: #66d9ef; padding: 4px 12px; text-align: right;">PDS</th>
+<th style="color: #a6e22e; padding: 4px 12px; text-align: left;">Start Time</th>
+<th style="color: #fd971f; padding: 4px 12px; text-align: left;">Stop Time</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="color: #f92672;">bc</td><td style="color: #e6db74;">BepiColombo</td><td style="color: #66d9ef; text-align: right;">4</td><td style="color: #a6e22e;">2018-10-20</td><td style="color: #fd971f;">2025-05-31</td></tr>
+<tr><td style="color: #f92672;">cassini</td><td style="color: #e6db74;">Cassini Orbiter</td><td style="color: #66d9ef; text-align: right;">3</td><td style="color: #a6e22e;">1997-10-15</td><td style="color: #fd971f;">2017-09-15</td></tr>
+<tr><td style="color: #f92672;">dawn</td><td style="color: #e6db74;">DAWN</td><td style="color: #66d9ef; text-align: right;">3</td><td style="color: #a6e22e;">2007-09-27</td><td style="color: #fd971f;">2018-10-31</td></tr>
+<tr><td style="color: #f92672;">juno</td><td style="color: #e6db74;">Juno</td><td style="color: #66d9ef; text-align: right;">3</td><td style="color: #a6e22e;">2011-08-05</td><td style="color: #fd971f;">2025-06-23</td></tr>
+<tr><td style="color: #f92672;">mro</td><td style="color: #e6db74;">MRO</td><td style="color: #66d9ef; text-align: right;">3</td><td style="color: #a6e22e;">2005-08-12</td><td style="color: #fd971f;">2025-07-19</td></tr>
+</tbody>
+</table>
+
+::: {style="font-size: 0.5em; color: #888; margin-top: 0.3em;"}
+37 missions total
+:::
+
+## Download SPICE Subsets {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+mk = ak.get_metakernel_and_files(
+    "mro",
+    start="2024-01-01",
+    stop="2024-01-31",
+) # returns functioning metakernel path
+```
+
+::: {.highlight-box}
+Date-filtered kernel subsets via NAIF subsetter.
+
+Metakernel path edited for local paths, immediately loadable with spiceypy.
+:::
+
+## Generic SPICE Kernels {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy.spice.generic_kernels import (
+    download_generic_kernels,
+    load_generic_kernels,
+)
+
+download_generic_kernels()
+load_generic_kernels()
+```
+
+::: {.highlight-box}
+planetary constants / basic illumination calculations.
+:::
+
+## Zero Config {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.python}
+from planetarypy.config import config
+
+config.storage_root
+# ~/planetarypy_data/
+```
+
+::: {.highlight-box}
+Override with `PLANETARYPY_CONFIG` env var.
+:::
+
+## Get Started {auto-animate="true" background-image="plpy_logo.svg" background-size="50%" background-opacity="0.08"}
+
+```{.bash}
+pip install planetarypy
+```
+
+```{.python}
+from planetarypy import pds
+
+df = pds.get_index("cassini.iss.ring_summary")
+```
+
+::: {style="margin-top: 1.5em; font-size: 0.7em;"}
+[github.com/planetarypy/planetarypy](https://github.com/planetarypy/planetarypy)
+| BSD-3 License
+| [planetarypy.org](https://planetarypy.org/)
+:::

@@ -55,8 +55,8 @@ def test_insert_product_type(con):
         "SELECT * FROM product_types WHERE folder_name='cassini_iss' AND product_key='edr_sat'"
     ).fetchone()
     assert row is not None
-    assert row[2] == "img_usgs_cassini"  # manifest
-    assert row[8] == "A"  # label_type
+    assert row[5] == "img_usgs_cassini"  # manifest (after normalized_type, phase, format)
+    assert row[11] == "A"  # label_type
 
 
 def test_insert_product(con):
