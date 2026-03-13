@@ -6,10 +6,11 @@ format:
     theme: [dark, custom-slides.scss]
     transition: fade
     transition-speed: slow
+    embed-resources: true
     auto-animate: true
     loop: true
-    # auto-slide: 10000
-    # auto-slide-stoppable: false
+    auto-slide: 10000
+    auto-slide-stoppable: false
     controls: false
     progress: true
     center: true
