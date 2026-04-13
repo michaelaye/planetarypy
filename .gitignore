@@ -68,8 +68,9 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
+# Documentation build artifacts
 docs/_build/
+docs/.quarto/
 
 # PyBuilder
 target/
@@ -132,3 +133,28 @@ dmypy.json
 .pixi
 *.egg-info
 *.code-workspace
+run_migration.py
+src/planetarypy/pds/migrate_config.py
+src/planetarypy/scripts/migrate_pds_config.py
+src/planetarypy/instruments/print.prt
+
+# IDE and tool config
+.idea/
+.claude/
+.playwright-mcp/
+CLAUDE.md
+
+# Quarto build artifacts
+docs/objects.json
+docs/README_files/
+docs/presentations/
+
+# Generated quartodoc API reference
+docs/reference/*.qmd
+docs/reference/_sidebar.yml
+docs/reference/_styles-quartodoc.css
+
+# Scratch/temp artifacts
+current_diffs*
+current_diffs_files/
+mro_hirise.toml

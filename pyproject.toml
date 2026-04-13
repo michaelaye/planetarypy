@@ -4,50 +4,129 @@ build-backend = "hatchling.build"
 
 [project]
 name = "planetarypy"
-version = "0.2.0"
-description = "Core package for planetary data tools."
-readme = "README.rst"
-requires-python = ">= 3.9, <4"
+version = "0.52.2"
+description = "Core package for planetary data tools. Includes PDS index utilities, SPICE integrations, and more."
+readme = "README.md"
+requires-python = ">= 3.11, <4"
 license = {text = "BSD license"}
-license-file = "LICENSE"
 authors = [
     {name = "Planetarypy Developers", email = "69774+michaelaye@users.noreply.github.com"}
 ]
 keywords = ["planetarypy", "planetary", "space", "science"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
     "Natural Language :: English",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
+# Core dependencies required for basic functionality
 dependencies = [
-    "tomlkit",
-    "requests",
-    "tqdm",
-    "pandas",
-    "astropy",
-    "spiceypy",
-    "yarl",
-    "matplotlib",
+    "astropy",         # For astronomy calculations
+    "typer>=0.9",      # For command-line interface
+    "fastcore",        # For utilities like improved Path
+    "numpy",           # For numerical operations
+    "pandas",          # For data handling
+    "pooch",           # For downloading and caching data files
+    "pvl",             # For PDS label parsing
+    "lxml",            # For XML handling
+    "python-dateutil", # For date parsing
+    "requests",        # For HTTP requests
+    "tomlkit",         # For configuration handling
+    "tqdm",            # For progress bars
+    "yarl",            # For URL handling
+    "loguru",          # For logging
+    "duckdb",          # For PDS catalog database
+    "rasterio",        # For geospatial transforms
+    "pyproj",          # For CRS reprojection
+    "rioxarray",       # For reading geo-referenced rasters
 ]
-repository = "https://github.com/planetarypy/planetarypy"
+
+[project.urls]
+Homepage = "https://github.com/planetarypy/planetarypy"
+Repository = "https://github.com/planetarypy/planetarypy"
 
 [project.optional-dependencies]
+# Optional dependencies for SPICE-related functionality
+spice = [
+    "spiceypy",       # For SPICE kernel handling
+    "matplotlib",     # For plotting
+    "planets>=0.8",   # For planetary calculations
+]
+# Development dependencies
 dev = [
     "pytest",
     "pytest-cov",
+    "pytest-xdist",  # For parallel test execution
     "build",
     "twine",
     "pip-tools",
-    "make"
+    "sh",            # For running shell commands from Python
+]
+# Documentation dependencies (also available via conda)
+docs = [
+    "quartodoc>=0.11.1",
+    "griffe>=1.5,<2",
 ]
 
 [project.scripts]
-planetarypy = "planetarypy.cli:main"
+plp = "planetarypy.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/planetarypy"]
+
+[tool.hatch.build]
+include = [
+    "src/planetarypy/**/*.py",
+    "src/planetarypy/**/*.pyd",
+    "src/planetarypy/**/*.so",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = """
+    -xvs
+    --import-mode=importlib
+    --cov=planetarypy
+    --cov-report=term
+    --cov-report=html
+    -n auto
+"""
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+source = ["planetarypy"]
+omit = [
+    "*/tests/*",
+    "*/scripts/*",
+    "*/__init__.py",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
+
+[tool.flake8]
+exclude = ["docs"]
+max-line-length = 88
+extend-ignore = ["E203", "E701"]
+
+[tool.bumpversion]
+current_version = "0.52.2"
+commit = true
+tag = true
