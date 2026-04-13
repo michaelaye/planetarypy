@@ -1,0 +1,58 @@
+# PDS Index Configuration
+
+## Overview
+
+PlanetaryPy manages PDS index file locations through two user-level configuration files:
+
+1. **General Configuration** (`~/.planetarypy_config.toml`): Stores general settings, primarily `storage_root` (default: `~/planetarypy_data/`)
+2. **URL Configuration** (`~/.planetarypy_index_urls.toml`): Stores URLs for PDS index files, organized by mission and instrument
+
+Both files are auto-created on first use. The URL configuration is fetched from the [planetarypy_configs](https://github.com/planetarypy/planetarypy_configs) GitHub repository.
+
+## Index URL Structure
+
+Index URLs follow the dotted key convention `mission.instrument.indexname`:
+
+```toml
+[missions.cassini.iss]
+ring_summary = "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_ring_summary.lbl"
+moon_summary = "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_moon_summary.lbl"
+
+[missions.mro.hirise]
+edr = "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL"
+
+[missions.mro.ctx]
+edr = "https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_5508/index/cumindex.lbl"
+```
+
+## Index Types
+
+PlanetaryPy supports two types of index URL discovery:
+
+### Static Indexes
+Most indexes have fixed, well-known URLs that change infrequently. These are stored directly in the URL configuration file.
+
+### Dynamic Indexes
+Some instruments (CTX, LROC) publish new cumulative index files as new data volumes are released. PlanetaryPy discovers the latest URLs by scraping the archive directory listing. This happens automatically when an index is first accessed or when an update is available.
+
+## Using Indexes
+
+```python
+from planetarypy.pds import get_index
+
+# Auto-downloads, parses, and caches as Parquet
+df = get_index("mro.ctx.edr")
+
+# Force refresh check
+df = get_index("mro.ctx.edr", allow_refresh=True)
+```
+
+Index files are downloaded as `.lbl` + `.tab`, parsed using PDS3 label conventions, and cached locally as Parquet files under `{storage_root}/{mission}/{instrument}/indexes/`.
+
+## Override with Environment Variable
+
+Set `PLANETARYPY_CONFIG` to use a custom config file location:
+
+```bash
+export PLANETARYPY_CONFIG=/path/to/custom_config.toml
+```

@@ -1,0 +1,139 @@
+project:
+  type: website
+  output-dir: _build
+  preview:
+    port: 4200
+    browser: true
+
+execute:
+  freeze: auto
+
+website:
+  title: PlanetaryPy
+  favicon: plpy_logo.png
+  repo-url: https://github.com/planetarypy/planetarypy
+  repo-actions: [issue]
+  navbar:
+    logo: plpy_logo.svg
+    search: true
+    left:
+      - text: Home
+        href: index.qmd
+      - text: Tutorials
+        href: tutorials/
+      - text: "How-To"
+        href: howto/index.qmd
+      - text: Explanation
+        href: explanation/index.qmd
+      - text: API Reference
+        href: reference/index.qmd
+      - text: Contributing
+        href: contributing.qmd
+    right:
+      - icon: github
+        aria-label: GitHub
+        href: https://github.com/planetarypy/planetarypy
+  sidebar:
+    - title: "Tutorials"
+      style: "docked"
+      contents:
+        - tutorials/index.qmd
+        - tutorials/pds_indexes_examples.ipynb
+        - tutorials/pds_catalog_tutorial.ipynb
+        - tutorials/geospatial_tutorial.ipynb
+        - tutorials/spicer_tutorial.ipynb
+        - tutorials/spice_kernel_examples.ipynb
+    - title: "How-To"
+      contents:
+        - howto/index.qmd
+        - howto/howto_spice_archived.ipynb
+        - howto/ctx_edr.ipynb
+        - howto/ctx_calib.ipynb
+    - title: Explanation
+      contents:
+        - explanation/index.qmd
+        - explanation/config_flow_diagram.qmd
+        - explanation/pds_index_config.qmd
+        - explanation/pds_index_download_flows.qmd
+    - title: "API Reference"
+      contents: "{{ contents }}"
+
+format:
+  html:
+    theme:
+      dark: [darkly]
+      light: [flatly]
+    toc: true
+    toc-depth: 3
+    toc-title: Contents
+    toc-location: right
+    code-link: true
+    css:
+      - styles.css
+      - reference/_styles-quartodoc.css
+
+# Read the generated sidebar definitions
+metadata-files:
+  - reference/_sidebar.yml
+
+quartodoc:
+  # Use the multi-page (pkgdown-like) layout
+  style: pkgdown
+  # Where to write generated API pages
+  dir: reference
+  # The import name of the package to document
+  package: planetarypy
+  # Docstring parser (numpy | google | sphinx)
+  parser: numpy
+  # Custom renderer with GitHub source links
+  renderer:
+    style: _renderer.py
+    repo_url: https://github.com/planetarypy/planetarypy
+    branch: main
+    source_dir: src
+  # Also write sidebar and default CSS that Quarto should load
+  sidebar: reference/_sidebar.yml
+  css: reference/_styles-quartodoc.css
+  # Title for the API index page
+  title: API Reference
+  # Grouped sections for the API
+  sections:
+    - title: Core Modules
+      desc: Core interfaces and utilities.
+      contents:
+        - config
+        - cli
+        - geo
+        - plotting
+        - datetime_format_converters
+        - utils
+
+    - title: PDS Utilities and CLI
+      desc: Tools for managing and working with Planetary Data System indexes.
+      contents:
+        - pds.dynamic_index
+        - pds.dynamic_url_handlers
+        - pds.index_fixes
+        - pds.index_labels
+        - pds.index_logging
+        - pds.index_main
+        - pds.static_index
+        - pds.utils
+
+    - title: SPICE
+      desc: SPICE kernels and surface illumination.
+      contents:
+        - spice.spicer
+        - spice.archived_kernels
+        - spice.config
+        - spice.generic_kernels
+
+    # - title: ISIS
+    #   contents:
+    #     - isis.autoseed
+
+    - title: Instruments
+      contents:
+        - instruments.mro.ctx
+        - instruments.go.ssi
+        - instruments.utils

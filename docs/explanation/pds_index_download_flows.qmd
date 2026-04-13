@@ -1,0 +1,400 @@
+# PDS Index Download Logic Flows
+
+This document describes the comprehensive download and caching logic for PDS indexes in `planetarypy`, covering all combinations of initial states, user parameters, and edge cases.
+
+## Overview
+
+The `get_index()` function manages PDS index files through a two-stage process:
+
+1. **Ensure parquet cache exists** (`ensure_parquet()`)
+2. **Check for updates and optionally refresh** (refresh logic)
+
+This separation ensures interrupted downloads auto-recover while avoiding redundant downloads.
+
+---
+
+## User-Facing Parameters
+
+### `get_index()` Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dotted_index_key` | str | required | Index identifier (e.g., `"mro.ctx.edr"`) |
+| `allow_refresh` | bool | `False` | Check for updates and download if newer version available |
+| `force_refresh` | bool | `False` | Force download even if already up-to-date |
+| `rebuild_parquet` | bool | `False` | Force rebuild parquet from existing label+table without re-downloading |
+
+---
+
+## Internal State: Files & Flags
+
+### Local Files
+- **Label file** (`*.lbl` or `*.LBL`): PDS3 label describing the index structure
+- **Table file** (`*.tab` or `*.TAB`): The actual index data in fixed-width format
+- **Parquet file** (`*.parq`): Optimized cache with datetime conversion
+
+### AccessLog Flags (TOML)
+- `last_checked`: Timestamp of last remote check
+- `last_updated`: Timestamp of last successful download
+- `update_available`: Boolean flag indicating newer version exists
+- `current_url` (dynamic only): URL of currently cached version
+- `available_url` (dynamic only): URL of latest discovered version
+
+---
+
+## Flow Diagrams
+
+### Stage 1: `ensure_parquet(force=rebuild_parquet)`
+
+This stage ensures a valid parquet cache exists before checking for updates.
+
+```
+┌─────────────────────────────────────┐
+│ ensure_parquet(force)               │
+└─────────────┬───────────────────────┘
+              │
+              ▼
+      ┌───────────────┐
+      │ force=True?   │
+      └───┬───────┬───┘
+          │       │
+         yes      no
+          │       │
+          │       ▼
+          │   ┌─────────────────────┐
+          │   │ parquet exists?     │
+          │   └───┬─────────────┬───┘
+          │       │             │
+          │      yes           no
+          │       │             │
+          │       │             ▼
+          │       │      ┌──────────────────┐
+          │       │      │ label+table      │
+          │       │      │ exist?           │
+          │       │      └─┬──────────────┬─┘
+          │       │        │              │
+          │       │       yes            no
+          │       │        │              │
+          ▼       │        ▼              ▼
+     ┌────────────┼────────────┐    ┌─────────────┐
+     │ label+table│exist?      │    │ DOWNLOAD    │
+     └──┬─────────┼────────┬───┘    │ label+table │
+        │         │        │         │ convert     │
+       yes        │       no         │ return TRUE │
+        │         │        │         └─────────────┘
+        ▼         │        ▼
+   ┌─────────┐   │   ┌─────────────┐
+   │ CONVERT │   │   │ DOWNLOAD    │
+   │ return  │   │   │ label+table │
+   │ FALSE   │   │   │ convert     │
+   └─────────┘   │   │ return TRUE │
+                 │   └─────────────┘
+                 ▼
+            ┌─────────┐
+            │ return  │
+            │ FALSE   │
+            └─────────┘
+```
+
+**Key Points:**
+- Returns `True` if a download occurred, `False` otherwise
+- Conversion-only paths return `False` (no download)
+- Missing label/table triggers download regardless of parquet state
+
+---
+
+### Stage 2: Refresh Logic (only if `ensure_parquet()` returned `False`)
+
+```
+┌─────────────────────────────────────┐
+│ Downloaded in ensure_parquet?       │
+└─────────────┬───────────────────────┘
+              │
+         ┌────┴────┐
+         │         │
+        yes       no
+         │         │
+         │         ▼
+         │    ┌─────────────────────────────┐
+         │    │ force_refresh=True?          │
+         │    └────┬──────────────────┬──────┘
+         │         │                  │
+         │        yes                no
+         │         │                  │
+         │         ▼                  ▼
+         │    ┌──────────┐     ┌──────────────────────┐
+         │    │ DOWNLOAD │     │ allow_refresh=True   │
+         │    └──────────┘     │ AND                  │
+         │                     │ update_available?    │
+         │                     └────┬──────────────┬──┘
+         │                          │              │
+         │                         yes            no
+         │                          │              │
+         │                          ▼              ▼
+         │                     ┌──────────┐   ┌────────────────┐
+         │                     │ DOWNLOAD │   │ update_avail?  │
+         │                     └──────────┘   └──┬──────────┬──┘
+         │                                       │          │
+         │                                      yes        no
+         │                                       │          │
+         │                                       ▼          │
+         │                                  ┌────────┐     │
+         │                                  │ WARN   │     │
+         │                                  │ user   │     │
+         │                                  └────────┘     │
+         ▼                                                 │
+    ┌────────────────────────────────────────────────────┬┘
+    │ Return index.dataframe                             │
+    └────────────────────────────────────────────────────┘
+```
+
+**Key Points:**
+- If `ensure_parquet()` downloaded, skip all refresh logic (avoid redundant download)
+- `force_refresh` always downloads (use for corrupted cache)
+- `allow_refresh` + `update_available` downloads new version
+- `update_available` alone (without `allow_refresh`) warns but returns cached data
+
+---
+
+## Scenario Matrix
+
+| Scenario | Label | Table | Parquet | Parameters | Action | Downloaded? |
+|----------|-------|-------|---------|------------|--------|-------------|
+| **First Time Download** | ❌ | ❌ | ❌ | default | Download label+table, convert | Yes |
+| **Interrupted After Label** | ✅ | ❌ | ❌ | default | Re-download label+table, convert | Yes |
+| **Interrupted After Table** | ✅ | ✅ | ❌ | default | Convert only (no download) | No |
+| **Conversion Failed** | ✅ | ✅ | ❌ | default | Re-convert only | No |
+| **Cache Valid** | ✅ | ✅ | ✅ | default | Return cached parquet | No |
+| **Cache Valid, Update Available** | ✅ | ✅ | ✅ | `allow_refresh=False` | Warn user, return cached | No |
+| **Cache Valid, Update Available** | ✅ | ✅ | ✅ | `allow_refresh=True` | Download new version | Yes |
+| **Corrupted Cache** | ✅ | ✅ | ✅ | `force_refresh=True` | Re-download | Yes |
+| **Rebuild Parquet Only** | ✅ | ✅ | ✅ | `rebuild_parquet=True` | Re-convert only | No |
+| **Rebuild Parquet, Missing Table** | ✅ | ❌ | ✅ | `rebuild_parquet=True` | Download label+table, convert | Yes |
+
+---
+
+## Special Cases
+
+### 1. Interrupted Downloads
+
+**Problem:** User interrupts download (Ctrl+C, network failure) leaving partial files.
+
+**Solution:**
+- If label exists but table missing → `ensure_parquet()` re-downloads both (label is small, safe to overwrite)
+- If label+table exist but parquet missing → `ensure_parquet()` converts only (no re-download)
+- No manual cleanup required; next `get_index()` call auto-recovers
+
+**AccessLog State After Interruption:**
+```toml
+[lro.lroc.edr]
+available_url = "https://pds.lroc.asu.edu/.../CUMINDEX.LBL"
+update_available = true
+last_checked = 2025-10-26T02:34:14
+# Note: last_updated not set yet (download incomplete)
+```
+
+---
+
+### 2. Dynamic URL Discovery (e.g., `mro.ctx.edr`, `lro.lroc.edr`)
+
+For instruments with versioned releases, URLs change over time.
+
+**Discovery Flow:**
+1. `discover_latest_url()` scrapes remote server for newest version
+2. Compares discovered URL with `current_url` in AccessLog
+3. If different → sets `update_available=True`, logs `available_url`
+4. On download → sets `current_url=available_url`, clears `update_available`
+
+**AccessLog Example (Update Available):**
+```toml
+[mro.ctx.edr]
+current_url = "https://pds-imaging.jpl.nasa.gov/.../release_42/CUMINDEX.LBL"
+available_url = "https://pds-imaging.jpl.nasa.gov/.../release_43/CUMINDEX.LBL"
+update_available = true
+last_checked = 2025-10-26T10:00:00
+last_updated = 2025-10-20T08:30:00
+```
+
+**After Download:**
+```toml
+[mro.ctx.edr]
+current_url = "https://pds-imaging.jpl.nasa.gov/.../release_43/CUMINDEX.LBL"
+available_url = "https://pds-imaging.jpl.nasa.gov/.../release_43/CUMINDEX.LBL"
+update_available = false
+last_updated = 2025-10-26T10:05:00
+```
+
+---
+
+### 3. Static URL Check (e.g., `go.ssi.index`, `cassini.iss.index`)
+
+For stable URLs, update detection uses HTTP `Last-Modified` header.
+
+**Check Flow:**
+1. `HEAD` request to remote URL
+2. Compare `Last-Modified` with `last_updated` in AccessLog
+3. If remote is newer → set `update_available=True`
+4. On download → update `last_updated` timestamp
+
+**AccessLog Example:**
+```toml
+[go.ssi.index]
+remote_timestamp = "2024-05-15T12:00:00"
+update_available = false
+last_checked = 2025-10-26T09:00:00
+last_updated = 2025-10-01T14:30:00
+```
+
+---
+
+### 4. Check Frequency (Performance Optimization)
+
+**Daily Check Limit:**
+- `should_check` property gates remote checks to once per day
+- If checked today → returns cached `update_available` flag
+- If not checked today → performs remote check, updates flag
+
+**Why:**
+- Reduces network overhead for frequently called indexes
+- User can override with `force_refresh=True` if needed
+
+---
+
+## Usage Examples
+
+### Enable Logging (Recommended)
+
+Planetarypy pre-configures logging at INFO level. Simply enable the namespace:
+
+```python
+from loguru import logger
+logger.enable("planetarypy")
+```
+
+This will show download progress, warnings, and errors without debug spam.
+
+**Alternative:** Use the convenience function for different levels:
+
+```python
+import planetarypy
+
+# Show all debug messages for troubleshooting
+planetarypy.enable_logging("DEBUG")
+
+# Show only warnings and errors
+planetarypy.enable_logging("WARNING")
+```
+
+### Basic Usage (First Time)
+```python
+from planetarypy.pds import get_index
+
+# Downloads label+table, converts to parquet
+df = get_index("mro.ctx.edr")
+```
+
+### Check for Updates Daily
+```python
+# Checks once/day; downloads if update available
+df = get_index("mro.ctx.edr", allow_refresh=True)
+```
+
+### Force Clean Re-download (Corrupted Cache)
+```python
+# Ignores cache, always downloads fresh
+df = get_index("mro.ctx.edr", force_refresh=True)
+```
+
+### Rebuild Parquet Only (Conversion Failed)
+```python
+# Re-converts from existing label+table without re-downloading
+df = get_index("mro.ctx.edr", rebuild_parquet=True)
+```
+
+### Suppress Update Checks (Max Performance)
+```python
+# Never checks remote; returns cached parquet
+# Warns if update_available flag already set
+df = get_index("mro.ctx.edr", allow_refresh=False)  # default
+```
+
+---
+
+## Implementation Details
+
+### File Overwrite Behavior
+- All downloads open files in `'wb'` mode (write-binary)
+- Partial files are safely overwritten on retry
+- No temp files; writes directly to final paths
+
+### Conversion Robustness
+- `convert_to_parquet()` can be called independently
+- Reads label to understand table structure
+- Converts time strings to pandas `datetime64`
+- Handles instrument-specific quirks (e.g., GO SSI formatting fixes)
+
+### Error Handling
+- Download errors logged via `logger.error()`, don't raise exceptions
+- Conversion errors logged but don't prevent retry
+- Missing parquet triggers reconversion/download on next call
+
+---
+
+## AccessLog Persistence
+
+All state changes are immediately persisted to TOML:
+- `log_update_available(False)` saves immediately
+- `log_update_time()` saves timestamp
+- `log_current_url()` (dynamic) saves after download
+
+**Location:** `~/.planetarypy_config/pds_index_access_log.toml`
+
+---
+
+## Future Enhancements
+
+Potential improvements (not yet implemented):
+
+1. **Partial Download Resume:** Use HTTP `Range` headers to resume interrupted table downloads
+2. **Parallel Downloads:** Download multiple indexes concurrently
+3. **Integrity Checks:** Verify checksums if provided by PDS
+4. **Background Updates:** Async worker to pre-fetch updates
+5. **Cache Expiry:** Automatic cleanup of old versions
+
+---
+
+## Troubleshooting
+
+### "FileNotFoundError: No such file or directory: '...CUMINDEX.parq'"
+**Cause:** Interrupted download left label but no parquet.  
+**Solution:** Call `get_index()` again; auto-recovers by re-downloading.
+
+### "Update available but not downloading"
+**Cause:** `allow_refresh=False` (default) and newer version exists.  
+**Solution:** Call with `allow_refresh=True` to download update.
+
+### "Repeated downloads on every call"
+**Cause:** Conversion to parquet failing silently.  
+**Solution:** Enable DEBUG logging to see conversion errors:
+```python
+import planetarypy
+planetarypy.enable_logging("DEBUG")
+```
+
+### "Wrong URL being used after update"
+**Cause:** AccessLog not updated after download.  
+**Solution:** Check `~/.planetarypy_config/pds_index_access_log.toml` for `current_url`; delete entry to reset.
+
+---
+
+## Summary
+
+The PDS index download system prioritizes:
+
+1. **Auto-recovery:** Interrupted downloads fix themselves
+2. **Efficiency:** Avoid redundant downloads and checks
+3. **Transparency:** Clear logging and warning messages
+4. **Flexibility:** Multiple parameters for different use cases
+5. **Robustness:** Graceful handling of edge cases
+
+For most users, `get_index(key, allow_refresh=True)` is all you need.
