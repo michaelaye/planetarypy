@@ -245,6 +245,7 @@ class Calib:
         pid,  # CTX product_id
         destripe_to_calib=True,  # if to copy destriped files as calib files or leave extra
         prefer_mirror=True,
+        workdir=None,  # override for storage_folder; if set, all derived paths live here (no volume/pid sub-paths applied)
     ):
         self.destripe_to_calib = destripe_to_calib
         self.edr = EDR(pid, prefer_mirror=prefer_mirror)
@@ -262,6 +263,7 @@ class Calib:
         )
         self.with_volume = ctxconfig["calib"]["with_volume"]
         self.with_pid = ctxconfig["calib"]["with_pid"]
+        self._workdir_override = Path(workdir) if workdir is not None else None
 
     def _check_and_add_sub_paths(self, base):
         base = Path(base) / self.edr.volume if self.with_volume else base
@@ -270,6 +272,13 @@ class Calib:
 
     @property
     def storage_folder(self):
+        # User-supplied workdir overrides everything; no volume/pid sub-paths applied.
+        # Callers are responsible for passing the final directory they want derived
+        # files (.cub, .lev1.cub, .dst.cal.cub, .lev2.cub, .gml, …) to live in.
+        # Useful for experimental runs that need to isolate calibration state from
+        # the canonical planetarypy_data archive (e.g. GapPipeline rundirs).
+        if self._workdir_override is not None:
+            return self._workdir_override
         if folder := ctxconfig["calib"]["storage"]:
             return self._check_and_add_sub_paths(folder)
         else:
@@ -518,9 +527,21 @@ class CTXCollection:
         2: "mappaths",
     }
 
-    def __init__(self, list_of_pids, workdir=".", remove_bad=True):
+    def __init__(self, list_of_pids, workdir=".", remove_bad=True, calib_workdir=None):
+        """
+        list_of_pids : iterable of CTX product-IDs
+        workdir : where collection-level artefacts (image lists, footprints.gdf, …) go.
+        remove_bad : filter pids flagged as bad data via EDR metadata.
+        calib_workdir : optional override for per-Calib storage_folder. When set, each
+            Calib(pid, workdir=calib_workdir) — so .cub / .lev1.cub / .dst.cal.cub / .gml
+            land in a flat directory at `calib_workdir` rather than the canonical
+            `storage_root/missions/mro/ctx/mrox_XXX/{pid}/`. Useful for experimental
+            runs that need calibration state isolated from the canonical archive.
+            None (default) keeps legacy behavior (canonical storage).
+        """
         self.pids = list_of_pids
         self.workdir = Path(workdir)
+        self.calib_workdir = Path(calib_workdir) if calib_workdir is not None else None
         if remove_bad:
             self.remove_bad_data()
 
@@ -536,7 +557,7 @@ class CTXCollection:
 
     @cached_property
     def calibs(self):
-        return [Calib(pid) for pid in self.pids]
+        return [Calib(pid, workdir=self.calib_workdir) for pid in self.pids]
 
     @cached_property
     def metadata(self):
