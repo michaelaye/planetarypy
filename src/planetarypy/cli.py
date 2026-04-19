@@ -47,6 +47,8 @@ def fetch(
     typer.echo(f"Resolving {key} / {product_id}...")
     try:
         resolved = resolve_product(mission, instrument, product_key, product_id)
+        for f in resolved.files:
+            typer.echo(f"URL: {resolved.url_stem}/{f}")
         if here:
             local_dir = Path.cwd()
         else:
@@ -54,7 +56,8 @@ def fetch(
                 mission, instrument, product_key, resolved.product_id,
             )
         download_product(resolved, local_dir, label_only=label_only, force=force)
-        typer.echo(f"Downloaded to: {local_dir}")
+        for f in resolved.files:
+            typer.echo(local_dir / f)
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -125,17 +128,6 @@ def hifetch(
         raise typer.Exit(1)
 
     product_key = data_level.lower()
-    if len(parts) == 4 and product_key == "rdr" and parts[3] not in ("RED", "COLOR"):
-        typer.echo(
-            "Bare observation ID — specify a suffix:\n"
-            f"  plp hifetch {pid}_RED     (RDR)\n"
-            f"  plp hifetch {pid}_COLOR   (RDR)\n"
-            f"  plp hifetch {pid}_RED4_0  (EDR CCD)",
-            err=True,
-        )
-        raise typer.Exit(1)
-    else:
-        product_key = "edr"
 
     from planetarypy.catalog._resolver import (
         resolve_product, download_product, _local_product_dir,
@@ -144,6 +136,8 @@ def hifetch(
     typer.echo(f"Resolving mro.hirise.{product_key} / {pid}...")
     try:
         resolved = resolve_product("mro", "hirise", product_key, pid)
+        for f in resolved.files:
+            typer.echo(f"URL: {resolved.url_stem}/{f}")
         if here:
             local_dir = Path.cwd()
         else:
@@ -151,7 +145,8 @@ def hifetch(
                 "mro", "hirise", product_key, resolved.product_id,
             )
         download_product(resolved, local_dir, force=force)
-        typer.echo(f"Downloaded to: {local_dir}")
+        for f in resolved.files:
+            typer.echo(local_dir / f)
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -167,17 +162,25 @@ def ctxqv(
     save: str = typer.Option(None, "--save", "-o", help="Save to PNG instead of displaying"),
     stretch: str = typer.Option("1,99", "--stretch", "-p", help="Percentile stretch as 'low,high'. Use 'none' to disable."),
     edr: bool = typer.Option(False, "--edr", help="Force raw EDR, skip calibrated files"),
+    center_box: int = typer.Option(None, "--center-box", "-c", help="Show full-res center crop of N pixels (default 500 if flag used)"),
 ):
     """Show a downsampled quickview of a CTX image.
 
     Automatically uses the best available level:
     map-projected > calibrated > cube > raw EDR.
+
+    Use --center-box to also show a full-resolution crop from the image center.
     """
     import matplotlib.pyplot as plt
+    import numpy as np
 
     arr = None
+    full_arr = None
     level = None
     pid = imgid
+
+    need_center = center_box is not None
+    source_path = None
 
     if not edr:
         try:
@@ -189,6 +192,7 @@ def ctxqv(
             arr, path, level = calib.quickview(stride=stride)
             if arr is not None:
                 typer.echo(f"Using {level} product: {path.name}")
+                source_path = path
         except Exception:
             pass
 
@@ -200,14 +204,45 @@ def ctxqv(
         pid = edr_obj.pid
         arr = edr_obj.quickview(stride=stride)
         level = "edr"
+        source_path = edr_obj.path
 
     typer.echo(f"Image: {arr.shape[1]}x{arr.shape[0]} px [{level}]")
 
     from planetarypy.plotting import imshow_gray
 
-    ax = imshow_gray(arr, stretch=stretch, title=f"{pid} [{level}]")
-    fig = ax.get_figure()
-    fig.tight_layout()
+    if need_center and source_path is not None:
+        box = center_box
+        # Read only the center crop at full resolution using rioxarray windowed read
+        import rioxarray as rxr
+        da = rxr.open_rasterio(source_path, chunks=True).isel(band=0, drop=True)
+        h, w = da.shape
+        cy, cx = h // 2, w // 2
+        half = box // 2
+        y0 = max(0, cy - half)
+        y1 = min(h, cy + half)
+        x0 = max(0, cx - half)
+        x1 = min(w, cx + half)
+        crop = da.values[y0:y1, x0:x1]
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7),
+                                        gridspec_kw={"width_ratios": [1, 1]})
+        imshow_gray(arr, stretch=stretch, title=f"{pid} [{level}]", ax=ax1)
+
+        # Draw center box indicator on the overview
+        oy0, ox0 = y0 // stride, x0 // stride
+        oy1, ox1 = y1 // stride, x1 // stride
+        from matplotlib.patches import Rectangle
+        rect = Rectangle((ox0, oy0), ox1 - ox0, oy1 - oy0,
+                          linewidth=1.5, edgecolor="red", facecolor="none")
+        ax1.add_patch(rect)
+
+        imshow_gray(crop, stretch=stretch, title=f"center {box}px full-res", ax=ax2)
+        fig.tight_layout()
+        typer.echo(f"Center crop: {crop.shape[1]}x{crop.shape[0]} px at ({cx},{cy})")
+    else:
+        ax = imshow_gray(arr, stretch=stretch, title=f"{pid} [{level}]")
+        fig = ax.get_figure()
+        fig.tight_layout()
 
     if save:
         fig.savefig(save, dpi=150, bbox_inches="tight")
