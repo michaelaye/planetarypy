@@ -86,18 +86,40 @@ def register_storage_resolver(key: str, resolver: callable):
     _STORAGE_RESOLVERS[key] = resolver
 
 
+# Lazy-loaded resolver paths: maps key → (module, function_name)
+_STORAGE_RESOLVER_MODULES = {
+    "mro.hirise": ("planetarypy.instruments.mro.hirise", "_hirise_local_product_dir"),
+}
+
+
 def _local_product_dir(
     mission: str, instrument: str, product_type: str, product_id: str,
 ) -> Path:
     """Build local storage path for a product.
 
-    Checks for a registered instrument-specific resolver first,
+    Checks for a registered instrument-specific resolver first (either
+    eagerly registered or lazy-loaded from ``_STORAGE_RESOLVER_MODULES``),
     then falls back to the default layout:
     ``{storage_root}/{mission}/{instrument}/{product_type}/{product_id}/``
     """
     key = f"{mission}.{instrument}"
+
+    # Check eager registrations first
     if key in _STORAGE_RESOLVERS:
         return _STORAGE_RESOLVERS[key](product_type, product_id)
+
+    # Try lazy-loading
+    if key in _STORAGE_RESOLVER_MODULES:
+        mod_path, func_name = _STORAGE_RESOLVER_MODULES[key]
+        try:
+            import importlib
+            mod = importlib.import_module(mod_path)
+            resolver = getattr(mod, func_name)
+            _STORAGE_RESOLVERS[key] = resolver  # cache for next call
+            return resolver(product_type, product_id)
+        except (ImportError, AttributeError):
+            pass
+
     # Default layout
     safe_pid = product_id.replace("/", "_").replace("\\", "_")
     return (
