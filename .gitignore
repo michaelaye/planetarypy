@@ -158,3 +158,5 @@ docs/reference/_styles-quartodoc.css
 current_diffs*
 current_diffs_files/
 mro_hirise.toml
+*.profraw
+*.prt
