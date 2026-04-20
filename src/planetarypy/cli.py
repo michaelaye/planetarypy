@@ -197,56 +197,6 @@ def hiedr(
 
 
 @app.command()
-def hifetch(
-    product_id: str = typer.Argument(
-        help="HiRISE product ID, e.g. PSP_003092_0985_RED or PSP_003092_0985_RED4_0",
-        autocompletion=_complete_hirise_obsid_rdr,
-    ),
-    here: bool = typer.Option(False, "--here", "-H", help="Download into current directory"),
-    force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
-):
-    """Download a full HiRISE data product (EDR .IMG or RDR .JP2).
-
-    Examples:
-        plp hifetch PSP_003092_0985_RED           (RDR JP2)
-        plp hifetch PSP_003092_0985_COLOR         (RDR JP2)
-        plp hifetch PSP_003092_0985_RED4_0        (EDR IMG)
-    """
-    from pathlib import Path
-    from planetarypy.instruments.mro.hirise import _parse_pid
-
-    try:
-        pid, parts, data_level = _parse_pid(product_id)
-    except ValueError as e:
-        typer.echo(str(e), err=True)
-        raise typer.Exit(1)
-
-    product_key = data_level.lower()
-
-    from planetarypy.catalog._resolver import (
-        resolve_product, download_product, _local_product_dir,
-    )
-
-    typer.echo(f"Resolving mro.hirise.{product_key} / {pid}...")
-    try:
-        resolved = resolve_product("mro", "hirise", product_key, pid)
-        for f in resolved.files:
-            typer.echo(f"URL: {resolved.url_stem}/{f}")
-        if here:
-            local_dir = Path.cwd()
-        else:
-            local_dir = _local_product_dir(
-                "mro", "hirise", product_key, resolved.product_id,
-            )
-        download_product(resolved, local_dir, force=force)
-        for f in resolved.files:
-            typer.echo(local_dir / f)
-    except Exception as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
-
-
-@app.command()
 def himos(
     obsid: str = typer.Argument(
         help="HiRISE observation ID, e.g. PSP_003092_0985",
