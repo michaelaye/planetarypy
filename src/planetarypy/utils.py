@@ -241,6 +241,7 @@ def url_retrieve(
     passwd: str = None,
     leave_tqdm: bool = True,
     disable_tqdm: bool = False,
+    tqdm_position: int | None = None,
 ):
     """
     Downloads a file from url to outfile.
@@ -248,6 +249,10 @@ def url_retrieve(
     Improved urlretrieve with progressbar, timeout and chunker.
     This downloader has built-in progress bar using tqdm and the `requests`
     package. Improves on standard `urllib` by adding time-out capability.
+
+    Uses atomic writes: downloads to a temporary ``.part`` file first, then
+    renames to the final path. This prevents other processes from reading
+    a partially-written file (e.g. during parallel test collection).
 
     Testing different chunk_sizes, 128 was usually fastest, YMMV.
 
@@ -270,6 +275,8 @@ def url_retrieve(
         scenarios, you might want to set this to False. Default: True
     """
     url = str(url)
+    outfile = Path(outfile)
+    part_file = outfile.with_suffix(outfile.suffix + ".part")
 
     if user:
         auth = HTTPBasicAuth(user, passwd)
@@ -278,17 +285,23 @@ def url_retrieve(
     R = requests.get(url, stream=True, allow_redirects=True, auth=auth)
     if R.status_code != 200:
         raise ConnectionError(f"Could not download {url}\nError code: {R.status_code}")
-    with tqdm.wrapattr(
-        open(outfile, "wb"),
-        "write",
+    tqdm_kwargs = dict(
         miniters=1,
         leave=leave_tqdm,
         disable=disable_tqdm,
         total=int(R.headers.get("content-length", 0)),
-        desc=str(Path(outfile).name),
+        desc=str(outfile.name),
+    )
+    if tqdm_position is not None:
+        tqdm_kwargs["position"] = tqdm_position
+    with tqdm.wrapattr(
+        open(part_file, "wb"),
+        "write",
+        **tqdm_kwargs,
     ) as fd:
         for chunk in R.iter_content(chunk_size=chunk_size):
             fd.write(chunk)
+    part_file.rename(outfile)
 
 
 def have_internet() -> bool:
