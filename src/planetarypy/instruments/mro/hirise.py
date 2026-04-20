@@ -125,7 +125,7 @@ def get_browse(product_id: str, annotated: bool = True,
     else:
         outpath = (
             Path(config["storage_root"])
-            / "mro" / "hirise" / "extras" / obs_id / filename
+            / "mro" / "hirise" / "extras" / data_level / obs_id / filename
         )
 
     if outpath.exists() and not force:
@@ -269,14 +269,14 @@ def complete_obsid(incomplete: str, index: str = "edr") -> list[str]:
 def _edr_storage() -> Path:
     """Resolve EDR local storage from config.
 
-    Priority: edr.local_storage → edr.local_mirror → storage_root/mro/pds
+    Priority: edr.local_storage → edr.local_mirror → storage_root/mro/hirise
     """
     cfg = _edr_config()
     for key in ("local_storage", "local_mirror"):
         val = cfg.get(key, "")
         if val:
             return Path(val)
-    return Path(config["storage_root"]) / "mro" / "pds"
+    return Path(config["storage_root"]) / "mro" / "hirise"
 
 
 def _edr_base_url() -> URL:
@@ -299,7 +299,7 @@ class SOURCE_PRODUCT:
     spid : str
         Full source product ID, e.g. ``"PSP_003092_0985_RED4_0"``.
     saveroot : Path, optional
-        Override storage root. Defaults to ``~planetarypy_data/mro/hirise/``.
+        Override storage root. Defaults to ``~/planetarypy_data/mro/hirise/``.
     check_url : bool
         If True, warn when the constructed URL doesn't exist on the server.
 
@@ -308,8 +308,8 @@ class SOURCE_PRODUCT:
     >>> prod = SOURCE_PRODUCT("PSP_003092_0985_RED4_0")
     >>> prod.obsid
     'PSP_003092_0985'
-    >>> prod.local_path
-    PosixPath('.../PSP_003092_0985/PSP_003092_0985_RED4_0.IMG')
+    >>> prod.local_path  # ~/planetarypy_data/mro/hirise/PSP_003092_0985/...
+    PosixPath('.../mro/hirise/PSP_003092_0985/PSP_003092_0985_RED4_0.IMG')
     """
 
     red_ccds = ["RED" + str(i) for i in range(10)]
