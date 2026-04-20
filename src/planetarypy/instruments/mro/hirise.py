@@ -285,19 +285,16 @@ def _edr_storage() -> Path:
 def _hirise_local_product_dir(product_type: str, product_id: str) -> Path:
     """Resolve local storage path for a HiRISE product.
 
-    Groups EDR products by observation ID (all channels together).
-    RDR products get their own folder.
+    All data levels (EDR, RDR, DTM, etc.) are stored together under
+    the observation ID folder. EDR and RDR products for the same
+    observation live side by side — no edr/rdr subdirectory split.
 
-    Registered with the catalog resolver so that ``plp fetch mro.hirise.edr``
+    Registered with the catalog resolver so that ``plp fetch mro.hirise.*``
     stores products in the same layout as ``plp hiedr``.
     """
     root = _edr_storage()
-    if product_type == "edr":
-        # EDR: group by obsid (first 3 tokens of product_id)
-        obsid = "_".join(product_id.split("_")[:3])
-        return root / obsid
-    # RDR, DTM, etc: per-product folder
-    return root / product_type / product_id
+    obsid = "_".join(product_id.split("_")[:3])
+    return root / obsid
 
 
 # Register with the catalog resolver
