@@ -192,16 +192,21 @@ def sun_azimuth_from_top(product_id: str, index: str = "rdr") -> float:
 
 # ── Observation ID Cache (for tab completion) ─────────────────────
 
-def _obsid_cache_path() -> Path:
+def _obsid_cache_path(index: str = "edr") -> Path:
     """Path to the cached obsid list file."""
-    return Path(config["storage_root"]) / "mro" / "hirise" / "obsids.txt"
+    return Path(config["storage_root"]) / "mro" / "hirise" / f"obsids_{index}.txt"
 
 
-def rebuild_obsid_cache() -> Path:
-    """Rebuild the observation ID cache from the HiRISE EDR index.
+def rebuild_obsid_cache(index: str = "edr") -> Path:
+    """Rebuild the observation ID cache from a HiRISE index.
 
     Extracts unique OBSERVATION_IDs, sorts them, and writes to a text file.
     Called automatically when the cache is missing.
+
+    Parameters
+    ----------
+    index : str
+        Which index to use: ``"edr"`` or ``"rdr"``.
 
     Returns
     -------
@@ -210,35 +215,38 @@ def rebuild_obsid_cache() -> Path:
     """
     from planetarypy.pds import get_index
 
-    cache = _obsid_cache_path()
+    cache = _obsid_cache_path(index)
     cache.parent.mkdir(parents=True, exist_ok=True)
-    df = get_index("mro.hirise.edr", allow_refresh=False)
+    df = get_index(f"mro.hirise.{index}", allow_refresh=False)
     obsids = sorted(df["OBSERVATION_ID"].unique())
     cache.write_text("\n".join(obsids) + "\n")
-    logger.info(f"Rebuilt obsid cache: {len(obsids)} entries at {cache}")
+    logger.info(f"Rebuilt {index.upper()} obsid cache: {len(obsids)} entries at {cache}")
     return cache
 
 
-def complete_obsid(incomplete: str) -> list[str]:
+def complete_obsid(incomplete: str, index: str = "edr") -> list[str]:
     """Return observation IDs matching a prefix (for tab completion).
 
     Reads from a cached text file for speed. Rebuilds the cache from
-    the EDR index if missing.
+    the specified index if missing.
 
     Parameters
     ----------
     incomplete : str
         Prefix to match against.
+    index : str
+        Which index to use: ``"edr"`` (default, all observations) or
+        ``"rdr"`` (only observations with processed RDR products).
 
     Returns
     -------
     list of str
         Matching observation IDs.
     """
-    cache = _obsid_cache_path()
+    cache = _obsid_cache_path(index)
     if not cache.exists():
         try:
-            rebuild_obsid_cache()
+            rebuild_obsid_cache(index)
         except Exception:
             return []
 

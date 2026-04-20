@@ -66,17 +66,23 @@ def fetch(
 # ── HiRISE commands ─────────────────────────────────────────────────
 
 
-def _complete_hirise_obsid(incomplete: str) -> list[str]:
-    """Tab-completion callback for HiRISE observation IDs."""
+def _complete_hirise_obsid_rdr(incomplete: str) -> list[str]:
+    """Tab-completion for HiRISE obsids with RDR products (browse, RDR fetch)."""
     from planetarypy.instruments.mro.hirise import complete_obsid
-    return complete_obsid(incomplete)
+    return complete_obsid(incomplete, index="rdr")
+
+
+def _complete_hirise_obsid_edr(incomplete: str) -> list[str]:
+    """Tab-completion for HiRISE obsids from EDR index (all observations)."""
+    from planetarypy.instruments.mro.hirise import complete_obsid
+    return complete_obsid(incomplete, index="edr")
 
 
 @app.command()
 def hibrowse(
     product_id: str = typer.Argument(
         help="HiRISE product ID, e.g. PSP_003092_0985_RED or PSP_004238_1135_RED1_1",
-        autocompletion=_complete_hirise_obsid,
+        autocompletion=_complete_hirise_obsid_rdr,
     ),
     annotated: bool = typer.Option(True, "--annotated/--clean", "-a/-c", help="Annotated (default) or clean browse"),
     here: bool = typer.Option(False, "--here", "-H", help="Download into current directory"),
@@ -120,7 +126,7 @@ def hibrowse(
 @app.command()
 def hiedr(
     obsid: str = typer.Argument(help="HiRISE observation ID, e.g. PSP_003092_0985",
-                                autocompletion=_complete_hirise_obsid),
+                                autocompletion=_complete_hirise_obsid_edr),
     red: bool = typer.Option(False, "--red", help="Download RED CCDs (RED0–RED9, 20 files)"),
     ir: bool = typer.Option(False, "--ir", help="Download IR CCDs (IR10–IR11, 4 files)"),
     bg: bool = typer.Option(False, "--bg", help="Download BG CCDs (BG12–BG13, 4 files)"),
@@ -174,7 +180,7 @@ def hiedr(
 def hifetch(
     product_id: str = typer.Argument(
         help="HiRISE product ID, e.g. PSP_003092_0985_RED or PSP_003092_0985_RED4_0",
-        autocompletion=_complete_hirise_obsid,
+        autocompletion=_complete_hirise_obsid_rdr,
     ),
     here: bool = typer.Option(False, "--here", "-H", help="Download into current directory"),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
@@ -224,7 +230,7 @@ def hifetch(
 def himos(
     obsid: str = typer.Argument(
         help="HiRISE observation ID, e.g. PSP_003092_0985",
-        autocompletion=_complete_hirise_obsid,
+        autocompletion=_complete_hirise_obsid_edr,
     ),
     red: bool = typer.Option(False, "--red", help="Process RED CCDs"),
     ir: bool = typer.Option(False, "--ir", help="Process IR CCDs"),
