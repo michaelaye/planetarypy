@@ -40,8 +40,7 @@ import spiceypy as spice
 
 from .generic_kernels import load_generic_kernels
 
-# Ensure generic kernels are available
-load_generic_kernels()
+_kernels_loaded = False
 
 Radii = namedtuple("Radii", "a b c")
 
@@ -170,6 +169,10 @@ class Spicer:
     L_SUN = 3.828e26  # Solar luminosity [W]
 
     def __init__(self, body: str, units: bool = False):
+        global _kernels_loaded
+        if not _kernels_loaded:
+            load_generic_kernels()
+            _kernels_loaded = True
         self._body = body.upper()
         self._units = units
 

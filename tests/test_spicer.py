@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+spiceypy = pytest.importorskip("spiceypy")
+
 from planetarypy.spice.spicer import Spicer, _rotate_vector
 
 
