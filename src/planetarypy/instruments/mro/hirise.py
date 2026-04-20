@@ -791,18 +791,27 @@ def map_project(normed: Path, mapfile: str | Path | None = None,
     return mapped
 
 
-def create_red_mosaic(
+# CCD configuration per color
+_COLOR_CCDS = {
+    "red": (SOURCE_PRODUCT.red_ccds, "RED"),
+    "ir":  (SOURCE_PRODUCT.ir_ccds, "IR"),
+    "bg":  (SOURCE_PRODUCT.bg_ccds, "BG"),
+}
+
+
+def create_mosaic(
     obsid: str,
-    ccds: list[int] = (4, 5),
+    color: str = "red",
+    ccds: list[int] | None = None,
     mapfile: str | Path | None = None,
     overwrite: bool = False,
     saveroot: Path | None = None,
-    calibrate: bool = True,
-    project: bool = True,
+    download: bool = True,
+    print_progress: bool = True,
 ) -> Path:
-    """Create a HiRISE RED CCD mosaic from EDR data.
+    """Create a HiRISE CCD mosaic from EDR data.
 
-    Full processing chain based on the pymars/HiRISE pipeline:
+    Full processing chain (pymars/HiRISE standard pipeline):
 
     Per channel:
         ``download → hi2isis → spiceinit → hical``
@@ -819,9 +828,12 @@ def create_red_mosaic(
     ----------
     obsid : str
         HiRISE observation ID, e.g. ``"ESP_013807_2035"``.
-    ccds : list of int
-        RED CCD numbers to mosaic. Default ``(4, 5)`` for the central pair.
-        Use ``range(10)`` for all 10 RED CCDs (full swath).
+    color : str
+        CCD color group: ``"red"`` (default), ``"ir"``, or ``"bg"``.
+    ccds : list of int, optional
+        Specific CCD numbers to include. If None, uses all CCDs for
+        the color (RED: 0-9, IR: 10-11, BG: 12-13).
+        For RED, a common choice is ``[4, 5]`` for the central nadir pair.
     mapfile : str or Path, optional
         ISIS map projection file for ``cam2map``. If None, uses ISIS
         default projection (Sinusoidal).
@@ -829,74 +841,111 @@ def create_red_mosaic(
         If True, re-download and reprocess even if the mosaic exists.
     saveroot : Path, optional
         Override local storage directory.
-    calibrate : bool
-        If True (default), run hical for radiometric calibration.
-        Set to False for uncalibrated processing (e.g. Planet Four).
-    project : bool
-        If True (default), run cam2map for map projection.
-        Set to False to skip map projection (output in raw geometry).
+    download : bool
+        If True (default), download EDR files if missing.
+        Set to False if files are already available locally.
+    print_progress : bool
+        If True (default), print step-by-step progress to stdout.
 
     Returns
     -------
     Path
         Path to the final mosaic cube.
+
+    Examples
+    --------
+    >>> create_mosaic("PSP_003092_0985")                     # RED 0-9, full pipeline
+    >>> create_mosaic("PSP_003092_0985", ccds=[4, 5])        # RED 4+5 central pair
+    >>> create_mosaic("PSP_003092_0985", color="ir")         # IR mosaic
+    >>> create_mosaic("PSP_003092_0985", color="bg")         # BG mosaic
     """
     _require_isis()
-    ccds = sorted(ccds)
+    color = color.lower()
+    if color not in _COLOR_CCDS:
+        raise ValueError(f"color must be 'red', 'ir', or 'bg', got '{color}'")
 
-    # Build product list: 2 channels per CCD
+    all_ccds, prefix = _COLOR_CCDS[color]
+
+    def _log(msg):
+        if print_progress:
+            print(msg, flush=True)
+
+    # Build the CCD list
+    if ccds is not None:
+        ccd_names = [f"{prefix}{n}" for n in sorted(ccds)]
+    else:
+        ccd_names = list(all_ccds)
+
+    # Build products: 2 channels per CCD
+    prod_kwargs = {"saveroot": saveroot} if saveroot else {}
     products = []
-    for ccdno in ccds:
+    for ccd in ccd_names:
         for channel in (0, 1):
-            kwargs = {"saveroot": saveroot} if saveroot else {}
-            products.append(RED_PRODUCT(obsid, ccdno, channel, **kwargs))
+            products.append(SOURCE_PRODUCT(f"{obsid}_{ccd}_{channel}", **prod_kwargs))
 
-    ccd_label = "".join(str(c) for c in ccds)
+    # Output naming
+    if ccds is not None:
+        ccd_label = prefix + "".join(str(c) for c in sorted(ccds))
+    else:
+        ccd_label = prefix
     out_dir = products[0].local_path.parent
-    mosaic_path = out_dir / f"{obsid}_RED{ccd_label}.mos.cub"
+    mosaic_path = out_dir / f"{obsid}_{ccd_label}.mos.cub"
 
     if mosaic_path.exists() and not overwrite:
-        logger.info(f"Mosaic exists: {mosaic_path}")
+        _log(f"Mosaic exists: {mosaic_path}")
         return mosaic_path
 
-    # ── Per-channel: download → hi2isis → spiceinit → hical ──
-    for prod in products:
-        prod.download(overwrite=overwrite)
+    n_channels = len(products)
+    n_ccds = len(ccd_names)
+    channel_names = " ".join(p.spid.split("_", 3)[-1] for p in products)
+    ccd_name_str = " ".join(ccd_names)
 
+    # ── Step 1: Download ──
+    if download:
+        _log(f"[1/6] Downloading {n_channels} channels...")
+        download_edr(obsid, colors=[color], ccds=ccds, saveroot=saveroot,
+                     overwrite=overwrite)
+
+    # ── Step 2: hi2isis + spiceinit ──
+    _log(f"[2/6] hi2isis + spiceinit: {channel_names}")
+    for prod in products:
+        ingest_edr(prod)
+
+    # ── Step 3: hical ──
+    _log(f"[3/6] hical: {channel_names}")
     cal_paths = []
     for prod in products:
-        cub = ingest_edr(prod)
-        if calibrate:
-            cub = calibrate_channel(cub)
-        cal_paths.append(cub)
+        cal_paths.append(calibrate_channel(prod.local_cube))
 
-    # ── Per-CCD: histitch → cubenorm → cam2map ──
-    ccd_paths = []
+    # ── Step 4: histitch + cubenorm ──
+    _log(f"[4/6] histitch + cubenorm: {ccd_name_str}")
+    normed_paths = []
     for i in range(0, len(cal_paths), 2):
-        ccdno = ccds[i // 2]
+        ccd = ccd_names[i // 2]
         normed = stitch_channels(
             cal_paths[i], cal_paths[i + 1],
-            obsid=obsid, ccd=f"RED{ccdno}",
+            obsid=obsid, ccd=ccd,
         )
-        if project:
-            mapped = map_project(normed, mapfile=mapfile)
-            ccd_paths.append(mapped)
-        else:
-            ccd_paths.append(normed)
+        normed_paths.append(normed)
 
-    # ── Mosaic CCDs ──
-    if len(ccd_paths) == 1:
-        # Single CCD, just rename
-        ccd_paths[0].rename(mosaic_path)
-    elif project:
-        # Map-projected mosaic: equalizer → automos (uses map coords to align)
-        listfile = out_dir / f"{obsid}_RED{ccd_label}.lis"
-        listfile.write_text("\n".join(str(p) for p in ccd_paths) + "\n")
+    # ── Step 5: cam2map ──
+    _log(f"[5/6] cam2map: {ccd_name_str}")
+    mapped_paths = []
+    for normed in normed_paths:
+        mapped_paths.append(map_project(normed, mapfile=mapfile))
 
-        # Hold first CCD as equalization reference
-        holdfile = out_dir / f"{obsid}_RED{ccd_label}_hold.lis"
-        holdfile.write_text(str(ccd_paths[0]) + "\n")
-        stats_out = out_dir / f"{obsid}_RED{ccd_label}.equstats.pvl"
+    # ── Step 6: equalizer + automos ──
+    _log(f"[6/6] equalizer + automos → {mosaic_path.name}")
+    if len(mapped_paths) == 1:
+        mapped_paths[0].rename(mosaic_path)
+    else:
+        stem = mosaic_path.stem
+        listfile = out_dir / f"{stem}.lis"
+        listfile.write_text("\n".join(str(p) for p in mapped_paths) + "\n")
+
+        holdfile = out_dir / f"{stem}_hold.lis"
+        holdfile.write_text(str(mapped_paths[0]) + "\n")
+        stats_out = out_dir / f"{stem}.equstats.pvl"
 
         equalizer(
             fromlist=str(listfile),
@@ -909,43 +958,19 @@ def create_red_mosaic(
             priority="beneath",
         )
 
-        for p in ccd_paths:
+        for p in mapped_paths:
             p.unlink(missing_ok=True)
         listfile.unlink(missing_ok=True)
         holdfile.unlink(missing_ok=True)
         stats_out.unlink(missing_ok=True)
-    else:
-        # Raw geometry mosaic: handmos with explicit pixel offsets
-        # (CCDs overlap by 48 unbinned pixels along the sample direction)
-        import rasterio
 
-        im0 = rasterio.open(ccd_paths[0])
-        bin_ = int(getkey(
-            from_=str(ccd_paths[0]),
-            objname="isiscube",
-            grpname="instrument",
-            keyword="summing",
-        ).stdout)
-        overlap_px = 48 // bin_
-        total_width = im0.width * len(ccd_paths) - overlap_px * (len(ccd_paths) - 1)
-
-        tmp = mosaic_path.with_suffix(".tmp.cub")
-        handmos(
-            from_=str(ccd_paths[0]),
-            mosaic=str(tmp),
-            nbands=1, outline=1, outband=1, outsample=1,
-            create="Y", nsamples=total_width, nlines=im0.height,
-        )
-        for idx, cub in enumerate(ccd_paths[1:], start=1):
-            im_n = rasterio.open(cub)
-            outsample = im0.width * idx - overlap_px * idx + 1
-            handmos(
-                from_=str(cub), mosaic=str(tmp),
-                outline=1, outband=1, create="N", outsample=outsample,
-            )
-        tmp.rename(mosaic_path)
-        for p in ccd_paths:
-            p.unlink(missing_ok=True)
-
-    logger.info(f"Created mosaic: {mosaic_path}")
+    _log(f"Done: {mosaic_path}")
     return mosaic_path
+
+
+def create_red_mosaic(obsid: str, ccds: list[int] = (4, 5), **kwargs) -> Path:
+    """Convenience wrapper for ``create_mosaic(color='red')``.
+
+    See :func:`create_mosaic` for full parameter documentation.
+    """
+    return create_mosaic(obsid, color="red", ccds=ccds, **kwargs)

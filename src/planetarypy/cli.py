@@ -220,6 +220,66 @@ def hifetch(
         raise typer.Exit(1)
 
 
+@app.command()
+def himos(
+    obsid: str = typer.Argument(
+        help="HiRISE observation ID, e.g. PSP_003092_0985",
+        autocompletion=_complete_hirise_obsid,
+    ),
+    red: bool = typer.Option(False, "--red", help="Process RED CCDs"),
+    ir: bool = typer.Option(False, "--ir", help="Process IR CCDs"),
+    bg: bool = typer.Option(False, "--bg", help="Process BG CCDs"),
+    ccds: str = typer.Option(None, "--ccds", help="Specific CCD numbers, e.g. '4,5'"),
+    mapfile: str = typer.Option(None, "--map", "-m", help="ISIS map projection file (.map)"),
+    overwrite: bool = typer.Option(False, "--force", "-f", help="Reprocess even if mosaic exists"),
+):
+    """Create a HiRISE CCD mosaic from EDR data via ISIS.
+
+    Full pipeline: download → hi2isis → spiceinit → hical → histitch →
+    cubenorm → cam2map → equalizer → automos.
+
+    If no color flag is given, defaults to --red.
+
+    Examples:
+        plp himos PSP_003092_0985                    (all 10 RED CCDs)
+        plp himos PSP_003092_0985 --ccds 4,5         (RED4+RED5 central pair)
+        plp himos PSP_003092_0985 --ir               (IR mosaic)
+        plp himos PSP_003092_0985 --red --ir --bg    (all three colors)
+        plp himos PSP_003092_0985 --map mymap.map    (custom projection)
+    """
+    from planetarypy.instruments.mro.hirise import create_mosaic
+
+    if not red and not ir and not bg:
+        red = True
+
+    colors = []
+    if red:
+        colors.append("red")
+    if ir:
+        colors.append("ir")
+    if bg:
+        colors.append("bg")
+
+    ccd_nums = [int(n) for n in ccds.split(",")] if ccds else None
+
+    for color in colors:
+        typer.echo(f"\n{'='*60}")
+        typer.echo(f"Processing {obsid} — {color.upper()} mosaic")
+        typer.echo(f"{'='*60}")
+        try:
+            path = create_mosaic(
+                obsid,
+                color=color,
+                ccds=ccd_nums if color == "red" else None,
+                mapfile=mapfile,
+                overwrite=overwrite,
+            )
+            typer.echo(f"Mosaic: {path}")
+        except Exception as e:
+            typer.echo(f"Error processing {color.upper()}: {e}", err=True)
+            raise typer.Exit(1)
+
+
 # ── ctxqv ────────────────────────────────────────────────────────────
 
 
