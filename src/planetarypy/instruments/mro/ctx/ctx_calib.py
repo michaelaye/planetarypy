@@ -71,7 +71,7 @@ raw_local_storage = ctxconfig["edr"]["local_storage"]
 # consider different cases for raw_local_storage
 if not raw_local_storage:  # empty string
     # this would be the default location for data retrieved by planetarypy
-    raw_local_storage = storage_root / "missions/mro/ctx"
+    raw_local_storage = storage_root / "mro/ctx"
 else:
     # if then path given is not absolute, it will be attached to config.storage_root
     raw_local_storage = Path(raw_local_storage)
@@ -283,7 +283,7 @@ class Calib:
             return self._check_and_add_sub_paths(folder)
         else:
             return self._check_and_add_sub_paths(
-                Path(config["storage_root"]) / "missions/mro/ctx"
+                Path(config["storage_root"]) / "mro/ctx"
             )
 
     @property
@@ -535,7 +535,7 @@ class CTXCollection:
         calib_workdir : optional override for per-Calib storage_folder. When set, each
             Calib(pid, workdir=calib_workdir) — so .cub / .lev1.cub / .dst.cal.cub / .gml
             land in a flat directory at `calib_workdir` rather than the canonical
-            `storage_root/missions/mro/ctx/mrox_XXX/{pid}/`. Useful for experimental
+            `storage_root/mro/ctx/mrox_XXX/{pid}/`. Useful for experimental
             runs that need calibration state isolated from the canonical archive.
             None (default) keeps legacy behavior (canonical storage).
         """

@@ -299,7 +299,7 @@ class SOURCE_PRODUCT:
     spid : str
         Full source product ID, e.g. ``"PSP_003092_0985_RED4_0"``.
     saveroot : Path, optional
-        Override storage root. Defaults to ``~planetarypy_data/missions/mro/hirise/``.
+        Override storage root. Defaults to ``~planetarypy_data/mro/hirise/``.
     check_url : bool
         If True, warn when the constructed URL doesn't exist on the server.
 
