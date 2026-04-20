@@ -1,0 +1,406 @@
+---
+title: "The PDS Catalog: From pdr-tests to Product URL Resolution"
+date: 2026-03-16
+---
+
+## Why a Catalog?
+
+Working with NASA's Planetary Data System (PDS) is hard. There are dozens of missions, hundreds of instruments, and millions of data products spread across multiple archive nodes. Each archive has its own URL structure, its own naming conventions, and its own quirks. A researcher who wants to download a single CTX image needs to know which PDS node hosts it, which volume it lives on, and how to construct the URL — information that isn't encoded in the product identifier itself.
+
+The planetarypy catalog module exists to answer a deceptively simple question: **given a product identifier, what is the download URL?**
+
+## The Foundation: pdr-tests
+
+The story begins with [pdr-tests](https://github.com/MillionConcepts/pdr-tests), a repository maintained by Million Concepts. Its purpose is testing their PDS data reader (`pdr`), but in doing so it has accumulated something invaluable: a structured inventory of PDS instrument definitions.
+
+The repository contains ~200 instrument definition directories, each with:
+
+- A `selection_rules.py` file that defines a `file_information` dictionary — a Python dict mapping product type keys (like `"edr"`, `"rdr"`, `"calibrated"`) to metadata about how to identify and validate those products.
+- CSV test files (`{product_key}_test.csv`) containing sample products with their `product_id`, `url_stem` (the directory URL), `label_file`, associated `files`, and content hashes.
+
+```
+pdr_tests/definitions/
+├── cassini_iss/
+│   ├── selection_rules.py    # file_information dict
+│   ├── edr_sat_test.csv      # sample Saturn EDR products
+│   └── edr_evj_test.csv      # sample Earth/Venus/Jupiter EDR products
+├── diviner/
+│   ├── selection_rules.py
+│   └── edr_test.csv
+├── mro/                      # bundles CTX, HiRISE, CRISM, SHARAD
+│   ├── selection_rules.py
+│   ├── ctx_edr_test.csv
+│   └── hirise_edr_test.csv
+...
+```
+
+This is the richest machine-readable source of PDS instrument metadata that exists. But it's designed for testing a reader, not for discovery or download. The planetarypy catalog transforms it into something queryable.
+
+## Building the Catalog: From Repository to Database
+
+### Step 1: Clone pdr-tests
+
+The `_repo` module performs a shallow, sparse checkout of only the `pdr_tests/definitions/` directory — typically a few megabytes rather than the full repository. It tracks the last fetch timestamp and updates automatically when the local copy is more than 24 hours old.
+
+### Step 2: Parse selection_rules.py (Without Executing It)
+
+The `_parser` module uses Python's `ast` module to safely extract the `file_information` dictionary from each `selection_rules.py` without executing any code. This is a deliberate security decision — the files are third-party Python code, and we only need the dictionary literal. The AST parser handles constants, lists, dicts, variable references, f-strings, and other common patterns.
+
+```python
+# What selection_rules.py looks like:
+file_information = {
+    "edr": {
+        "manifest": "CUMINDEX.LBL",
+        "fn_must_contain": [".IMG"],
+        "fn_ends_with": [".IMG"],
+        "label": "D",
+    },
+    "rdr": { ... },
+}
+```
+
+The parser extracts this dictionary and the associated CSV test data for each product key.
+
+### Step 3: Map Folder Names to Mission/Instrument
+
+This is where it gets complicated. pdr-tests uses folder names like `cassini_iss`, `diviner`, `mro`, and `gal_ssi`. These don't follow any consistent convention:
+
+- `cassini_iss` splits cleanly into mission `cassini` + instrument `iss`
+- `diviner` is just an instrument name (the mission is LRO)
+- `mro` is a mission name that bundles CTX, HiRISE, CRISM, and SHARAD into one folder
+- `gal_ssi` uses the abbreviation `gal` instead of `galileo`
+
+The `_mission_map` module resolves this with a three-tier strategy:
+
+1. **Manual map** (`MANUAL_MISSION_MAP`): 150+ hand-curated entries for known cases
+2. **Auto-split**: For unlisted names, split on the first underscore
+3. **Multi-instrument split** (`MULTI_INSTRUMENT_SPLIT`): For folders that bundle multiple instruments (marked with `"_split"` sentinel), extract the instrument name from product key prefixes (e.g., `ctx_edr` → instrument `ctx`, product key `edr`)
+
+The splitting creates synthetic folder names like `mro__ctx` and `mro__hirise` to keep the database normalised.
+
+### Step 4: Product Key Normalization
+
+Product keys like `edr_saturn`, `edr_jupiter`, and `edr_cruise` represent the same data type (`edr`) from different mission phases. The `BODY_MAP` in `_mission_map` decomposes these into a normalized type plus a phase:
+
+| Original product_key | Normalized type | Phase |
+|---|---|---|
+| `edr_saturn` | `edr` | `saturn` |
+| `edr_evj` | `edr` | `evj` |
+| `calibrated_cruise` | `calibrated` | `cruise` |
+
+This enables queries like "show me all EDR products for Cassini ISS" without caring about mission phase.
+
+### Step 5: Fix Broken URLs
+
+During the catalog's development, we discovered that the USGS Imaging Node (`pdsimage2.wr.usgs.gov`) — which hosted a significant fraction of PDS data — had gone completely offline. Every URL returned 404.
+
+The `_url_rewrite` module rewrites these broken URLs at build time to working mirrors:
+
+- **SETI Rings Node** (`pds-rings.seti.org`) for Cassini ISS, Galileo SSI, Juno JunoCam
+- **JPL Planetary Data** (`planetarydata.jpl.nasa.gov`) for most other missions
+
+This fixed 60 of the 69 broken URLs. The remaining 9 (Chandrayaan-1 M3, Galileo NIMS, LRO LAMP, Apollo, Mariner 9) have no known mirrors.
+
+### Step 6: Store in DuckDB
+
+The result is a DuckDB database with three tables:
+
+- **instruments**: mission, instrument name, folder mapping, product type count
+- **product_types**: product key, normalized type, phase, file conventions (extensions, label type)
+- **products**: individual sample products with product_id, url_stem, files, label_file, hash
+
+DuckDB was chosen for its analytical query performance, single-file deployment (no server), and excellent Python integration. The entire catalog is one file under `~/.planetarypy_data/catalog/pdr_catalog.duckdb`.
+
+A `catalog` view joins all three tables for convenient querying.
+
+## Product Key Normalization
+
+Product keys in pdr-tests often encode both the data type and the mission phase or target body. For example, Cassini ISS has `edr_saturn`, `edr_jupiter`, and `edr_cruise` — three keys that represent the same data type (EDR) from different phases. Without normalization, a user querying for "all Cassini ISS EDR products" would need to know about each variant.
+
+The `BODY_MAP` in `_mission_map` decomposes these keys into a normalized type plus a phase:
+
+| Original product_key | Normalized type | Phase |
+|---|---|---|
+| `edr_saturn` | `edr` | `saturn` |
+| `edr_evj` | `edr` | `evj` |
+| `calibrated_cruise` | `calibrated` | `cruise` |
+
+Currently recognized phases include:
+
+- **Planets/bodies**: saturn, jupiter, neptune, uranus, earth, pluto, ceres, vesta, gaspra, ida, halley, phobos, arrokoth
+- **Mission phases**: cruise, launch, kem_cruise, early_mission, late_mission, pre_jupiter, earth_venus_jupiter
+
+### Debatable Cases
+
+Some candidate phases have been deliberately excluded because they risk false matches:
+
+**`flyby`** (appears in juno.jiram): `flyby_img_edr` would decompose to `type=img_edr, phase=flyby`. But `flyby` is so generic that `mariner._misc.pos_flyby` would also match — possibly correct but unverified. Not added without a full audit of `*flyby*` product keys.
+
+**`orbit`** (appears in rosetta.consert, mgs.mag_er, near.grs): `l2_orbit` at Rosetta CONSERT correctly means "orbital phase L2 data". But `orbit_info` at MGS is metadata *about* orbits, not data from an "orbit phase". And NEAR GRS has a standalone `orbit` key that would decompose to `type=orbit, phase=orbit`. Too ambiguous for a global rule — would need mission-specific overrides.
+
+### Non-Decomposable Keys
+
+Some product keys contain body names as structural identifiers, not phase modifiers:
+
+| Mission | Keys | Why not decomposable |
+|---|---|---|
+| HST | `mars_cube`, `mars_image` | Instrument is defined by its target |
+| IUE | `comet_extracted`, `comet_image` | Instrument is defined by its target |
+| Pre-Magellan | `eb_mars_img`, `eb_venus` | Dataset names, not phase splits |
+
+These remain as-is. The body name is part of what the instrument *is*.
+
+### Edge Cases
+
+- **`photom_halley_addenda`** (ihw.irsn): Body `halley` sits in the middle of the key, not at prefix/suffix position. Current normalization only strips from edges. Stays as-is.
+- **`cassini.rss.solar`** and **`nh.swap.solar_wind`**: `solar` appears in both solar occultation data and `solar_wind` (a physical phenomenon). Both are in `NORMALIZATION_EXCEPTIONS`. Correct behavior.
+- **`mex.pfs.ATM_cruise_dupes`**: Contains `cruise` but the prefix `ATM_` and suffix `_dupes` prevent matching. Correct — this is a special duplicate dataset.
+
+## The URL Resolution Problem
+
+With the catalog built, we have ~1,948 sample products with known URLs. But researchers don't want samples — they want *their* products. The question becomes: given an arbitrary product ID that isn't in the catalog, can we figure out the download URL?
+
+The answer depends on the archive structure.
+
+### Archive URL Patterns
+
+Analysis of all 1,948 sample product URLs revealed four distinct patterns:
+
+| Pattern | Count | Example |
+|---------|-------|---------|
+| **Fixed directory** | ~1,606 types | Every product at the same URL path |
+| **Volume-based** | ~49 | Path includes `COISS_2022`, `mrox_0001`, etc. |
+| **Orbit-based** | ~52 | Path includes `PSP/ORB_001300_001399/` |
+| **Date-based** | ~90 | Path includes `2018193/WAC` or `sol00338` |
+
+For fixed-directory types, URL resolution is trivial: use the same `url_stem` and swap the filename. For the others, you need to know *which* volume, orbit, or date directory a product lives in — information that only the PDS cumulative index files contain.
+
+## The Four-Tier Resolution Chain
+
+The `resolve_product()` function in `_download.py` implements a chain-of-responsibility pattern that tries four strategies in sequence:
+
+```
+resolve_product("mro", "ctx", "edr", "B01_009942_1894_XI_09N202W")
+    │
+    ├─ Tier 1: Catalog exact match
+    │          Is this one of the ~1,948 sample products in the DB?
+    │          → YES: return its stored url_stem + files directly
+    │
+    ├─ Tier 2: PDS index lookup (authoritative)
+    │          Is there a registered cumulative index for mro.ctx.edr?
+    │          → YES: search the index for the product_id,
+    │            extract volume_id + file_spec, construct URL
+    │
+    ├─ Tier 3: Pattern-based resolution
+    │          Do all catalog samples for this type share the same url_stem?
+    │          → YES: use that fixed stem + derive filename from product_id
+    │
+    └─ Tier 4: Fail with guidance
+              → ProductNotFoundError with context-specific help
+```
+
+### Tier 1: Catalog Exact Match
+
+The simplest case. If the requested `product_id` matches one of the ~1,948 sample products in the database, return its pre-computed `url_stem` and file list directly.
+
+```sql
+SELECT url_stem, files, label_file
+FROM products p
+JOIN instruments i USING (folder_name)
+WHERE i.mission = 'mro' AND i.instrument = 'ctx'
+  AND p.product_id = 'B01_009942_1894_XI_09N202W'
+```
+
+This is fast (DuckDB query) and reliable (URLs were verified or rewritten during build).
+
+### Tier 2: PDS Index Lookup
+
+Many PDS archives publish **cumulative index files** — large CSV/TAB files that list every product in the archive with its volume ID and file path. The `_index_bridge` module maintains a registry (`INDEX_REGISTRY`) mapping `(mission, instrument, product_key)` tuples to `IndexConfig` objects:
+
+```python
+INDEX_REGISTRY = {
+    ("mro", "ctx", "edr"): IndexConfig(
+        index_key="mro.ctx.edr",
+        archive_url="https://planetarydata.jpl.nasa.gov/img/data/mro/ctx",
+    ),
+    ("cassini", "iss", "edr_sat"): IndexConfig(
+        index_key="cassini.iss.index",
+        seti_volume_group="COISS_2xxx",
+    ),
+    # ... 60+ entries covering MRO, LRO, Cassini, Galileo, Voyager,
+    #     Juno, New Horizons, MGS, Viking, MESSENGER, Phoenix, MSL, MER
+}
+```
+
+When a product isn't in the catalog samples, the system:
+
+1. Looks up the `IndexConfig` for the product type
+2. Loads the index DataFrame via `planetarypy.pds.get_index()` (downloading if necessary, caching as Parquet)
+3. Searches for the product_id with case-insensitive, whitespace-tolerant matching across multiple column candidates (`PRODUCT_ID`, `FILE_NAME`, `IMAGE_ID`, `OBSERVATION_ID`)
+4. Extracts `VOLUME_ID` and `FILE_SPECIFICATION_NAME` from the matching row
+5. Constructs the URL
+
+Two URL construction patterns are supported:
+
+- **Standard archives**: `{archive_url}/{volume_id}/{file_directory}/`
+- **SETI Rings archives**: `https://pds-rings.seti.org/holdings/volumes/{group}/{volume}/{file_directory}/`
+
+Special cases handled:
+
+- **Multi-volume concatenation**: Some instruments split data across multiple index files (e.g., Diviner EDR1 + EDR2). The `extra_index_keys` field loads and concatenates them.
+- **Naming bridges**: The Galileo index system uses `go` (Galileo Orbiter abbreviation) while the catalog uses `galileo`. The registry entry maps `("galileo", "ssi", "edr")` to index key `go.ssi.index`.
+
+This tier can resolve millions of products across ~30 instruments.
+
+#### Why index comes before pattern
+
+A subtle but important ordering decision. Tier 2 (index lookup) is tried *before* Tier 3 (pattern-based) because index data is **authoritative**. Consider a product type with only one sample in the catalog — its single `url_stem` looks "fixed", so pattern-based resolution would happily construct URLs using that stem. But the actual archive might span hundreds of volumes, each with a different URL path. The index knows the truth; pattern inference can be fooled.
+
+When an index is registered for a product type, pattern-based resolution is skipped entirely.
+
+### Tier 3: Pattern-Based Resolution
+
+The key insight that enables Tier 3: **for most product types, every product lives in the same directory**. The URL only differs in the filename.
+
+But how do we know which types are truly "fixed" versus which ones merely appear fixed because we only have one sample? This is where the `_url_examiner` module comes in.
+
+#### Fetchability Classification
+
+The examiner analyses all sample products for each product type and classifies them into three categories:
+
+| Status | Meaning | Resolution |
+|--------|---------|------------|
+| **fixed** | All samples share the same `url_stem` | Pattern-based works |
+| **indexed** | `url_stem` varies but an index is registered | Index bridge handles it |
+| **unfetchable** | `url_stem` varies, no index available | Only samples work |
+
+For multi-sample types, the classification is straightforward: count distinct `url_stem` values. If there's only one, it's fixed.
+
+For single-sample types, the examiner uses **regex heuristics** to detect variable-looking path segments in the URL:
+
+| Pattern type | Regex examples | What it detects |
+|---|---|---|
+| Volume IDs | `CO[A-Z]{2,4}_\d{4}`, `[a-z]{2,6}[-_]\d{4}[a-z]?` | `COISS_2011`, `mrocr_0006` |
+| Dates | `sol\d{3,5}`, `\d{7}` | `sol096`, `2013005` (YYYYDOY) |
+| Orbits | `ORB[-_]\d{3,}` | `ORB_029500`, `ORB_3300_3399` |
+| Numbered dirs | `[a-z]\d{5,}` | `e23006`, `m14007` |
+
+If no variable segments are detected, the single sample is conservatively treated as fixed. This errs on the side of caution — it may miss some variable types, but it won't produce wrong URLs for genuinely fixed ones.
+
+The examiner also checks whether the product_id *contains* the variable information (e.g., an orbit number embedded in the product_id), which is useful diagnostic information even though it doesn't change the classification.
+
+#### Pattern Resolution
+
+Once the examiner confirms a type is fixed, the `_url_patterns` module resolves products by:
+
+1. Querying the catalog for sample products of the same type
+2. Extracting the constant `url_stem`
+3. Deriving the filename from the product_id using label rules learned from samples
+
+Label filename derivation rules are learned from the relationship between `product_id` and `label_file` in the sample data:
+
+| Rule | Example | Derivation |
+|------|---------|------------|
+| Standard PDS3 | `PRODUCT_ID` → `PRODUCT_ID.LBL` | `{product_id}.LBL` |
+| Case-insensitive | `product_id` → `product_id.lbl` | `{product_id}.{ext}` |
+| PDS4 URN | `urn:...:segment` → `segment.xml` | Extract last URN segment |
+| Dash-prefix strip | `CIRS-HSK06072016` → `HSK06072016.LBL` | Strip prefix before dash |
+
+The file list (data file + label file) is built using metadata from the `product_types` table: `label_type` (detached, attached, or N/A), `fn_ends_with`, and `fn_must_contain`.
+
+### Tier 4: Fail with Guidance
+
+When none of the above tiers can resolve a product, the system raises `ProductNotFoundError` with a context-specific error message:
+
+- **Index exists but product not found**: "Check the product_id spelling" — the index is authoritative, so a miss likely means a typo.
+- **Unfetchable type**: Explains *why* it's unfetchable (variable paths, no index) and suggests `example_products()` to see what's available.
+- **Other**: Generic guidance about available resolution methods.
+
+The goal is to never leave the user with just "not found" — always explain what would be needed to resolve the product.
+
+## Coverage Summary
+
+| Resolution tier | Product types | Products resolvable |
+|---|---|---|
+| Tier 1: Catalog exact match | All ~1,740 types | ~1,948 known samples |
+| Tier 2: PDS index lookup | 58 product types across 29 instruments on 15 missions | Millions (full archives) |
+| Tier 3: Pattern-based | ~630 truly fixed types | Unlimited (any valid ID) |
+| Unfetchable | ~950+ types | Only catalog samples |
+
+The combination of Tiers 2 and 3 means that for the vast majority of PDS product types, any valid product identifier can be resolved to a download URL without the user needing to know the archive structure, the hosting PDS node, or the volume organisation.
+
+### Direct Data Access Status
+
+The following 58 product types across 15 missions support download of **any** product by ID
+via PDS cumulative index resolution (Tier 2).
+
+| Mission | Instrument | Product Type | Index Source | Archive |
+|---------|------------|-------------|-------------|---------|
+| Cassini | CIRS | jupiter | `cassini.cirs.cube_point_index` | SETI Rings |
+| Cassini | ISS | edr_evj | `cassini.iss_cruise.index` | SETI Rings |
+| Cassini | ISS | edr_sat | `cassini.iss.index` | SETI Rings |
+| Cassini | RSS Occ. | rss | `cassini.rss.index` | SETI Rings |
+| Cassini | UVIS | edr | `cassini.uvis.index` | SETI Rings |
+| Cassini | VIMS | edr | `cassini.vims.index` | SETI Rings |
+| Galileo | SSI | edr | `go.ssi.index` | SETI Rings |
+| Juno | JunoCam | edr | `juno.junocam.index` | SETI Rings |
+| LRO | Diviner | edr | `lro.diviner.edr1` | WUSTL |
+| LRO | Diviner | rdr | `lro.diviner.rdr1` | WUSTL |
+| LRO | LOLA | edr | `lro.lola.edr` | WUSTL |
+| LRO | LOLA | rdr | `lro.lola.rdr` | WUSTL |
+| LRO | LROC | edr | `lro.lroc.edr` | ASU |
+| MER Opportunity | Pancam | rdr | `mer_opportunity.pancam.rdr` | WUSTL |
+| MER Spirit | Pancam | rdr | `mer_spirit.pancam.rdr` | WUSTL |
+| MESSENGER | MDIS | cdr | `messenger.mdis.cdr` | JPL |
+| MESSENGER | MDIS | edr | `messenger.mdis.edr` | JPL |
+| MGS | MOC | edr | `mgs.moc.edr` | JPL |
+| MGS | MOC | rdr | `mgs.moc.rdr` | JPL |
+| MRO | CRISM | mtrdr | `mro.crism.mtrdr` | WUSTL |
+| MRO | CTX | edr | `mro.ctx.edr` | JPL |
+| MRO | HiRISE | dtm | `mro.hirise.dtm` | U. Arizona |
+| MRO | HiRISE | edr | `mro.hirise.edr` | U. Arizona |
+| MRO | HiRISE | rdr | `mro.hirise.rdr` | U. Arizona |
+| MSL | APXS | edr, oxide_rdr, spectrum_rdr | `msl.apxs.*` | WUSTL |
+| MSL | ChemCam | 6 product types | `msl.ccam.*` | WUSTL |
+| MSL | CheMin | 13 product types | `msl.cmn.*` | WUSTL |
+| MSL | SAM | l2_qms | `msl.sam.l2` | WUSTL |
+| New Horizons | LORRI | edr, rdr | `new_horizons.lorri.*` | SETI Rings |
+| Phoenix | AFM, ELEC, TECP, WCL | edr, rdr | `phoenix.meca.*` | WUSTL |
+| Viking | VIS | edr | `viking.vis.edr` | JPL |
+| Voyager 1 | ISS | edr | `voyager1.iss.index` | SETI Rings |
+| Voyager 2 | ISS | edr | `voyager2.iss.index` | SETI Rings |
+
+## Design Decisions
+
+### Why DuckDB?
+
+The catalog is fundamentally an analytical workload — queries like "list all instruments for Cassini" or "how many product types have variable URL stems?" scan and aggregate across the full dataset. DuckDB excels at this while remaining a single file with zero server infrastructure. It embeds directly in the Python process.
+
+### Why AST Parsing?
+
+The `selection_rules.py` files are third-party Python code. Executing them (via `exec` or `importlib`) would be a security risk and could have side effects. AST parsing extracts only the data we need (the `file_information` dictionary literal) without running anything.
+
+### Why a Registry Instead of Auto-Discovery?
+
+The `INDEX_REGISTRY` is hand-curated — every entry is explicit, with a verified `archive_url` or `seti_volume_group`. We could try to auto-discover indexes by probing predictable paths (see Open Tasks), but auto-discovery can produce false positives (stale indexes, wrong archive versions), so the registry remains the authoritative source. Auto-discovery would feed *candidates* into the registry, not replace it.
+
+### Why Rewrite URLs at Build Time?
+
+Broken URLs (the USGS Imaging Node going offline) affect every user on every download. Rewriting during catalog build means the fix is applied once, stored in the database, and every subsequent URL resolution returns a working mirror. The alternative — rewriting at download time — would require every code path that touches URLs to know about the rewrite rules.
+
+## Source File Map
+
+```
+src/planetarypy/catalog/
+├── __init__.py            # Public API: build_catalog(), list_missions(), fetch_product(), etc.
+├── _resolver.py           # Resolution chain orchestrator, ResolvedProduct, download_product()
+├── _index_resolver.py     # Tier 2: INDEX_REGISTRY, resolve_from_index(), URL construction
+├── _pattern_resolver.py   # Tier 3: pattern-based resolution + fetchability classification
+├── _mission_map.py        # Folder name → (mission, instrument) mapping, product key normalisation
+├── _parser.py             # AST parser for selection_rules.py, CSV parser
+├── _repo.py               # Shallow sparse checkout of pdr-tests
+├── _schema.py           # DuckDB schema: instruments, product_types, products tables
+├── _url_rewrite.py      # USGS → SETI/JPL URL rewriting at build time
+├── _validation.py       # URL health checking (HEAD requests)
+└── cli.py               # plp_build_catalog entry point
+```

@@ -1,0 +1,60 @@
+/*-- scss:defaults --*/
+
+$presentation-font-size-root: 46px;
+$presentation-h1-font-size: 2.2em;
+$presentation-h2-font-size: 1.6em;
+$presentation-h3-font-size: 1.3em;
+$code-block-font-size: 0.7em;
+$presentation-line-height: 1.4;
+
+/*-- scss:rules --*/
+
+.reveal .slides section {
+  text-align: left;
+}
+
+.reveal pre {
+  font-size: $code-block-font-size;
+  width: 100%;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  padding: 0.6em;
+}
+
+.reveal pre code {
+  line-height: 1.5;
+  max-height: 500px;
+}
+
+.reveal code {
+  font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", monospace;
+}
+
+.reveal p {
+  font-size: 0.85em;
+  margin-bottom: 0.3em;
+}
+
+.reveal .subtitle {
+  font-size: 0.7em;
+  opacity: 0.85;
+}
+
+.reveal section .highlight-box {
+  background: rgba(255, 255, 255, 0.08);
+  border-left: 4px solid #42affa;
+  padding: 0.5em 0.8em;
+  border-radius: 4px;
+  font-size: 0.85em;
+  margin: 0.5em 0;
+}
+
+.reveal .slide-number {
+  font-size: 0.5em;
+}
+
+/* Ensure text output blocks are also large */
+.reveal .sourceCode pre.text {
+  font-size: 0.65em;
+  background: rgba(0, 0, 0, 0.3);
+}

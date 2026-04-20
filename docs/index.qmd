@@ -1,0 +1,34 @@
+---
+title: PlanetaryPy Documentation
+page-layout: article
+---
+
+Python tools for planetary science data access.
+
+**Key features:**
+
+- **90+ PDS index files** — auto-downloaded, cached as Parquet, auto-updated
+- **PDS Catalog** — 65 missions, 2042 product types, searchable via DuckDB
+- **Direct data access** — `fetch_product("mro.ctx.edr", "PRODUCT_ID")` for 58 product types across 15 missions
+- **37 SPICE missions** — date-filtered kernel subsets via NAIF
+- **Unified CLI** — `plp fetch`, `plp hibrowse`, `plp ctxqv`, `plp catalog build`
+
+```bash
+pip install planetarypy
+```
+
+- Project repository: <https://github.com/planetarypy/planetarypy>
+- PyPI: <https://pypi.org/project/planetarypy/>
+- Part of the [PlanetaryPy](https://planetarypy.org/) Organisation
+
+## How these docs are organized
+
+This documentation follows the [Diátaxis approach](https://diataxis.fr):
+
+- **Tutorials** — Step-by-step lessons for learning the package
+- **How-To Guides** — Practical guides for solving specific problems
+- **Reference** — API documentation generated from docstrings
+- **Explanation** — Background information and design decisions
+
+The navigation bar at the top links to these four subsections.
+Sidebars enable navigation between documents, and the table of contents on the right enables navigation within a document.
