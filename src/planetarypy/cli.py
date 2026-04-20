@@ -286,12 +286,49 @@ def himos(
             raise typer.Exit(1)
 
 
-# ── ctxqv ────────────────────────────────────────────────────────────
+# ── CTX commands ────────────────────────────────────────────────────
+
+
+def _complete_ctx_pid(incomplete: str) -> list[str]:
+    """Tab-completion callback for CTX product IDs."""
+    from planetarypy.instruments.mro.ctx.ctx_edr import complete_ctx_pid
+    return complete_ctx_pid(incomplete)
+
+
+@app.command()
+def ctxfetch(
+    product_id: str = typer.Argument(
+        help="CTX product ID, e.g. P02_001916_2221_XI_42N027W",
+        autocompletion=_complete_ctx_pid,
+    ),
+):
+    """Download a CTX EDR product.
+
+    Downloads to the configured storage location (see ~/.planetarypy_mro_ctx.toml).
+    Cached products are returned immediately.
+
+    Examples:
+        plp ctxfetch P02_001916_2221_XI_42N027W
+        plp ctxfetch J05_046771_1950_XN_15N254W
+    """
+    from planetarypy.instruments.mro.ctx.ctx_edr import EDR
+
+    try:
+        edr_obj = EDR(product_id)
+        typer.echo(f"URL: {edr_obj.url}")
+        path = edr_obj.path  # downloads if not cached
+        typer.echo(path)
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command()
 def ctxqv(
-    imgid: str = typer.Argument(help="CTX product ID (short or full), e.g. J05_046771_1950"),
+    imgid: str = typer.Argument(
+        help="CTX product ID (short or full), e.g. J05_046771_1950",
+        autocompletion=_complete_ctx_pid,
+    ),
     stride: int = typer.Option(10, "--stride", "-s", help="Downsample factor"),
     save: str = typer.Option(None, "--save", "-o", help="Save to PNG instead of displaying"),
     stretch: str = typer.Option("1,99", "--stretch", "-p", help="Percentile stretch as 'low,high'. Use 'none' to disable."),

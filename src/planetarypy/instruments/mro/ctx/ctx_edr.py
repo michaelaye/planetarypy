@@ -291,3 +291,59 @@ class EDR:
 
     def __str__(self):
         return self.__repr__()
+
+
+# ── Product ID Cache (for tab completion) ─────────────────────────
+
+def _pid_cache_path() -> Path:
+    """Path to the cached CTX product ID list file."""
+    return Path(config["storage_root"]) / "mro" / "ctx" / "product_ids.txt"
+
+
+def rebuild_pid_cache() -> Path:
+    """Rebuild the CTX product ID cache from the EDR index.
+
+    Returns
+    -------
+    Path
+        Path to the cache file.
+    """
+    cache = _pid_cache_path()
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    df = get_edr_index(allow_refresh=False)
+    pids = sorted(df["PRODUCT_ID"].unique())
+    cache.write_text("\n".join(pids) + "\n")
+    logger.info(f"Rebuilt CTX product ID cache: {len(pids)} entries at {cache}")
+    return cache
+
+
+def complete_ctx_pid(incomplete: str) -> list[str]:
+    """Return CTX product IDs matching a prefix (for tab completion).
+
+    Parameters
+    ----------
+    incomplete : str
+        Prefix to match against.
+
+    Returns
+    -------
+    list of str
+        Matching product IDs.
+    """
+    cache = _pid_cache_path()
+    if not cache.exists():
+        try:
+            rebuild_pid_cache()
+        except Exception:
+            return []
+
+    prefix = incomplete.upper()
+    matches = []
+    with open(cache) as f:
+        for line in f:
+            pid = line.rstrip()
+            if pid.startswith(prefix):
+                matches.append(pid)
+            elif matches:
+                break
+    return matches
