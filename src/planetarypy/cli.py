@@ -7,6 +7,7 @@ Usage:
     plp catalog build
 """
 
+import click
 import typer
 
 app = typer.Typer(
@@ -20,10 +21,29 @@ app = typer.Typer(
 # ── fetch ────────────────────────────────────────────────────────────
 
 
+def _complete_product_id(ctx: click.Context, args: list[str], incomplete: str) -> list[str]:
+    """Context-aware tab completion for product IDs based on the key argument."""
+    key = ctx.params.get("key", "")
+    if not key:
+        return []
+    try:
+        if key == "mro.ctx.edr":
+            from planetarypy.instruments.mro.ctx.ctx_edr import complete_ctx_pid
+            return complete_ctx_pid(incomplete)
+        if key.startswith("mro.hirise"):
+            from planetarypy.instruments.mro.hirise import complete_obsid
+            index = "edr" if "edr" in key else "rdr"
+            return complete_obsid(incomplete, index=index)
+    except Exception:
+        pass
+    return []
+
+
 @app.command()
 def fetch(
     key: str = typer.Argument(help="Dotted product key, e.g. mro.ctx.edr"),
-    product_id: str = typer.Argument(help="Product identifier"),
+    product_id: str = typer.Argument(help="Product identifier",
+                                     autocompletion=_complete_product_id),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
     label_only: bool = typer.Option(False, "--label-only", "-l", help="Download only the label file"),
     here: bool = typer.Option(False, "--here", "-H", help="Download into current directory instead of planetarypy storage"),
@@ -293,34 +313,6 @@ def _complete_ctx_pid(incomplete: str) -> list[str]:
     """Tab-completion callback for CTX product IDs."""
     from planetarypy.instruments.mro.ctx.ctx_edr import complete_ctx_pid
     return complete_ctx_pid(incomplete)
-
-
-@app.command()
-def ctxfetch(
-    product_id: str = typer.Argument(
-        help="CTX product ID, e.g. P02_001916_2221_XI_42N027W",
-        autocompletion=_complete_ctx_pid,
-    ),
-):
-    """Download a CTX EDR product.
-
-    Downloads to the configured storage location (see ~/.planetarypy_mro_ctx.toml).
-    Cached products are returned immediately.
-
-    Examples:
-        plp ctxfetch P02_001916_2221_XI_42N027W
-        plp ctxfetch J05_046771_1950_XN_15N254W
-    """
-    from planetarypy.instruments.mro.ctx.ctx_edr import EDR
-
-    try:
-        edr_obj = EDR(product_id)
-        typer.echo(f"URL: {edr_obj.url}")
-        path = edr_obj.path  # downloads if not cached
-        typer.echo(path)
-    except Exception as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
 
 
 @app.command()
