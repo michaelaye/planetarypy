@@ -206,7 +206,7 @@ class TestObsidCompletion:
 
         # Monkey-patch the cache path
         orig = hirise._obsid_cache_path
-        hirise._obsid_cache_path = lambda: cache
+        hirise._obsid_cache_path = lambda index="edr": cache
         try:
             matches = hirise.complete_obsid("PSP_003092")
             assert matches == ["PSP_003092_0985", "PSP_003092_1715"]
