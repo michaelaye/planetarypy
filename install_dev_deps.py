@@ -1,53 +1,135 @@
 #!/usr/bin/env python
-from pathlib import Path
-import tomlkit
-import sh
+import logging
 import sys
+from pathlib import Path
+
+import sh
+import tomlkit
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+logger = logging.getLogger(__name__)
 
 # Define packages that should be installed via pip instead of conda
-PIP_PACKAGES = {'build', 'pip-tools'}
+PIP_PACKAGES = {"build", "pip-tools", "planets"}
+
+# Define packages that should NEVER be installed via pip
+CONDA_ONLY_PACKAGES = {"gdal"}
+
+# Core packages that must be installed first
+CORE_PACKAGES = {"gdal"}
+
+
+def get_package_name(dep):
+    """Extract the package name from a dependency string, removing version specifiers."""
+    return (
+        dep.split(">=")[0]
+        .split("==")[0]
+        .split("<=")[0]
+        .split("~=")[0]
+        .split("!=")[0]
+        .strip()
+    )
+
 
 def install_deps():
+    logger.info("\n=== Starting install_dev_deps.py ===")
+
+    # Install core packages first
+    logger.info("\nInstalling core dependencies via mamba...")
+    try:
+        sh.mamba(
+            "install",
+            "-y",
+            "-c",
+            "conda-forge",
+            *CORE_PACKAGES,
+            _err=sys.stderr,
+            _out=sys.stdout,
+        )
+        logger.info("Core dependencies installed successfully!")
+    except sh.ErrorReturnCode as e:
+        logger.error("Error installing core packages!")
+        logger.error("Exit code: %s", e.exit_code)
+        logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
+        logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
+        sys.exit(1)
+
     # Read pyproject.toml
+    logger.info("\nReading pyproject.toml...")
     pyproject_path = Path("pyproject.toml")
     with open(pyproject_path) as f:
         pyproject = tomlkit.load(f)
-    
-    # Get both main and dev dependencies
+
+    # Get main, spice, and dev dependencies
+    logger.info("\nCollecting dependencies from pyproject.toml...")
     main_deps = pyproject["project"]["dependencies"]
     dev_deps = pyproject["project"]["optional-dependencies"]["dev"]
-    all_deps = main_deps + dev_deps
-    
+    spice_deps = pyproject["project"]["optional-dependencies"]["spice"]
+    all_deps = main_deps + dev_deps + spice_deps
+
+    logger.info("Found %d main dependencies", len(main_deps))
+    logger.info("Found %d dev dependencies", len(dev_deps))
+    logger.info("Found %d spice dependencies", len(spice_deps))
+    logger.info("Total dependencies to process: %d", len(all_deps))
+
     # Split dependencies into conda and pip packages
-    conda_deps = [dep for dep in all_deps if dep not in PIP_PACKAGES]
-    pip_deps = [dep for dep in all_deps if dep in PIP_PACKAGES]
-    
+    logger.info("\nSplitting dependencies between conda and pip...")
+    # Remove core packages and pip-only packages from conda installation
+    conda_deps = [
+        dep
+        for dep in all_deps
+        if get_package_name(dep) not in PIP_PACKAGES
+        and get_package_name(dep) not in CORE_PACKAGES
+    ]
+    pip_deps = [
+        dep
+        for dep in all_deps
+        if get_package_name(dep) in PIP_PACKAGES
+        and get_package_name(dep).lower() not in CONDA_ONLY_PACKAGES
+    ]
+
+    logger.info("Packages to install via conda: %d", len(conda_deps))
+    logger.info("Packages to install via pip: %d", len(pip_deps))
+
     # Install conda packages
     if conda_deps:
         try:
-            print("Installing with mamba:", ' '.join(conda_deps))
-            sh.mamba("install", "-y", "-c", "conda-forge", *conda_deps, 
-                    _err=sys.stderr, _out=sys.stdout)
-            print("Conda installation completed successfully!")
+            logger.info("\nInstalling conda packages...")
+            logger.info("Packages: %s", " ".join(conda_deps))
+            sh.mamba(
+                "install",
+                "-y",
+                "-c",
+                "conda-forge",
+                *conda_deps,
+                _err=sys.stderr,
+                _out=sys.stdout,
+            )
+            logger.info("Conda installation completed successfully!")
         except sh.ErrorReturnCode as e:
-            print("Error installing conda packages!")
-            print("Exit code:", e.exit_code)
-            print("Stdout:", e.stdout.decode() if e.stdout else 'No stdout')
-            print("Stderr:", e.stderr.decode() if e.stderr else 'No stderr')
+            logger.error("Error installing conda packages!")
+            logger.error("Exit code: %s", e.exit_code)
+            logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
+            logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
             sys.exit(1)
-    
+
     # Install pip packages
     if pip_deps:
         try:
-            print("\nInstalling with pip:", ' '.join(pip_deps))
+            logger.info("\nInstalling pip packages...")
+            logger.info("Packages: %s", " ".join(pip_deps))
             sh.pip("install", *pip_deps, _err=sys.stderr, _out=sys.stdout)
-            print("Pip installation completed successfully!")
+            logger.info("Pip installation completed successfully!")
         except sh.ErrorReturnCode as e:
-            print("Error installing pip packages!")
-            print("Exit code:", e.exit_code)
-            print("Stdout:", e.stdout.decode() if e.stdout else 'No stdout')
-            print("Stderr:", e.stderr.decode() if e.stderr else 'No stderr')
+            logger.error("Error installing pip packages!")
+            logger.error("Exit code: %s", e.exit_code)
+            logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
+            logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
             sys.exit(1)
 
+    logger.info("\n=== install_dev_deps.py completed successfully ===")
+
+
 if __name__ == "__main__":
-    install_deps() 
+    install_deps()

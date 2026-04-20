@@ -1,4 +1,4 @@
-.PHONY: clean clean-test clean-pyc clean-build docs help
+.PHONY: clean clean-test clean-pyc clean-build docs docs-api docs-preview docs-clean help
 .DEFAULT_GOAL := help
 
 define BROWSER_PYSCRIPT
@@ -65,16 +65,19 @@ coverage: ## check code coverage quickly with the default Python
 	coverage html
 	$(BROWSER) htmlcov/index.html
 
-docs: ## generate Sphinx HTML documentation, including API docs
-	rm -f docs/planetarypy.rst
-	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ planetarypy
-	$(MAKE) -C docs clean
-	$(MAKE) -C docs html
-	$(BROWSER) docs/_build/html/index.html
+docs: docs-api ## render full documentation locally
+	cd docs && quarto render
+	$(BROWSER) docs/_build/index.html
 
-servedocs: docs ## compile the docs watching for changes
-	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
+docs-api: ## generate API reference (run before committing doc changes)
+	cd docs && quartodoc build
+
+docs-preview: ## preview docs with live reload
+	cd docs && quarto preview
+
+docs-clean: ## remove generated HTML (not reference/*.qmd)
+	rm -rf docs/_build
+	rm -rf docs/.quarto
 
 release: dist ## package and upload a release
 	twine upload dist/*
