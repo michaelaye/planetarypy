@@ -799,6 +799,39 @@ _COLOR_CCDS = {
 }
 
 
+def _smart_max_workers(n_tasks: int) -> int:
+    """Calculate max parallel workers based on available memory.
+
+    Each ISIS CCD processing step uses ~500 MB-1 GB of memory.
+    Uses 80% of available RAM.
+    """
+    import os
+
+    per_task_bytes = 1.0 * 1024**3  # ~1 GB per ISIS CCD task (conservative)
+    try:
+        import psutil
+        available = psutil.virtual_memory().available
+    except ImportError:
+        available = 8 * 1024**3  # assume 8 GB if psutil unavailable
+
+    budget = available * 0.8
+    workers = max(1, int(budget / per_task_bytes))
+    workers = min(workers, n_tasks, os.cpu_count() or 4)
+    return workers
+
+
+def _stitch_worker(args):
+    """Picklable worker for parallel histitch + cubenorm."""
+    ch0_cal, ch1_cal, obsid, ccd = args
+    return stitch_channels(ch0_cal, ch1_cal, obsid=obsid, ccd=ccd)
+
+
+def _project_worker(args):
+    """Picklable worker for parallel cam2map."""
+    normed, mapfile = args
+    return map_project(normed, mapfile=mapfile)
+
+
 def create_mosaic(
     obsid: str,
     color: str = "red",
@@ -808,6 +841,7 @@ def create_mosaic(
     saveroot: Path | None = None,
     download: bool = True,
     print_progress: bool = True,
+    max_workers: int | None = None,
 ) -> Path:
     """Create a HiRISE CCD mosaic from EDR data.
 
@@ -822,6 +856,7 @@ def create_mosaic(
     Mosaic:
         ``equalizer → automos(priority=beneath)``
 
+    Steps 2-5 are parallelized using process-based parallelism.
     Intermediate files are deleted after each step to conserve disk.
 
     Parameters
@@ -846,6 +881,9 @@ def create_mosaic(
         Set to False if files are already available locally.
     print_progress : bool
         If True (default), print step-by-step progress to stdout.
+    max_workers : int, optional
+        Maximum number of parallel workers for steps 2-5.
+        If None, auto-calculates based on available memory (80% of free RAM).
 
     Returns
     -------
@@ -858,6 +896,7 @@ def create_mosaic(
     >>> create_mosaic("PSP_003092_0985", ccds=[4, 5])        # RED 4+5 central pair
     >>> create_mosaic("PSP_003092_0985", color="ir")         # IR mosaic
     >>> create_mosaic("PSP_003092_0985", color="bg")         # BG mosaic
+    >>> create_mosaic("PSP_003092_0985", max_workers=4)      # limit parallelism
     """
     _require_isis()
     color = color.lower()
@@ -906,33 +945,39 @@ def create_mosaic(
         download_edr(obsid, colors=[color], ccds=ccds, saveroot=saveroot,
                      overwrite=overwrite)
 
-    # ── Step 2: hi2isis + spiceinit ──
-    _log(f"[2/6] hi2isis + spiceinit: {channel_names}")
-    for prod in products:
-        ingest_edr(prod)
+    # Determine parallelism
+    from concurrent.futures import ProcessPoolExecutor
+
+    if max_workers is None:
+        n_workers = _smart_max_workers(n_channels)
+    else:
+        n_workers = max_workers
+
+    # ── Step 2: hi2isis + spiceinit (process-parallel, SPICE is not thread-safe) ──
+    _log(f"[2/6] hi2isis + spiceinit: {channel_names} ({n_workers} workers)")
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        list(executor.map(ingest_edr, products))
 
     # ── Step 3: hical ──
-    _log(f"[3/6] hical: {channel_names}")
-    cal_paths = []
-    for prod in products:
-        cal_paths.append(calibrate_channel(prod.local_cube))
+    _log(f"[3/6] hical: {channel_names} ({n_workers} workers)")
+    cube_paths = [p.local_cube for p in products]
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        cal_paths = list(executor.map(calibrate_channel, cube_paths))
 
     # ── Step 4: histitch + cubenorm ──
-    _log(f"[4/6] histitch + cubenorm: {ccd_name_str}")
-    normed_paths = []
-    for i in range(0, len(cal_paths), 2):
-        ccd = ccd_names[i // 2]
-        normed = stitch_channels(
-            cal_paths[i], cal_paths[i + 1],
-            obsid=obsid, ccd=ccd,
-        )
-        normed_paths.append(normed)
+    _log(f"[4/6] histitch + cubenorm: {ccd_name_str} ({n_workers} workers)")
+    stitch_args = [
+        (cal_paths[i * 2], cal_paths[i * 2 + 1], obsid, ccd_names[i])
+        for i in range(n_ccds)
+    ]
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        normed_paths = list(executor.map(_stitch_worker, stitch_args))
 
     # ── Step 5: cam2map ──
-    _log(f"[5/6] cam2map: {ccd_name_str}")
-    mapped_paths = []
-    for normed in normed_paths:
-        mapped_paths.append(map_project(normed, mapfile=mapfile))
+    _log(f"[5/6] cam2map: {ccd_name_str} ({n_workers} workers)")
+    project_args = [(normed, mapfile) for normed in normed_paths]
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        mapped_paths = list(executor.map(_project_worker, project_args))
 
     # ── Step 6: equalizer + automos ──
     _log(f"[6/6] equalizer + automos → {mosaic_path.name}")
