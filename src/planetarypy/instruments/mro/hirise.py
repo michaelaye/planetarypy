@@ -279,6 +279,35 @@ def _edr_storage() -> Path:
     return Path(config["storage_root"]) / "mro" / "hirise"
 
 
+# ── Storage resolver (for catalog integration) ───────────────────
+
+
+def _hirise_local_product_dir(product_type: str, product_id: str) -> Path:
+    """Resolve local storage path for a HiRISE product.
+
+    Groups EDR products by observation ID (all channels together).
+    RDR products get their own folder.
+
+    Registered with the catalog resolver so that ``plp fetch mro.hirise.edr``
+    stores products in the same layout as ``plp hiedr``.
+    """
+    root = _edr_storage()
+    if product_type == "edr":
+        # EDR: group by obsid (first 3 tokens of product_id)
+        obsid = "_".join(product_id.split("_")[:3])
+        return root / obsid
+    # RDR, DTM, etc: per-product folder
+    return root / product_type / product_id
+
+
+# Register with the catalog resolver
+try:
+    from planetarypy.catalog._resolver import register_storage_resolver
+    register_storage_resolver("mro.hirise", _hirise_local_product_dir)
+except ImportError:
+    pass  # catalog not available
+
+
 def _edr_base_url() -> URL:
     """Resolve EDR base URL from config."""
     cfg = _edr_config()

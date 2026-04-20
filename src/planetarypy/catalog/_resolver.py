@@ -60,14 +60,45 @@ class ResolvedProduct:
         return None
 
 
+# ── Storage resolver registry ─────────────────────────────────────
+#
+# Instrument modules can register custom storage resolvers so that
+# `plp fetch` stores products in the same layout as instrument-specific
+# commands (hiedr, ctxfetch, etc.) and respects per-instrument config files.
+#
+# Register with:  register_storage_resolver("mro.hirise", my_func)
+# The function signature is:  (product_type, product_id) -> Path
+
+_STORAGE_RESOLVERS: dict[str, callable] = {}
+
+
+def register_storage_resolver(key: str, resolver: callable):
+    """Register an instrument-specific storage path resolver.
+
+    Parameters
+    ----------
+    key : str
+        Dotted mission.instrument key, e.g. ``"mro.hirise"``.
+    resolver : callable
+        Function ``(product_type: str, product_id: str) -> Path``
+        returning the local directory for a product.
+    """
+    _STORAGE_RESOLVERS[key] = resolver
+
+
 def _local_product_dir(
     mission: str, instrument: str, product_type: str, product_id: str,
 ) -> Path:
     """Build local storage path for a product.
 
-    Layout: {storage_root}/{mission}/{instrument}/{product_type}/{product_id}/
+    Checks for a registered instrument-specific resolver first,
+    then falls back to the default layout:
+    ``{storage_root}/{mission}/{instrument}/{product_type}/{product_id}/``
     """
-    # Sanitize product_id for filesystem use
+    key = f"{mission}.{instrument}"
+    if key in _STORAGE_RESOLVERS:
+        return _STORAGE_RESOLVERS[key](product_type, product_id)
+    # Default layout
     safe_pid = product_id.replace("/", "_").replace("\\", "_")
     return (
         config.storage_root / mission / instrument / product_type / safe_pid
