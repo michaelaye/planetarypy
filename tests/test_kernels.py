@@ -16,6 +16,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
+pytest.importorskip("spiceypy")
+
 from planetarypy.spice import generic_kernels
 from planetarypy.spice.archived_kernels import BASE_URL, Subsetter, datasets
 from planetarypy.spice.config import KERNEL_STORAGE

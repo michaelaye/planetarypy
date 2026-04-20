@@ -1,5 +1,8 @@
 import pandas as pd
+import pytest
 from astropy.time import Time
+
+pytest.importorskip("spiceypy")
 
 from planetarypy.spice import archived_kernels as kernels
 

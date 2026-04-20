@@ -3,6 +3,8 @@ import pandas as pd
 import pytest
 from pathlib import Path
 
+pytest.importorskip("spiceypy")
+
 
 # Skip in parallel mode - this test needs fresh module imports
 @pytest.mark.skipif(
