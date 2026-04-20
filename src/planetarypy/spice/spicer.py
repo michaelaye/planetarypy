@@ -1,770 +1,550 @@
-"""SPICE manager to make simple SPICE calculations simple."""
+"""Spicer: surface illumination calculations via SPICE.
 
-__all__ = ['Radii', 'make_axis_rotation_matrix', 'IllumAngles', 'SurfaceCoords', 'Spicer', 'MarsSpicer', 'TritonSpicer',
-           'EnceladusSpicer', 'PlutoSpicer', 'EarthSpicer', 'MoonSpicer', 'Mars_Ls_now']
+Provides a clean OO interface for computing illumination geometry,
+solar flux, and related quantities at surface points on solar system bodies.
 
+Requires spiceypy and the NAIF generic kernels (LSK + PCK). The set of
+supported bodies is determined by the loaded PCK kernel — the default
+``pck00011.tpc`` includes the Sun, all 8 planets, Pluto, 70+ moons,
+and a few asteroids (Ceres, Vesta, Lutetia). Additional bodies become
+available if you load further kernels via spiceypy.
+
+Examples
+--------
+>>> from planetarypy.spice.spicer import Spicer
+>>> mars = Spicer("MARS")
+>>> illum = mars.illumination(lon=137.4, lat=-4.6, time="2024-01-15T12:00:00")
+>>> illum.solar_incidence
+45.2
+>>> illum.solar_flux
+450.3
+
+Use ``units=True`` to get astropy Quantities instead of plain floats:
+
+>>> mars = Spicer("MARS", units=True)
+>>> illum = mars.illumination(lon=137.4, lat=-4.6, time="2024-01-15T12:00:00")
+>>> illum.solar_incidence
+<Quantity 45.2 deg>
+"""
+
+from __future__ import annotations
 
 import datetime as dt
 from collections import namedtuple
+from dataclasses import dataclass, field
 from math import tau
 
 import dateutil.parser as tparser
 import numpy as np
 import spiceypy as spice
-from astropy import units as u
-from astropy.constants import L_sun
-from astropy.visualization import quantity_support
-from matplotlib import pyplot as plt
-from traitlets import Enum, Float, HasTraits, Unicode
 
-import planets
-from ..exceptions import MissingParameterError, SpiceError, SPointNotSetError
-from .kernels import load_generic_kernels
+from .generic_kernels import load_generic_kernels
 
-
-load_generic_kernels()
-
+_kernels_loaded = False
 
 Radii = namedtuple("Radii", "a b c")
-"""Simple named Radii structure.
-
-Stores the 3 element radii tuple of SPICE in a named structure.
-"""
 
 
-def make_axis_rotation_matrix(direction, angle):
-    """
-    Create a rotation matrix corresponding to the rotation around a general
-    axis by a specified angle.
+def _rotate_vector(vector, axis, angle_rad):
+    """Rotate a vector around an axis (right-hand rule, CCW looking along axis).
 
-    R = dd^T + cos(a) (I - dd^T) + sin(a) skew(d)
-
-    Parameters:
-
-        angle : float a
-        direction : array d
-    """
-    d = np.array(direction, dtype=np.float64)
-    d /= np.linalg.norm(d)
-
-    eye = np.eye(3, dtype=np.float64)
-    ddt = np.outer(d, d)
-    skew = np.array([[0, d[2], -d[1]], [-d[2], 0, d[0]], [d[1], -d[0], 0]], dtype=np.float64)
-
-    mtx = ddt + np.cos(angle) * (eye - ddt) + np.sin(angle) * skew
-    return mtx
-
-
-class IllumAngles:
-    """Managing illumination angles.
-
-
-    Attributes
-    ----------
-    phase : traitlets.Float
-        Phase angle
-    solar : traitlets.Float
-        Solar incidence angle
-    emission : traitlets.Float
-        Surface emission angle
-    dphase
-    dsolar
-    demission
-    """
-
-    @classmethod
-    def fromtuple(cls, args):
-        newargs = np.degrees(args)
-        return cls(phase=newargs[0], solar=newargs[1], emission=newargs[2])
-
-    def __init__(self, phase=0, solar=0, emission=0):
-        self.phase = (phase * u.deg).to(u.radian)
-        self.solar = (solar * u.deg).to(u.radian)
-        self.emission = (emission * u.deg).to(u.radian)
-
-    @property
-    def dphase(self):
-        "float : degree version of self.phase"
-        return self.phase.to(u.deg)
-
-    @property
-    def dsolar(self):
-        "float : degree version of solar incidence angle."
-        return self.solar.to(u.deg)
-
-    @property
-    def demission(self):
-        "float : degree version of emission angle."
-        return self.emission.to(u.deg)
-
-    def __str__(self):
-        s = "Print-out precision is '.2f'\n"
-        s += "Phase: {0:.2f}\nSolar Incidence: {1:.2f}\nEmission: {2:.2f}".format(self.dphase, self.dsolar,
-                                                                                  self.demission)
-        return s
-
-    def __repr__(self):
-        return self.__str__()
-
-
-class SurfaceCoords:
-    """Managing SPICE surface coordinates.
-
-    Attributes
-    ----------
-    lon : traitlets.Float
-        Longitude
-    lat : traitlets.Float
-        Latitude
-    radius : traitlets.Float
-        Radius of lat/lon location. Could be below or above actual surface.
-    dlon
-    dlat
-    """
-
-    @classmethod
-    def fromtuple(cls, args):
-        """Initialize object via args tuple.
-
-        This is handy as a tuple is often the output of SPICE functions.
-
-        Parameters
-        ----------
-        radius: float
-            Radius of lat/lon location. Could be below or above actual surface.
-        lon: float
-            Longitude
-        lat: float
-            Latitude
-        """
-        return cls(radius=args[0], lon=np.degrees(args[1]), lat=np.degrees(args[2]))
-
-    def __init__(self, lon=0, lat=0, radius=0):
-        self.lon = (lon * u.deg).to(u.radian)
-        self.lat = (lat * u.deg).to(u.radian)
-        self.radius = radius * u.km
-
-    @property
-    def dlon(self):
-        return self.lon.to(u.deg)
-
-    @property
-    def dlat(self):
-        "float : Degree version of radians latitude."
-        return self.lat.to(u.deg)
-
-    def __str__(self):
-        "Return string with useful summary."
-        return "Longitude: {0}\nLatitude: {1}\nRadius: {2}".format(self.dlon, self.dlat, self.radius)
-
-    def __repr__(self):
-        return self.__str__()
-
-
-class Spicer(HasTraits):
-    """Main Spicer utility class. SPICE body objects should inherit from this.
+    Matches the SPICE (axisar) and scipy convention.
 
     Parameters
     ----------
-    time : str or dt.datetime
-        str should be parseable by dateutil.timeparser
+    vector : array-like
+        3D vector to rotate.
+    axis : array-like
+        Axis of rotation (will be normalized).
+    angle_rad : float
+        Rotation angle in radians.
 
-    Attributes
-    ----------
-    time : datetime.datetime
-        Time of Spicer object. Can be changed, which updates all dependent values.
-    method : str
-        SPICE method flag for surface point interception calculation.
-    corr : str
-        SPICE method flag for aberration correction
-    body : str
-        Planetary body string for the SPICE system. To be set either by instance user
-        or by subclass.
-    ref_frame
-    utc
-    et
-    target_id
-    radii
-    center_to_sun
-    solar_constant
-    north_pole
-    south_pole
-    l_s
-    sun_direction
+    Returns
+    -------
+    np.ndarray
+        Rotated 3D vector.
+    """
+    from scipy.spatial.transform import Rotation
+
+    axis = np.array(axis, dtype=np.float64)
+    axis /= np.linalg.norm(axis)
+    r = Rotation.from_rotvec(angle_rad * axis)
+    return r.apply(vector)
+
+
+def _parse_time(time) -> dt.datetime:
+    """Parse a time argument into a datetime."""
+    if time is None:
+        return dt.datetime.now()
+    if isinstance(time, dt.datetime):
+        return time
+    return tparser.parse(time)
+
+
+def _to_et(time) -> float:
+    """Convert a time argument to SPICE ephemeris time."""
+    t = _parse_time(time)
+    return spice.utc2et(t.isoformat())
+
+
+def _maybe_quantity(value, unit_str, use_units: bool):
+    """Optionally wrap a value in an astropy Quantity."""
+    if not use_units:
+        return value
+    from astropy import units as u
+    return value * u.Unit(unit_str)
+
+
+# ── Result dataclasses ───────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class IlluminationResult:
+    """Result of an illumination calculation.
+
+    All angles in degrees, flux in W/m². When created with
+    ``units=True``, values are astropy Quantities.
     """
 
-    method = "Near point:ellipsoid"
-    corr = Unicode("none")
-    target = ""
-    _body = Unicode()
-    _ref_frame = Unicode()
+    solar_incidence: float
+    """Solar incidence angle [deg]."""
 
-    def __init__(self, body, time=None, tilt=0, aspect=0, tau=0.0):
-        self._body = body
-        if time is None:
-            self.time = dt.datetime.now()
-        else:
-            self.time = tparser.parse(time)
-        self._ref_frame = "IAU_" + str(self.body).upper()
-        self._tilt = tilt * u.deg
-        self._aspect = aspect * u.deg
-        self.spoint_set = False
-        self.tau = tau
+    emission: float
+    """Emission angle [deg] (0 if no observer specified)."""
 
-    @property
-    def tilt(self):
-        return self._tilt
+    phase: float
+    """Phase angle [deg] (0 if no observer specified)."""
 
-    @tilt.setter
-    def tilt(self, val):
-        self._tilt = val
+    solar_flux: float
+    """Solar flux at the surface [W/m²] (0 if incidence > 90°)."""
 
-    @property
-    def aspect(self):
-        return self._aspect
+    subsolar_lon: float
+    """Sub-solar longitude [deg]."""
 
-    @aspect.setter
-    def aspect(self, val):
-        self._aspect = val
+    subsolar_lat: float
+    """Sub-solar latitude [deg]."""
 
-    @property
-    def body(self):
-        return self._body
+    l_s: float
+    """Solar longitude (season) [deg]."""
 
-    @body.setter
-    def body(self, value):
-        self._body = value
-        self.ref_frame = "IAU_" + str(value).upper()
+    local_solar_time: str
+    """Local solar time string."""
 
-    @property
-    def ref_frame(self):
-        "str: Reference frame for SPICE calculations."
-        return self._ref_frame
-
-    @ref_frame.setter
-    def ref_frame(self, value):
-        self._ref_frame = value
-
-    @property
-    def utc(self):
-        "str : Isoformat of UTC time."
-        return self.time.isoformat()
-
-    @property
-    def et(self):
-        "float : Returns Ephemeral time value from SPICE for current <time> value."
-        return spice.utc2et(self.utc)
-
-    @property
-    def target_id(self):
-        "int : SPICE Body ID for self.target."
-        res = spice.bodn2c(self.target)
-        return res
-
-    @property
-    def radii(self):
-        "namedtuple Radii : Radii values container."
-        _, radii = spice.bodvrd(self.target, "RADII", 3)
-        return Radii(*radii)
-
-    def body_to_object(self, target):
-        """Calculate distance to target.
-
-        Parameters
-        ----------
-        target : str
-            SPICE body string to calculate distance to from self.body.
-
-        Returns
-        -------
-        tuple : ([float, float, float], float)
-            distance vector[3], light-time between body and target
-
-        # TODO: spkezp would be faster, but it uses body codes instead of names
-        """
-        output = spice.spkpos(target, self.et, self.ref_frame, self.corr, self.body)
-        return output
-
-    @property
-    def center_to_sun(self):
-        "float : Distance of body center to sun [km]."
-        cts, lighttime = self.body_to_object("SUN")
-        return cts * u.km
-
-    @property
-    def solar_constant(self):
-        "float : With global value L_s, solar constant at coordinates of body center."
-        dist = spice.vnorm(self.center_to_sun.value) * u.km
-        return (L_sun / (2 * tau * (dist)**2)).to(u.W / u.m / u.m)
-
-    @property
-    def north_pole(self):
-        "float[3] : In self.ref_frame coords, the north pole [km]."
-        return (0.0, 0.0, self.radii.c)
-
-    @property
-    def south_pole(self):
-        "float[3] : In self.ref_frame coords, the south pole [km]."
-        return (0.0, 0.0, -self.radii.c)
-
-    def srfrec(self, surfcoord, body=None):
-        """Convert lon/lat to rectangular coordinates.
-
-        Convert planetocentric longitude and latitude of a surface point on a
-        specified body to rectangular coordinates.
-
-        self.target needs to be set for this!
-
-        Parameters
-        ----------
-        surfcoord : SurfaceCoords
-            Instance of SurfaceCoords.
-        body : str or int, optional
-            SPICE body str (will be converted) or SPICE body id. Default: self.body
-
-        Examples
-        --------
-
-        >>> mspice = MarsSpicer()
-        >>> print('{0:g} {1:g} {2:g}'.format(*mspice.srfrec(0,85)))
-        294.268 0 3363.5
-        """
-        if body is None:
-            body = self.target_id
-        if not str(body).isdigit():
-            body = spice.bodn2c(body)
-        return spice.srfrec(body, surfcoord.lon.value, surfcoord.lat.value)
-
-    def set_spoint_by(self, func_str=None, lon=None, lat=None):
-        """Set the current surface point for illumination calculations.
-
-        Parameters
-        ----------
-        func_str : {'subpnt', 'sincpt'}
-
-        """
-        if func_str is not None and func_str not in ["subpnt", "sincpt"]:
-            raise NotImplementedError('Only "sincpt" and "subpnt" are supported at this time.')
-        elif func_str is not None:
-            raise NotImplementedError("not yet implemented.")
-            # if not self.instrument or not self.obs:
-            #     print("Observer and/or instrument have to be set first.")
-            #     return
-            # if func_str in 'subpnt':
-            #     spoint = self.subpnt()[0]
-            # elif func_str in 'sincpt':
-            #     spoint = self.sincpt()[0]
-            # else:
-            #     raise Exception("No valid method recognized.")
-        elif None in [lat, lon]:
-            raise MissingParameterError("both lat and lon need to be given.")
-        else:
-            coords = SurfaceCoords(lat=lat, lon=lon)
-            spoint = self.srfrec(coords).tolist()
-        self.spoint_set = True
-        self.spoint = spoint
-
-    @property
-    def l_s(self):
-        return np.rad2deg(spice.lspcn(self.target, self.et, self.corr))
-
-    @property
-    def sun_direction(self):
-        if not self.spoint_set:
-            raise SPointNotSetError
-        return spice.vsub(self.center_to_sun.value, self.spoint)
-
-    @property
-    def illum_angles(self):
-        """Ilumin returns (trgepoch, srfvec, phase, solar, emission)
-        """
-        if self.obs is not None:
-            output = spice.ilumin(
-                "Ellipsoid",
-                self.target,
-                self.et,
-                self.ref_frame,
-                self.corr,
-                self.obs,
-                self.spoint,
-            )
-            return IllumAngles.fromtuple(output[2:])
-        else:
-            solar = spice.vsep(self.sun_direction, self.snormal)
-            # leaving at 0 what I don't have
-            return IllumAngles.fromtuple((0, solar, 0))
-
-    @property
-    def snormal(self):
-        if not self.spoint_set:
-            raise SPointNotSetError
-        return spice.surfnm(*self.radii, self.spoint)
-
-    @property
-    def coords(self):
-        if not self.spoint_set:
-            raise SPointNotSetError
-        return SurfaceCoords.fromtuple(spice.reclat(self.spoint))
-
-    @property
-    def local_soltime(self):
-        return spice.et2lst(self.et, self.target_id, self.coords.lon.value, "PLANETOGRAPHIC")[3]
-
-    def _get_flux(self, vector):
-        diff_angle = spice.vsep(vector, self.sun_direction)
-        if (self.illum_angles.dsolar > 90 * u.deg) or (np.degrees(diff_angle) > 90):
-            return 0 * u.W / (u.m * u.m)
-        else:
-            return (self.solar_constant * np.cos(diff_angle) * np.exp(-self.tau / np.cos(self.illum_angles.solar)))
-
-    @property
-    def F_flat(self):
-        return self._get_flux(self.snormal)
-
-    @property
-    def to_north(self):
-        if not self.spoint_set:
-            raise SPointNotSetError
-        return spice.vsub(self.north_pole, self.spoint)
-
-    @property
-    def tilted_normal(self):
-        """
-        Create a tilted surface normal vector for by amount of self.tilt
-
-        The tilt is applied by rotating the snormal vector towards north.
-        """
-        if not self.spoint_set:
-            raise SPointNotSetError
-        # cross product
-        axis = spice.vcrss(self.to_north, self.spoint)
-        rotmat = make_axis_rotation_matrix(axis, np.radians(self.tilt))
-        return np.matrix.dot(rotmat, self.snormal)
-
-    @property
-    def F_tilt(self):
-        return self._get_flux(self.tilted_normal)
-
-    @property
-    def tilted_rotated_normal(self):
-        """
-        Rotate the tilted normal around the snormal to create an aspect angle.
-
-        Angle `aspect` should be in degrees and is applied clockwise.
-        """
-        rotmat = make_axis_rotation_matrix(self.snormal, np.radians(self.aspect))
-        return np.matrix.dot(rotmat, self.tilted_normal)
-
-    @property
-    def F_aspect(self):
-        return self._get_flux(self.tilted_rotated_normal)
-
-    def advance_time_by(self, secs):
-        self.time += dt.timedelta(seconds=secs)
-
-    def time_series(self, flux_name, dt, no_of_steps=None, provide_times=None):
-        """
-        Provide time series of fluxes with a <dt> in seconds as sampling
-        intervals.
-
-        Parameters
-        ----------
-        flux_name :
-            String. Decides which of flux vector attributes to integrate.
-            Should be one of ['F_flat','F_tilt','F_aspect']
-        dt :
-            delta time for the time series, in seconds
-        no_of_steps :
-            number of steps to add to time series
-        provide_times :
-            Should be set to one of ['time','utc','et','l_s'] if wanted.
-
-        Returns
-        -------
-        if provide_times is None:
-            out : ndarray
-            Array of evenly spaced flux values, given as E/(dt*m**2).
-            I.e. the internal fluxes are multiplied by dt.
-        else:
-            out : (ndarray, ndarray)
-            Tuple of 2 arrays, out[0] being the times, out[1] the fluxes
-        """
-        saved_time = self.time
-        times = []
-        fluxes = []
-        energies = []
-        i = 0
-        criteria = i < no_of_steps
-        while criteria:
-            i += 1
-            if provide_times:
-                times.append(getattr(self, provide_times))
-            fluxes.append(getattr(self, flux_name))
-            energies.append(getattr(self, flux_name) * dt * u.s)
-            self.advance_time_by(dt)
-            criteria = i < no_of_steps
-
-        self.time = saved_time
-        energies = (np.array([e.value for e in energies]) * energies[0].unit).to("J/m**2")
-        fluxes = np.array([f.value for f in fluxes]) * fluxes[0].unit
-        if provide_times:
-            return np.array(times), energies
-        else:
-            return fluxes, energies
-
-    @property
-    def subsolar(self):
-        # normalize surface point vector:
-        uuB = spice.vhat(self.center_to_sun)
-
-        # receive subsolar point in IAU_MARS rectangular coords
-        # the *self.radii unpacks the Radii object into 3 arguments.
-        v_subsolar = spice.surfpt((0, 0, 0), uuB, *self.radii)
-
-        return v_subsolar
-
-    @property
-    def subsolar2(self):
-        methods = [
-            "Intercept/ellipsoid",
-            "Near point/ ellipsoid",
-        ]
-
-        return spice.subslr(
-            methods[0],
-            self.target,
-            self.et,
-            self.ref_frame,
-            self.corr,
-            self.target,
+    def __repr__(self):
+        return (
+            f"IlluminationResult(\n"
+            f"  solar_incidence={self.solar_incidence},\n"
+            f"  emission={self.emission},\n"
+            f"  phase={self.phase},\n"
+            f"  solar_flux={self.solar_flux},\n"
+            f"  l_s={self.l_s},\n"
+            f"  local_solar_time='{self.local_solar_time}'\n"
+            f")"
         )
 
-    def point_towards_sun(self, pixel_res=0.5):
-        """
-        Calculate a surface point towards the sun to compute the solar azimuth.
 
-        Instead of going through the effort in defining azimuth origins and positive
-        directions here, I return lon/lat for a point that lies within a pixel but
-        towards the subsolar point.
+# ── Spicer class ─────────────────────────────────────────────────────
+
+
+class Spicer:
+    """Surface illumination calculator for any solar system body.
+
+    Parameters
+    ----------
+    body : str
+        NAIF body name (e.g. "MARS", "MOON", "ENCELADUS").
+    units : bool
+        If True, return astropy Quantities with units.
+        If False (default), return plain floats.
+
+    Examples
+    --------
+    >>> mars = Spicer("MARS")
+    >>> mars.radii
+    Radii(a=3396.19, b=3396.19, c=3376.2)
+    >>> mars.ref_frame
+    'IAU_MARS'
+    """
+
+    L_SUN = 3.828e26  # Solar luminosity [W]
+
+    def __init__(self, body: str, units: bool = False):
+        global _kernels_loaded
+        if not _kernels_loaded:
+            load_generic_kernels()
+            _kernels_loaded = True
+        self._body = body.upper()
+        self._units = units
+
+    @property
+    def body(self) -> str:
+        return self._body
+
+    @property
+    def ref_frame(self) -> str:
+        return f"IAU_{self._body}"
+
+    @property
+    def target_id(self) -> int:
+        return spice.bodn2c(self._body)
+
+    @property
+    def radii(self) -> Radii:
+        """Body radii [km]."""
+        _, r = spice.bodvrd(self._body, "RADII", 3)
+        return Radii(*r)
+
+    def _ensure_ephemeris(self):
+        """Try to load satellite ephemeris for this body.
+
+        On first failure, attempts to download and load the appropriate
+        planetary system SPK. These can be large (100 MB to 1+ GB).
+        """
+        from .generic_kernels import ensure_system_for_body, _body_to_system, SATELLITE_KERNELS, _loaded_systems
+        system = _body_to_system(self._body)
+        if system is not None and system in SATELLITE_KERNELS:
+            if system not in _loaded_systems:
+                from .generic_kernels import _SYSTEM_SIZES, GENERIC_STORAGE
+                kernel_path = GENERIC_STORAGE / SATELLITE_KERNELS[system]
+                if not kernel_path.exists():
+                    size = _SYSTEM_SIZES.get(system, "large")
+                    print(f"Body '{self._body}' needs {system.title()} satellite ephemeris ({size}).")
+            ensure_system_for_body(self._body)
+        else:
+            raise RuntimeError(
+                f"No ephemeris data available for '{self._body}'. "
+                f"Load additional SPICE kernels via spiceypy.furnsh()."
+            )
+
+    def solar_longitude(self, time=None) -> float:
+        """Solar longitude L_s [deg] at the given time (default: now)."""
+        et = _to_et(time)
+        try:
+            ls = np.rad2deg(spice.lspcn(self._body, et, "NONE"))
+        except Exception:
+            self._ensure_ephemeris()
+            ls = np.rad2deg(spice.lspcn(self._body, et, "NONE"))
+        return _maybe_quantity(ls, "deg", self._units)
+
+    @property
+    def Ls(self) -> float:
+        """Current solar longitude L_s [deg]."""
+        return self.solar_longitude()
+
+    def subsolar_point(self, time=None) -> tuple[float, float]:
+        """Sub-solar point (lon, lat) in degrees at the given time."""
+        et = _to_et(time)
+        try:
+            spoint, _, _ = spice.subslr(
+                "Intercept/ellipsoid", self._body, et,
+                self.ref_frame, "NONE", self._body,
+            )
+        except Exception:
+            self._ensure_ephemeris()
+            spoint, _, _ = spice.subslr(
+                "Intercept/ellipsoid", self._body, et,
+                self.ref_frame, "NONE", self._body,
+            )
+        coords = spice.reclat(spoint)
+        lon = np.degrees(coords[1])
+        lat = np.degrees(coords[2])
+        if lon < 0:
+            lon += 360.0
+        return (
+            _maybe_quantity(lon, "deg", self._units),
+            _maybe_quantity(lat, "deg", self._units),
+        )
+
+    def center_to_sun(self, time=None):
+        """Vector from body center to Sun [km] at the given time."""
+        et = _to_et(time)
+        try:
+            pos, _ = spice.spkpos("SUN", et, self.ref_frame, "NONE", self._body)
+        except Exception:
+            self._ensure_ephemeris()
+            pos, _ = spice.spkpos("SUN", et, self.ref_frame, "NONE", self._body)
+        return pos
+
+    def solar_constant(self, time=None) -> float:
+        """Solar constant at body center distance [W/m²]."""
+        cts = self.center_to_sun(time)
+        dist_m = spice.vnorm(cts) * 1000.0  # km → m
+        flux = self.L_SUN / (2 * tau * dist_m**2)
+        return _maybe_quantity(flux, "W/m2", self._units)
+
+    def illumination(self, lon: float, lat: float, time=None,
+                     observer: str | None = None,
+                     tau_atm: float = 0.0,
+                     slope: float = 0.0,
+                     aspect: float = 0.0) -> IlluminationResult:
+        """Compute illumination at a surface point.
 
         Parameters
         ----------
+        lon, lat : float
+            Planetocentric longitude and latitude [deg].
+        time : str or datetime, optional
+            Observation time. Default: now.
+        observer : str, optional
+            NAIF observer name (e.g. "MRO") for emission/phase angles.
+            If None, only solar incidence is computed.
+        tau_atm : float
+            Atmospheric optical depth for flux attenuation (default 0).
+        slope : float
+            Surface slope in degrees (0 = flat). The surface normal is
+            tilted toward north by this amount.
+        aspect : float
+            Aspect angle in degrees, clockwise from north. Rotates the
+            tilted normal around the vertical. Only used when slope > 0.
+
+        Returns
+        -------
+        IlluminationResult
+        """
+        et = _to_et(time)
+
+        # Surface point in rectangular body-fixed coords
+        spoint = spice.srfrec(self.target_id, np.radians(lon), np.radians(lat))
+
+        # Surface normal
+        snormal = spice.surfnm(*self.radii, spoint)
+
+        # Sun vector
+        sun_pos, _ = spice.spkpos("SUN", et, self.ref_frame, "NONE", self._body)
+        sun_dir = spice.vsub(sun_pos, spoint)
+
+        if observer is not None:
+            # Full illumination angles via ilumin
+            _, _, phase_r, solar_r, emission_r = spice.ilumin(
+                "Ellipsoid", self._body, et, self.ref_frame,
+                "NONE", observer, spoint,
+            )
+            phase = np.degrees(phase_r)
+            solar_inc = np.degrees(solar_r)
+            emission = np.degrees(emission_r)
+        else:
+            # Simple: angle between sun direction and surface normal
+            solar_inc = np.degrees(spice.vsep(sun_dir, snormal))
+            phase = float("nan")
+            emission = float("nan")
+
+        # Compute effective normal for flux (may be tilted)
+        if slope > 0:
+            # Tilt the normal toward north
+            to_north = spice.vsub(
+                (0.0, 0.0, self.radii.c),  # north pole
+                spoint,
+            )
+            tilt_axis = spice.vcrss(spoint, to_north)
+            flux_normal = _rotate_vector(snormal, tilt_axis, np.radians(slope))
+
+            # Rotate around the original normal by aspect angle
+            if aspect != 0:
+                flux_normal = _rotate_vector(flux_normal, snormal, np.radians(aspect))
+        else:
+            flux_normal = snormal
+
+        # Solar flux using the (possibly tilted) surface normal
+        dist_m = spice.vnorm(sun_pos) * 1000.0
+        sc = self.L_SUN / (2 * tau * dist_m**2)
+        flux_angle = spice.vsep(sun_dir, flux_normal)
+        if solar_inc > 90.0 or np.degrees(flux_angle) > 90.0:
+            flux = 0.0
+        else:
+            flux = sc * np.cos(flux_angle)
+            if tau_atm > 0:
+                flux *= np.exp(-tau_atm / np.cos(np.radians(solar_inc)))
+
+        # Sub-solar point
+        ss_lon, ss_lat = self.subsolar_point(time)
+
+        # Solar longitude
+        l_s = np.rad2deg(spice.lspcn(self._body, et, "NONE"))
+
+        # Local solar time
+        _, _, _, lst_str, _ = spice.et2lst(
+            et, self.target_id, np.radians(lon), "PLANETOCENTRIC",
+        )
+
+        q = self._units
+        return IlluminationResult(
+            solar_incidence=_maybe_quantity(solar_inc, "deg", q),
+            emission=_maybe_quantity(emission, "deg", q),
+            phase=_maybe_quantity(phase, "deg", q),
+            solar_flux=_maybe_quantity(flux, "W/m2", q),
+            subsolar_lon=_maybe_quantity(
+                ss_lon.value if q else ss_lon, "deg", False),
+            subsolar_lat=_maybe_quantity(
+                ss_lat.value if q else ss_lat, "deg", False),
+            l_s=_maybe_quantity(l_s, "deg", q),
+            local_solar_time=lst_str,
+        )
+
+    def illumination_at(self, point, time=None, observer: str | None = None,
+                        tau_atm: float = 0.0) -> IlluminationResult:
+        """Compute illumination at a planetarypy Point.
+
+        Parameters
+        ----------
+        point : planetarypy.geo.Point
+            Must have lon/lat.
+        time, observer, tau_atm
+            See ``illumination()``.
+        """
+        if point.lon is None or point.lat is None:
+            raise ValueError("Point must have lon/lat coordinates")
+        return self.illumination(point.lon, point.lat, time=time,
+                                 observer=observer, tau_atm=tau_atm)
+
+    def sun_direction_at(self, lon: float, lat: float, time=None,
+                         pixel_res: float = 0.5) -> tuple[float, float]:
+        """Compute a surface point toward the sun for azimuth calculation.
+
+        Returns lon/lat of a point within one pixel of the origin but
+        in the direction of the subsolar point. Use with
+        ``Point.azimuth_to()`` to get solar azimuth.
+
+        Parameters
+        ----------
+        lon, lat : float
+            Origin surface point [deg].
+        time : str or datetime, optional
         pixel_res : float
-            Pixel sampling size, required to calculate new point within one pixel of
-            the origin (i.e. `spoint`) point.
+            Pixel size in km (default 0.5).
 
         Returns
         -------
-        dlon, dlat : float
-            Lon/Lat in degrees for point towards sun.
+        sun_lon, sun_lat : float
+            Lon/lat [deg] of point toward sun.
         """
-        # Check if surface point spoint was set
-        if not self.spoint_set:
-            raise SPointNotSetError
+        et = _to_et(time)
+        spoint = spice.srfrec(self.target_id, np.radians(lon), np.radians(lat))
 
-        # Get the difference vector poB=subsolar-origin with its tail at origin
-        # and its head at the subsolar point
-        poB = spice.vsub(self.subsolar, self.spoint)
+        # Subsolar point
+        subsolar, _, _ = spice.subslr(
+            "Intercept/ellipsoid", self._body, et,
+            self.ref_frame, "NONE", self._body,
+        )
 
-        # the difference vector cuts through the body.
-        # we need the tangent vector to the surface at the origin point.
-        # vperp receives the perpendicular component of the poB towards the
-        # spoint vector
-        hpoB = spice.vperp(poB, self.spoint)
-
-        # unitize the tangent vector and then scale it to within a pixel of the
-        # origin point
+        # Vector from spoint toward subsolar, projected onto tangent plane
+        poB = spice.vsub(subsolar, spoint)
+        hpoB = spice.vperp(poB, spoint)
         upoB = spice.vhat(hpoB)
 
-        # get pixel scale in km/pixel and then divide by 2 to insure to stay
-        # within a pixel of the origin point
+        # Scale to within a pixel
         scale = (pixel_res / 1000.0) / 2.0
         spoB = spice.vscl(scale, upoB)
+        nB = spice.vadd(spoint, spoB)
 
-        # Compute the new point in body fixed. This point will be within a
-        # pixel of the origin but in the same direction as the requested la/lon
-        # of the point of interest, i.e. the subsolar point
-        nB = spice.vadd(self.spoint, spoB)
+        coords = spice.reclat(nB)
+        sun_lon = np.degrees(coords[1])
+        sun_lat = np.degrees(coords[2])
+        if sun_lon < 0:
+            sun_lon += 360.0
 
-        coords = SurfaceCoords.fromtuple(spice.reclat(nB))
-        return coords.dlon, coords.dlat
+        return (
+            _maybe_quantity(sun_lon, "deg", self._units),
+            _maybe_quantity(sun_lat, "deg", self._units),
+        )
 
-    def projected_tilted_rotated_normal(self, pixel_res=0.5):
-        hpoB = spice.vperp(self.tilted_rotated_normal, self.snormal)
+    def _project_to_tangent_plane(self, spoint, target_point):
+        """Project a target point onto the tangent plane at spoint.
 
-        upoB = spice.vhat(hpoB)
-
-        scale = (pixel_res / 1000.0) / 2.0
-        spoB = spice.vscl(scale, upoB)
-
-        nB = spice.vadd(self.spoint, spoB)
-
-        coords = SurfaceCoords.fromtuple(spice.reclat(nB))
-        return coords.dlon, coords.dlat
-
-    def fluxes_around_equator(self, deltalon=10):  # delta between points at equator where flux is calculated
-        longitudes = range(0, 360, deltalon)
-        fluxes = []
-        for lon in longitudes:
-            self.set_spoint_by(lat=0, lon=lon)
-            fluxes.append(self.F_flat.value)
-        plt.plot(longitudes, fluxes)
-        plt.xlabel("Longitudes [deg]")
-        plt.ylabel("Fluxes [W/m^2]")
-        plt.title(f"Fluxes at {self.time.isoformat()[:16]} around the equator.")
-        return longitudes, fluxes
-
-
-class MarsSpicer(Spicer):
-    target = "MARS"
-    obs = Enum([None, "MRO", "MGS", "MEX"])
-    instrument = Enum([None, "MRO_HIRISE", "MRO_CRISM", "MRO_CTX"])
-    # Coords dictionary to store often used coords
-    location_coords = dict(inca=(220.09830399469547, -440.60853011059214, -3340.5081261541495))
-
-    def __init__(self, time=None, obs=None, inst=None, **kwargs):
-        """ Initialising MarsSpicer class.
-
-        Demo:
-        >>> mspicer = MarsSpicer(time='2007-02-16T17:45:48.642')
-        >>> mspicer.goto('inca')
-        >>> print('Incidence angle: {0:g}'.format(mspicer.illum_angles.dsolar))
-        Incidence angle: 95.5388
-
-        >>> mspicer = MarsSpicer(time='2007-01-27T12:00:00')
-        >>> mspicer.set_spoint_by(lon=300, lat = -80)
-        >>> print('Incidence angle: {0:g}'.format(mspicer.illum_angles.dsolar))
-        Incidence angle: 85.8875
+        Returns a unit vector in the tangent plane pointing from spoint
+        toward the projection of target_point.
         """
-        super().__init__(self.target, time=time, **kwargs)
-        self.obs = obs
-        self.instrument = inst
+        diff = spice.vsub(target_point, spoint)
+        tangent = spice.vperp(diff, spoint)
+        return spice.vhat(tangent)
 
-    def goto(self, loc_string):
-        """Set self.spoint to coordinates as saved in location_coords.
+    def _tangent_north(self, spoint):
+        """Unit vector in the tangent plane at spoint pointing toward north."""
+        north_pole = (0.0, 0.0, self.radii.c)
+        return self._project_to_tangent_plane(spoint, north_pole)
 
-        Currently available locations:
-            'inca'  (call like so: mspicer.goto('inca'))
-        """
-        self.spoint_set = True
-        self.spoint = self.location_coords[loc_string.lower()]
+    def solar_azimuth_at(self, lon: float, lat: float, time=None) -> float:
+        """Compute solar azimuth at a surface point via SPICE.
 
+        Returns the azimuth of the sun measured clockwise from north
+        in the local tangent plane. This is the standard geographic
+        convention (N=0°, E=90°, S=180°, W=270°).
 
-class TritonSpicer(Spicer):
-    target = "TRITON"
-    obs = Enum([None, "EARTH"])
-
-    def __init__(self, time=None, obs=None, inst=None):
-        super().__init__(self.target, time=time)
-        self.obs = obs
-        self.instrument = inst
-
-
-class EnceladusSpicer(Spicer):
-    target = "ENCELADUS"
-    obs = Enum([None, "EARTH"])
-
-    def __init__(self, time=None, obs=None, inst=None):
-        super().__init__(self.target, time=time)
-        self.obs = obs
-        self.instrument = inst
-
-
-class PlutoSpicer(Spicer):
-    target = "PLUTO"
-    obs = Enum([None, "EARTH"])
-
-    def __init__(self, time=None, obs=None, inst=None):
-        super().__init__(self.target, time=time)
-        self.obs = obs
-        self.instrument = inst
-
-
-class EarthSpicer(Spicer):
-    target = "EARTH"
-    obs = Enum([None, "EARTH"])
-
-    def __init__(self, time=None, obs=None, inst=None):
-        super().__init__(self.target, time=time)
-        self.obs = obs
-        self.instrument = inst
-
-
-class MoonSpicer(Spicer):
-    target = "MOON"
-    obs = Enum([None, "EARTH"])
-    constants = planets.Moon
-
-    def __init__(self, time=None, obs=None, inst=None):
-        super().__init__(self.target, time=time)
-        self.obs = obs
-        self.instrument = inst
-
-    @property
-    def albedo_var(self):
-        # motivated by P. Hayne's heat1d code
-        a, b = self.constants.albedoCoef
-        A0 = self.constants.albedo
-        i = self.illum_angles.solar.value
-        return A0 + a * (i / (np.pi / 4))**3 + b * (i / (np.pi / 2))**8
-
-    @property
-    def Qs(self):
-        return self.F_flat.value * (1 - self.albedo_var)
-
-    def time_series(self, flux_name, dt, no_of_steps=None, provide_times=None):
-        """
-        Provide time series of fluxes with a <dt> in seconds as sampling
-        intervals.
+        Independent of any PDS index — computed directly from SPICE
+        ephemeris.
 
         Parameters
         ----------
-        flux_name :
-            String. Decides which of flux vector attributes to integrate.
-            Should be one of ['F_flat','F_tilt','F_aspect']
-        dt :
-            delta time for the time series, in seconds
-        no_of_steps :
-            number of steps to add to time series
-        provide_times :
-            Should be set to one of ['time','utc','et','l_s'] if wanted.
+        lon, lat : float
+            Planetocentric longitude and latitude [deg].
+        time : str or datetime, optional
 
         Returns
         -------
-        if provide_times is None:
-            out : ndarray
-            Array of evenly spaced flux values, given as E/(dt*m**2).
-            I.e. the internal fluxes are multiplied by dt.
-        else:
-            out : (ndarray, ndarray)
-            Tuple of 2 arrays, out[0] being the times, out[1] the fluxes
+        float
+            Solar azimuth [deg], clockwise from north.
         """
-        saved_time = self.time
-        times = []
-        fluxes = []
-        energies = []
-        self.Qs_series = []
-        i = 0
-        criteria = i < no_of_steps
-        while criteria:
-            i += 1
-            if provide_times:
-                times.append(getattr(self, provide_times))
-            fluxes.append(getattr(self, flux_name))
-            energies.append(getattr(self, flux_name) * dt * u.s)
-            self.Qs_series.append(self.Qs)
-            self.advance_time_by(dt)
-            criteria = i < no_of_steps
+        et = _to_et(time)
+        spoint = spice.srfrec(self.target_id, np.radians(lon), np.radians(lat))
 
-        self.time = saved_time
-        energies = (np.array([e.value for e in energies]) * energies[0].unit).to("J/m**2")
-        fluxes = np.array([f.value for f in fluxes]) * fluxes[0].unit
-        if provide_times:
-            return np.array(times), energies
-        else:
-            return fluxes, energies
+        # Subsolar point
+        subsolar, _, _ = spice.subslr(
+            "Intercept/ellipsoid", self._body, et,
+            self.ref_frame, "NONE", self._body,
+        )
 
+        # Project sun and north directions onto tangent plane
+        sun_tangent = self._project_to_tangent_plane(spoint, subsolar)
+        north_tangent = self._tangent_north(spoint)
 
-def Mars_Ls_now():
-    ms = MarsSpicer()
-    return round(ms.l_s, 1)
+        # East = north × surface_normal (right-hand rule)
+        snormal = spice.surfnm(*self.radii, spoint)
+        east_tangent = spice.vcrss(north_tangent, snormal)
+        # Normalize (should already be unit but be safe)
+        east_tangent = spice.vhat(east_tangent)
+
+        # Azimuth: angle from north, positive toward east (CW from above)
+        north_comp = spice.vdot(sun_tangent, north_tangent)
+        east_comp = spice.vdot(sun_tangent, east_tangent)
+        az = np.degrees(np.arctan2(east_comp, north_comp)) % 360
+
+        return _maybe_quantity(az, "deg", self._units)
+
+    def north_azimuth_at(self, lon: float, lat: float, time=None) -> float:
+        """Compute north azimuth in a spacecraft image via SPICE.
+
+        This would require the instrument boresight and orientation —
+        not available with generic kernels alone. For now, raises
+        NotImplementedError. Use the PDS index NORTH_AZIMUTH instead.
+
+        (Included as a placeholder for future mission kernel support.)
+        """
+        raise NotImplementedError(
+            "North azimuth in image space requires mission-specific SPICE "
+            "kernels (CK, IK). Use the PDS index NORTH_AZIMUTH for now."
+        )
+
+    @staticmethod
+    def supported_bodies() -> list[tuple[int, str, float]]:
+        """List all bodies available for Spicer calculations.
+
+        Returns bodies that have radii defined in the currently loaded
+        SPICE kernels (typically the generic PCK kernel ``pck00011.tpc``).
+        Load additional kernels via spiceypy to extend this list.
+
+        Returns
+        -------
+        list of (naif_id, name, equatorial_radius_km)
+        """
+        bodies = []
+        for code in list(range(0, 1000)) + list(range(2000000, 2000100)):
+            try:
+                name = spice.bodc2n(code)
+                _, radii = spice.bodvrd(name, "RADII", 3)
+                if radii[0] > 0:
+                    bodies.append((code, name, float(radii[0])))
+            except Exception:
+                pass
+        return sorted(bodies, key=lambda x: x[0])
+
+    def __repr__(self):
+        return f"Spicer('{self._body}', units={self._units})"
