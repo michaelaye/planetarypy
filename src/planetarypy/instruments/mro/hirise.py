@@ -123,10 +123,12 @@ def get_browse(product_id: str, annotated: bool = True,
     if dest is not None:
         outpath = Path(dest) / filename
     else:
-        outpath = (
-            Path(config["storage_root"])
-            / "mro" / "hirise" / "extras" / data_level / obs_id / filename
-        )
+        extras_root = Path(config["storage_root"]) / "mro" / "hirise" / "extras"
+        cfg = _hirise_config().get("storage", {})
+        if cfg.get("separate_levels", False):
+            outpath = extras_root / data_level / obs_id / filename
+        else:
+            outpath = extras_root / obs_id / filename
 
     if outpath.exists() and not force:
         logger.debug(f"Already cached: {outpath}")
@@ -285,15 +287,19 @@ def _edr_storage() -> Path:
 def _hirise_local_product_dir(product_type: str, product_id: str) -> Path:
     """Resolve local storage path for a HiRISE product.
 
-    All data levels (EDR, RDR, DTM, etc.) are stored together under
-    the observation ID folder. EDR and RDR products for the same
-    observation live side by side — no edr/rdr subdirectory split.
+    By default, all data levels (EDR, RDR, DTM, etc.) are stored
+    together under the observation ID folder. Set ``separate_levels = true``
+    in ``~/.planetarypy_mro_hirise.toml`` [storage] to use
+    ``{root}/{product_type}/{obsid}/`` instead.
 
     Registered with the catalog resolver so that ``plp fetch mro.hirise.*``
     stores products in the same layout as ``plp hiedr``.
     """
     root = _edr_storage()
     obsid = "_".join(product_id.split("_")[:3])
+    cfg = _hirise_config().get("storage", {})
+    if cfg.get("separate_levels", False):
+        return root / product_type / obsid
     return root / obsid
 
 
