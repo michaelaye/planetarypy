@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.4] - 2026-04-24
+
+### Fixed
+- **`url_retrieve` is now concurrency-safe.** Previously two processes (e.g. parallel pytest-xdist workers hitting `load_generic_kernels()` via `Spicer("MARS")` / `Spicer("MOON")`) could clobber each other's `.part` scratch file and race on the final `rename()`, producing `FileNotFoundError`. The scratch file now includes the writer's PID (`{name}.{pid}.part`), and when a concurrent winner has already moved the final file into place the loser silently drops its scratch copy instead of raising. This was the root cause of intermittent CI failures in `test_spicer`.
+
+### Changed
+- CI workflow `test.yaml` now prefetches the SPICE generic kernels in a single-writer step before invoking `pytest`, so parallel test workers see cached files and never trigger the download path simultaneously. Complements the `url_retrieve` fix; either alone would green CI, both together harden the library for any concurrent caller.
+
 ## [0.53.3] - 2026-04-24
 
 ### Fixed

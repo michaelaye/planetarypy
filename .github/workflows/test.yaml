@@ -52,6 +52,14 @@ jobs:
       shell: bash -l {0}
       run: pip install -e ".[dev]"
 
+    - name: Prefetch SPICE generic kernels
+      shell: bash -l {0}
+      # Single-writer download so parallel pytest-xdist workers can't
+      # race on the same .part file when test_spicer triggers
+      # load_generic_kernels() concurrently.
+      run: |
+        python -c "from planetarypy.spice.generic_kernels import download_generic_kernels; download_generic_kernels()"
+
     - name: Run tests
       shell: bash -l {0}
       run: |

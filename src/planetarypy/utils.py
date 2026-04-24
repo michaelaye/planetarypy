@@ -2,6 +2,7 @@
 import datetime as dt
 import email.utils as eut
 import http.client as httplib
+import os
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -276,7 +277,10 @@ def url_retrieve(
     """
     url = str(url)
     outfile = Path(outfile)
-    part_file = outfile.with_suffix(outfile.suffix + ".part")
+    # Per-PID scratch file so concurrent callers (e.g. parallel pytest
+    # workers, multiprocessing) don't clobber each other's partial
+    # writes and don't race on the final rename.
+    part_file = outfile.with_suffix(f"{outfile.suffix}.{os.getpid()}.part")
 
     if user:
         auth = HTTPBasicAuth(user, passwd)
@@ -301,7 +305,19 @@ def url_retrieve(
     ) as fd:
         for chunk in R.iter_content(chunk_size=chunk_size):
             fd.write(chunk)
-    part_file.rename(outfile)
+    # If another concurrent writer already finished first, drop our
+    # scratch file rather than overwriting the winner.
+    if outfile.exists():
+        part_file.unlink(missing_ok=True)
+    else:
+        try:
+            part_file.replace(outfile)
+        except FileNotFoundError:
+            # Lost a very tight race: another writer moved our part
+            # file out from under us (unlikely with per-PID suffix).
+            # If outfile now exists we're still fine.
+            if not outfile.exists():
+                raise
 
 
 def have_internet() -> bool:
