@@ -52,13 +52,34 @@ jobs:
       shell: bash -l {0}
       run: pip install -e ".[dev]"
 
+    - name: Cache PDS indexes and SPICE kernels
+      # ~/planetarypy_data/ holds SPICE generic kernels (~200 MB) and PDS
+      # cumulative indexes (HiRISE RDR ~200 MB, CTX EDR ~100 MB). Caching
+      # means we only hit the NAIF and PDS servers once per cache-key
+      # change, rather than on every CI run.  Bump the key suffix
+      # (currently ``testdata-v1``) to force a fresh pull.
+      uses: actions/cache@v4
+      with:
+        path: ~/planetarypy_data
+        key: planetarypy-testdata-v1-${{ runner.os }}
+        restore-keys: |
+          planetarypy-testdata-v1-
+
     - name: Prefetch SPICE generic kernels
       shell: bash -l {0}
-      # Single-writer download so parallel pytest-xdist workers can't
-      # race on the same .part file when test_spicer triggers
-      # load_generic_kernels() concurrently.
+      # Idempotent after a cache hit: download_generic_kernels() skips
+      # any file that already exists.  On a fresh cache this serially
+      # seeds the kernels so parallel pytest-xdist workers don't race.
       run: |
         python -c "from planetarypy.spice.generic_kernels import download_generic_kernels; download_generic_kernels()"
+
+    - name: Prefetch HiRISE RDR cumulative index
+      shell: bash -l {0}
+      # Same idempotency story as the SPICE prefetch: first run seeds
+      # the parquet cache; subsequent runs hit the cache hit.  Covers
+      # test_spicer.TestSolarAzimuth which queries the RDR index.
+      run: |
+        python -c "from planetarypy.pds import get_index; get_index('mro.hirise.rdr')"
 
     - name: Run tests
       shell: bash -l {0}
