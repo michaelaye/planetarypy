@@ -64,11 +64,11 @@ def fetch(
 
     mission, instrument, product_key = key.split(".")
 
-    typer.echo(f"Resolving {key} / {product_id}...")
+    typer.echo(f"Resolving {key} / {product_id}...", err=True)
     try:
         resolved = resolve_product(mission, instrument, product_key, product_id)
         for f in resolved.files:
-            typer.echo(f"URL: {resolved.url_stem}/{f}")
+            typer.echo(f"URL: {resolved.url_stem}/{f}", err=True)
         if here:
             local_dir = Path.cwd()
         else:
@@ -76,6 +76,9 @@ def fetch(
                 mission, instrument, product_key, resolved.product_id,
             )
         download_product(resolved, local_dir, label_only=label_only, force=force)
+        # Final resolved paths go to stdout (and only stdout) so that
+        # shell command substitution — e.g. `qgis (plp fetch …)` —
+        # captures just the file paths, not the diagnostic chatter.
         for f in resolved.files:
             typer.echo(local_dir / f)
     except Exception as e:
@@ -127,12 +130,17 @@ def hibrowse(
     obs_id = f"{parts[0]}_{parts[1]}_{parts[2]}"
     orbit = int(parts[1])
     suffix = "abrowse.jpg" if annotated else "browse.jpg"
-    typer.echo(f"Fetching {HIRISE_BASE}/EXTRAS/{data_level}/{parts[0]}/{_orbit_range(orbit)}/{obs_id}/{pid}.{suffix}")
+    typer.echo(
+        f"Fetching {HIRISE_BASE}/EXTRAS/{data_level}/{parts[0]}/{_orbit_range(orbit)}/{obs_id}/{pid}.{suffix}",
+        err=True,
+    )
 
     try:
         dest = Path.cwd() if here else None
         outpath = get_browse(product_id, annotated=annotated, dest=dest, force=force)
-        typer.echo(f"Browse: {outpath}")
+        # Raw path on stdout so `qgis (plp hibrowse …)` and similar
+        # shell substitutions capture just the path.
+        typer.echo(outpath)
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
