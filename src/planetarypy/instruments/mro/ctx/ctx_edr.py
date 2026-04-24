@@ -8,6 +8,7 @@ See below for examples and some explanations.
 import os
 from functools import cached_property
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import warnings
@@ -29,42 +30,98 @@ from planetarypy.pds import get_index
 # idea for later
 # from planetarypy.instruments.base import Instrument
 
-STORAGE_ROOT = Path(config["storage_root"])
-
 CONFIGPATH = Path.home() / ".planetarypy_mro_ctx.toml"
 
 with CONFIGPATH.open() as f:
     CTXCONFIG = tomlkit.load(f)
 
-# warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
-
 BASEURL = URL(CTXCONFIG["edr"]["url"])
 
-# local mirror is a potentially read-only local data server that some workgroups may have.
-# usually a user can't write on it, hence extra treatment for it.
-# first lookup would be tried here, if it's set in config file.
-EDR_LOCAL_MIRROR = CTXCONFIG["edr"]["local_mirror"]
-MIRROR_READABLE = os.access(EDR_LOCAL_MIRROR, os.R_OK)
-MIRROR_WRITEABLE = os.access(EDR_LOCAL_MIRROR, os.W_OK)
+Level = Literal["edr", "calib"]
 
-# Next is where we
-# 1. lookup data if EDR_LOCAL_MIRROR is not set-up or not readable (e.g. currently unmounted drives)
-# 2. store new data that isn't on the local mirror if it is not writeable.
-EDR_LOCAL_STORAGE = CTXCONFIG["edr"]["local_storage"]
 
-# consider different cases for EDR_LOCAL_STORAGE
-if not EDR_LOCAL_STORAGE:  # empty string
-    # this would be the default location for data retrieved by planetarypy
-    EDR_LOCAL_STORAGE = STORAGE_ROOT / "mro/ctx"
-else:
-    # if the path given is not absolute, it will be attached to config.storage_root
-    EDR_LOCAL_STORAGE = Path(EDR_LOCAL_STORAGE)
-    if not EDR_LOCAL_STORAGE.is_absolute():
-        EDR_LOCAL_STORAGE = STORAGE_ROOT / EDR_LOCAL_STORAGE
+def _storage_root():
+    """Current ``config["storage_root"]`` as a Path (looked up on each call
+    so user-level config edits take effect without re-importing this module).
+    """
+    return Path(config["storage_root"])
+
+
+def _resolve_storage_root(raw, default_sub):
+    """Normalize a CTXCONFIG storage-path value.
+
+    Empty → ``{storage_root}/{default_sub}``. Relative → joined to
+    ``storage_root``. Absolute → used as-is.
+    """
+    root = _storage_root()
+    if not raw:
+        return root / default_sub
+    p = Path(raw)
+    return p if p.is_absolute() else root / p
+
+
+def _edr_local_mirror():
+    """Configured read-mostly mirror path, or None if empty."""
+    value = CTXCONFIG["edr"]["local_mirror"]
+    return Path(value) if value else None
+
+
+def _mirror_readable():
+    mirror = _edr_local_mirror()
+    return bool(mirror) and os.access(mirror, os.R_OK)
+
+
+def _level_base(level: Level):
+    if level == "edr":
+        return _resolve_storage_root(
+            CTXCONFIG["edr"]["local_storage"], "mro/ctx",
+        )
+    if level == "calib":
+        return _resolve_storage_root(
+            CTXCONFIG["calib"]["storage"], "mro/ctx",
+        )
+    raise ValueError(f"Unknown CTX data level: {level!r}")
+
+
+def ctx_storage_folder(
+    level: Level, volume=None, pid=None, base=None,
+):
+    """Build the CTX storage folder for a given data level.
+
+    Single source of truth for EDR, Calib, and the catalog resolver
+    (``plp fetch mro.ctx.edr``), so every entry point lays files out
+    the same way.
+
+    Parameters
+    ----------
+    level : {"edr", "calib"}
+        Which ``CTXCONFIG`` section drives the ``with_volume`` / ``with_pid``
+        toggles.
+    volume : str | None
+        PDS volume (e.g. ``"mrox_0123"``). Inserted only when
+        ``[level].with_volume`` is true.
+    pid : str | None
+        Product ID. Inserted only when ``[level].with_pid`` is true.
+    base : Path | str | None
+        Override for the base directory. ``None`` uses the config-derived
+        root for ``level``. Pass a mirror root here to apply the same
+        volume/pid layout under a read-mostly mirror.
+    """
+    if level not in ("edr", "calib"):
+        raise ValueError(f"Unknown CTX data level: {level!r}")
+    section = CTXCONFIG[level]
+    base = Path(base) if base is not None else _level_base(level)
+    if section["with_volume"] and volume:
+        base = base / volume
+    if section["with_pid"] and pid:
+        base = base / pid
+    return base
+
 
 # make a cache for the index file to prevent repeated index loading
 cache = dict()
-# Track if we've already checked for updates this session to avoid repeated Index instantiations
+# Track if we've already checked for updates this session to avoid repeated
+# Index instantiations.
 _update_checked_this_session = False
 
 
@@ -110,11 +167,19 @@ class EDR:
     def __init__(self, pid: str, allow_refresh_index=True, prefer_mirror=True):
         self.pid = pid  # product_id
         self.allow_refresh_index = allow_refresh_index
-        # should the PDS volumen become part of the path?
-        self.with_volume = CTXCONFIG["edr"]["with_volume"]
-        # should the product_id become part of the path?
-        self.with_pid = CTXCONFIG["edr"]["with_pid"]
         self.prefer_mirror = prefer_mirror
+
+    @property
+    def with_volume(self):
+        """Whether the PDS volume segment is inserted into the storage path
+        (read from ``CTXCONFIG["edr"]`` on each access)."""
+        return CTXCONFIG["edr"]["with_volume"]
+
+    @property
+    def with_pid(self):
+        """Whether the product_id segment is inserted into the storage path
+        (read from ``CTXCONFIG["edr"]`` on each access)."""
+        return CTXCONFIG["edr"]["with_pid"]
 
     @property
     def pid(self):
@@ -159,25 +224,22 @@ class EDR:
         "get the PDS volume number for the current product id"
         return self.meta.volume_id.lower()
 
-    def _check_and_add_sub_paths(self, base):
-        base = Path(base) / self.volume if self.with_volume else base
-        base = base / self.pid if self.with_pid else base
-        return base
-
     @property
     def fname(self):
         return self.pid + ".IMG"
 
     @property
     def local_mirror_folder(self):
-        if EDR_LOCAL_MIRROR and MIRROR_READABLE:
-            return self._check_and_add_sub_paths(EDR_LOCAL_MIRROR)
-        else:
-            return None
+        mirror = _edr_local_mirror()
+        if mirror and _mirror_readable():
+            return ctx_storage_folder(
+                "edr", volume=self.volume, pid=self.pid, base=mirror,
+            )
+        return None
 
     @property
     def local_storage_folder(self):
-        return self._check_and_add_sub_paths(EDR_LOCAL_STORAGE)
+        return ctx_storage_folder("edr", volume=self.volume, pid=self.pid)
 
     def _download(self, folder):
         return Path(
@@ -193,7 +255,7 @@ class EDR:
     @property
     def path(self):
         # easiest case
-        if not MIRROR_READABLE:
+        if not _mirror_readable():
             return self._download(self.local_storage_folder)
         # this checks the mirror always first for reading and writing
         # but falls back to local storage if things fail.
@@ -297,7 +359,7 @@ class EDR:
 
 def _pid_cache_path() -> Path:
     """Path to the cached CTX product ID list file."""
-    return Path(config["storage_root"]) / "mro" / "ctx" / "product_ids.txt"
+    return _level_base("edr") / "product_ids.txt"
 
 
 def rebuild_pid_cache() -> Path:
@@ -347,3 +409,30 @@ def complete_ctx_pid(incomplete: str) -> list[str]:
             elif matches:
                 break
     return matches
+
+
+# ── Catalog resolver registration ─────────────────────────────────
+#
+# Wired into planetarypy.catalog._resolver._STORAGE_RESOLVER_MODULES
+# so `plp fetch mro.ctx.edr <pid>` lands in the same folder that
+# `EDR(pid).local_storage_folder` resolves to.
+
+def _ctx_local_product_dir(product_type, product_id):
+    """Resolve the local directory for `plp fetch mro.ctx.<product_type>`.
+
+    For ``product_type == "edr"`` this returns the same folder that
+    ``EDR(product_id).local_storage_folder`` produces, keeping the CLI
+    ``plp fetch`` and the programmatic ``EDR``/``ctxqv`` paths aligned.
+
+    For other product types this falls back to the catalog's generic
+    layout so registering the resolver doesn't accidentally change
+    behavior for unrelated CTX products.
+    """
+    if product_type == "edr":
+        # Skip the index lookup when volume isn't needed — avoids loading
+        # the full CTX EDR parquet just to resolve a path.
+        if not CTXCONFIG["edr"]["with_volume"]:
+            return ctx_storage_folder("edr", pid=product_id)
+        return EDR(product_id).local_storage_folder
+    safe_pid = product_id.replace("/", "_").replace("\\", "_")
+    return _storage_root() / "mro" / "ctx" / product_type / safe_pid

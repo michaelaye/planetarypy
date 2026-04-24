@@ -89,6 +89,7 @@ def register_storage_resolver(key: str, resolver: callable):
 # Lazy-loaded resolver paths: maps key → (module, function_name)
 _STORAGE_RESOLVER_MODULES = {
     "mro.hirise": ("planetarypy.instruments.mro.hirise", "_hirise_local_product_dir"),
+    "mro.ctx": ("planetarypy.instruments.mro.ctx.ctx_edr", "_ctx_local_product_dir"),
 }
 
 

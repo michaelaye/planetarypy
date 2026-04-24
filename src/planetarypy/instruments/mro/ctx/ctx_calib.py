@@ -1,7 +1,5 @@
-"""Module for dealing with CTX data."""
+"""Module for dealing with CTX calibrated data (ISIS pipeline)."""
 
-# import warnings
-import os
 import random
 import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
@@ -12,15 +10,15 @@ from subprocess import CalledProcessError
 import geopandas as gpd
 import hvplot.pandas  # noqa: F401
 import pandas as pd
-import pooch
-import tomlkit
 from loguru import logger
 from tqdm.auto import tqdm
-from yarl import URL
 
-from planetarypy.config import config
 from planetarypy.instruments import utils
-from planetarypy.pds import get_index
+from planetarypy.instruments.mro.ctx.ctx_edr import (
+    CTXCONFIG,
+    EDR,
+    ctx_storage_folder,
+)
 from planetarypy.utils import catch_isis_error, file_variations
 
 try:
@@ -41,201 +39,6 @@ try:
 except KeyError:
     warnings.warn("kalasiris has a problem initializing ISIS")
 
-# idea for later
-# from planetarypy.instruments.base import Instrument
-# import warnings
-
-storage_root = Path(config["storage_root"])
-
-configpath = Path.home() / ".planetarypy_mro_ctx.toml"
-
-with configpath.open() as f:
-    ctxconfig = tomlkit.load(f)
-
-# warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
-
-baseurl = URL(ctxconfig["edr"]["url"])
-
-# local mirror is a potentially read-only local data server that many groups have.
-# usually a user can't write on it, hence extra treatment for it.
-# first lookup would be tried here, if it's set in config file.
-raw_local_mirror = ctxconfig["edr"]["local_mirror"]
-mirror_readable = os.access(raw_local_mirror, os.R_OK)
-mirror_writeable = os.access(raw_local_mirror, os.W_OK)
-
-# The next is where we
-# 1. lookup data if raw_local_mirror is not set-up or not readable (like currently unmounted drive
-# 2. store new data that isn't on the local mirror if it is not writeable.
-raw_local_storage = ctxconfig["edr"]["local_storage"]
-
-# consider different cases for raw_local_storage
-if not raw_local_storage:  # empty string
-    # this would be the default location for data retrieved by planetarypy
-    raw_local_storage = storage_root / "mro/ctx"
-else:
-    # if then path given is not absolute, it will be attached to config.storage_root
-    raw_local_storage = Path(raw_local_storage)
-    if not raw_local_storage.is_absolute():
-        raw_local_storage = storage_root / raw_local_storage
-
-# make a cache for the index file to prevent repeated index loading
-cache = dict()
-# Track if we've already checked for updates this session to avoid repeated Index instantiations
-_update_checked_this_session = False
-
-
-def get_edr_index(allow_refresh=True):  # can afford refresh as it's cached
-    "add some useful extra columns to the index."
-    global _update_checked_this_session
-
-    # Use cache if available and refresh not explicitly requested
-    if "edrindex" in cache and not allow_refresh:
-        return cache["edrindex"]
-
-    # If cache exists and we've already checked for updates this session, use cache
-    # This prevents repeated Index instantiations when multiple EDR instances
-    # are created (e.g., in remove_bad_data())
-    if "edrindex" in cache and allow_refresh and _update_checked_this_session:
-        return cache["edrindex"]
-
-    # Call get_index() with allow_refresh - it will only refresh if update is available
-    # This creates an Index instance and checks for updates, but only once per session
-    edrindex = get_index("mro.ctx.edr", allow_refresh=allow_refresh)
-    edrindex["short_pid"] = edrindex.PRODUCT_ID.map(lambda x: x[:15])
-    edrindex["month_col"] = edrindex.PRODUCT_ID.map(lambda x: x[:3])
-    edrindex.LINE_SAMPLES = edrindex.LINE_SAMPLES.astype(int)
-    cache["edrindex"] = edrindex
-    if allow_refresh:
-        _update_checked_this_session = True
-    return edrindex
-
-
-def product_id_from_serial_number(serial_number, allow_refresh=True):
-    """
-    Given a serial_number like 'MRO/CTX/1234567890.123', return the matching PRODUCT_ID.
-    """
-    prefix = "MRO/CTX/"
-    if not serial_number.startswith(prefix):
-        raise ValueError("serial_number must start with 'MRO/CTX/'")
-    count = serial_number[len(prefix) :]
-    edrindex = get_edr_index(allow_refresh=allow_refresh)
-    matches = edrindex[edrindex["SPACECRAFT_CLOCK_START_COUNT"].str.strip() == count]
-    if matches.empty:
-        raise ValueError(f"No PRODUCT_ID found for serial_number: {serial_number}")
-    return matches.iloc[0]["PRODUCT_ID"]
-
-
-class EDR:
-    def __init__(self, pid: str, allow_refresh_index=True, prefer_mirror=True):
-        self.pid = pid  # product_id
-        self.allow_refresh_index = allow_refresh_index
-        self.with_volume = ctxconfig["edr"]["with_volume"]
-        self.with_pid = ctxconfig["edr"]["with_pid"]
-        self.prefer_mirror = prefer_mirror
-
-    @property
-    def pid(self):
-        return self._pid
-
-    @pid.setter
-    def pid(self, value):
-        if len(value) < 26:
-            val = value[:15]  # use short_pid
-            self.edrindex = get_edr_index()
-            value = self.edrindex.query(f"short_pid=='{val}'").PRODUCT_ID.iloc[0]
-        self._pid = value
-
-    @property
-    def short_pid(self):
-        return self.pid[:15]
-
-    @cached_property
-    def meta(self):
-        "get the metadata from the index table"
-        edrindex = get_edr_index(allow_refresh=self.allow_refresh_index)
-        s = edrindex.query("PRODUCT_ID == @self.pid").squeeze()
-        s.name = f"Metadata for {self.pid}"
-        s.index = s.index.str.lower()
-        return s
-
-    @property
-    def image_time(self):
-        return self.meta.image_time
-
-    @property
-    def serial_number(self):
-        count = self.meta["SPACECRAFT_CLOCK_START_COUNT"].strip()
-        return f"MRO/CTX/{count}"
-
-    @property
-    def data_ok(self):
-        return True if self.meta.data_quality_desc.strip() == "OK" else False
-
-    @property
-    def volume(self):
-        "get the PDS volume number for the current product id"
-        return self.meta.volume_id.lower()
-
-    def _check_and_add_sub_paths(self, base):
-        base = Path(base) / self.volume if self.with_volume else base
-        base = base / self.pid if self.with_pid else base
-        return base
-
-    @property
-    def fname(self):
-        return self.pid + ".IMG"
-
-    @property
-    def local_mirror_folder(self):
-        if raw_local_mirror and mirror_readable:
-            return self._check_and_add_sub_paths(raw_local_mirror)
-        else:
-            return None
-
-    @property
-    def local_storage_folder(self):
-        return self._check_and_add_sub_paths(raw_local_storage)
-
-    def _download(self, folder):
-        return Path(
-            pooch.retrieve(
-                url=str(self.url),
-                known_hash=None,
-                fname=self.fname,
-                path=folder,
-                progressbar=True,
-            )
-        )
-
-    @property
-    def path(self):
-        # easiest case
-        if not mirror_readable:
-            return self._download(self.local_storage_folder)
-        # this checks the mirror always first for reading and writing
-        # but falls back to local storage if things fail.
-        if self.prefer_mirror:
-            try:
-                return self._download(self.local_mirror_folder)
-            except Exception:
-                logger.warning(
-                    "You preferred to use local mirror, but I can't access it.\n"
-                    "Using local_storage."
-                )
-        return self._download(self.local_storage_folder)
-
-    @property
-    def url(self):
-        "Calculate URL from input dataframe row."
-        url = baseurl / self.meta.volume_id.lower() / "data" / (self.pid + ".IMG")
-        return url
-
-    def __repr__(self):
-        return f"EDR(pid='{self.pid}') # Volume: {self.volume}"
-
-    def __str__(self):
-        return self.__repr__()
-
 
 class Calib:
     "Manage processing of EDR PDS files using ISIS tools."
@@ -255,20 +58,25 @@ class Calib:
                 self.edr.path.name,
                 [
                     ".cub",
-                    f"{ctxconfig['calib']['calibrated_ext']}.cub",
+                    f"{CTXCONFIG['calib']['calibrated_ext']}.cub",
                     ".dst.cal.cub",
-                    f"{ctxconfig['calib']['mapped_ext']}.cub",
+                    f"{CTXCONFIG['calib']['mapped_ext']}.cub",
                 ],
             )
         )
-        self.with_volume = ctxconfig["calib"]["with_volume"]
-        self.with_pid = ctxconfig["calib"]["with_pid"]
         self._workdir_override = Path(workdir) if workdir is not None else None
 
-    def _check_and_add_sub_paths(self, base):
-        base = Path(base) / self.edr.volume if self.with_volume else base
-        base = base / self.pid if self.with_pid else base
-        return base
+    @property
+    def with_volume(self):
+        """Whether the PDS volume segment is inserted into the calib path
+        (read from ``CTXCONFIG["calib"]`` on each access)."""
+        return CTXCONFIG["calib"]["with_volume"]
+
+    @property
+    def with_pid(self):
+        """Whether the product_id segment is inserted into the calib path
+        (read from ``CTXCONFIG["calib"]`` on each access)."""
+        return CTXCONFIG["calib"]["with_pid"]
 
     @property
     def storage_folder(self):
@@ -279,12 +87,7 @@ class Calib:
         # the canonical planetarypy_data archive (e.g. GapPipeline rundirs).
         if self._workdir_override is not None:
             return self._workdir_override
-        if folder := ctxconfig["calib"]["storage"]:
-            return self._check_and_add_sub_paths(folder)
-        else:
-            return self._check_and_add_sub_paths(
-                Path(config["storage_root"]) / "mro/ctx"
-            )
+        return ctx_storage_folder("calib", volume=self.edr.volume, pid=self.pid)
 
     @property
     def cub_path(self):

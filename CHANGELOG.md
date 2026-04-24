@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.2] - 2026-04-24
+
+### Fixed
+- **CTX storage path mismatch between `plp fetch` and `ctxqv`/`EDR`.** `plp fetch mro.ctx.edr <pid>` previously wrote to `{storage_root}/mro/ctx/edr/<pid>/` (the catalog's generic layout), while `EDR(pid).local_storage_folder` (used by `plp ctxqv` and programmatic access) wrote to `{storage_root}/mro/ctx/<volume>/…` per `~/.planetarypy_mro_ctx.toml`. Downloads from one code path were invisible to the other, causing redundant re-downloads. Both paths now resolve through the single `ctx_storage_folder(level, volume, pid)` helper and land in the same directory.
+
+### Changed
+- CTX storage layout for `plp fetch mro.ctx.edr` now follows `~/.planetarypy_mro_ctx.toml` (`[edr].local_storage`, `[edr].with_volume`, `[edr].with_pid`) instead of the generic catalog fallback. A new `_ctx_local_product_dir` resolver is registered in `planetarypy.catalog._resolver._STORAGE_RESOLVER_MODULES`.
+- CTX config (`CTXCONFIG`, mirror reachability) is now read lazily on each access rather than snapshotted at import — mounting or unmounting the local mirror mid-session is reflected immediately, and `with_volume` / `with_pid` config edits take effect without re-importing.
+- `EDR.with_volume`, `EDR.with_pid`, `Calib.with_volume`, `Calib.with_pid` are now `@property` reads of `CTXCONFIG` (previously snapshotted in `__init__`).
+
+### Removed
+- Shadow duplicate `EDR` class in `planetarypy.instruments.mro.ctx.ctx_calib` (leftover from the original module split). `EDR` is now defined once in `ctx_edr.py` and imported from there.
+- Module-level globals `STORAGE_ROOT`, `EDR_LOCAL_STORAGE`, `EDR_LOCAL_MIRROR`, `MIRROR_READABLE`, `MIRROR_WRITEABLE` in `ctx_edr.py` and their lowercase counterparts in `ctx_calib.py`. Replaced by lazy accessors (`_storage_root`, `_edr_local_mirror`, `_mirror_readable`, `_level_base`).
+
+### Migration notes
+- If you previously ran `plp fetch mro.ctx.edr <pid>` and have existing downloads under `{storage_root}/mro/ctx/edr/<pid>/`, they will **not** be picked up by the new layout. Either move them to `{storage_root}/mro/ctx/<volume>/[<pid>/]` (per your `[edr].with_volume` / `[edr].with_pid` toggles), delete them, or re-run `plp fetch` to download into the new location.
+
 ## [0.52.2] - 2026-04-13
 
 ### Fixed

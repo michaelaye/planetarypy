@@ -114,10 +114,12 @@ class TestResolveCatalog:
 
 
 class TestLocalProductDir:
+    # Use a fake mission/instrument that has no registered storage resolver
+    # so the test exercises the generic fallback layout, not a specific one.
     def test_basic_path(self):
-        path = _local_product_dir("mro", "ctx", "edr", "PRODUCT_001")
-        assert path.parts[-4:] == ("mro", "ctx", "edr", "PRODUCT_001")
+        path = _local_product_dir("fake", "instr", "edr", "PRODUCT_001")
+        assert path.parts[-4:] == ("fake", "instr", "edr", "PRODUCT_001")
 
     def test_sanitizes_slashes(self):
-        path = _local_product_dir("mro", "ctx", "edr", "some/product/id")
+        path = _local_product_dir("fake", "instr", "edr", "some/product/id")
         assert "some_product_id" in str(path)
