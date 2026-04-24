@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.5] - 2026-04-24
+
+### Added
+- **Separate mirror/local config for CTX EDR in `~/.planetarypy_mro_ctx.toml`.** The old single `[edr]` section conflated three things (mirror layout, local layout, download URL) under one set of `with_volume` / `with_pid` toggles, so users couldn't e.g. keep the shared read-only mirror in canonical PDS layout while storing new downloads next to their calib outputs. Two new optional sub-tables decouple them:
+
+  ```toml
+  [edr]
+  url = "https://pds-imaging.jpl.nasa.gov/data/mro/ctx"
+
+  [edr.mirror]                              # read-only; may be unmounted
+  path = "/Volumes/planet/Mars/CTX/pds"
+  with_volume = true
+  with_pid = false
+  with_data_segment = false                 # PDS canonical "<vol>/data/<pid>.IMG"
+
+  [edr.local]                               # writeable; where new downloads go
+  path = ""                                 # "" → {storage_root}/mro/ctx
+  with_volume = true
+  with_pid = true                           # co-locate raw EDR with calib outputs
+  ```
+
+  The legacy flat shape (`local_mirror`, `local_storage`, top-level `with_volume` / `with_pid`) is still read transparently — no user TOML edit is required. Opt in by adding the sub-tables when ready.
+
+- **`plp ctx-migrate [--dry-run]`** — one-shot utility that walks each `mrox_*` volume folder under the configured EDR local root and relocates any file named `<pid>.<ext>` (26-char CTX product_id, so `.IMG`, `.cub`, `.lev1.cub`, `.lev2.cub`, `.lev2.tif`, `.lev1.gml`, `.csm2map.tif`, etc.) to whatever layout the active config dictates. Idempotent; conflicts are skipped with a warning rather than overwriting.
+
+### Changed
+- Internal CTX path helpers refactored from `ctx_storage_folder(level, …)` + `_level_base(level)` into three small readers `_edr_mirror_folder` / `_edr_local_folder` / `_calib_folder` plus a 7-line `_apply_toggles` helper. No external API change for `EDR` / `Calib` callers.
+
 ## [0.53.4] - 2026-04-24
 
 ### Fixed

@@ -405,6 +405,71 @@ def catalog_build(
         typer.echo(f"URL validation: {counts}")
 
 
+# ── CTX housekeeping ────────────────────────────────────────────────
+
+
+@app.command("ctx-migrate")
+def ctx_migrate(
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n",
+        help="Show what would be moved without touching anything",
+    ),
+):
+    """Move existing CTX files on disk to match current [edr.local] layout.
+
+    Scans each ``mrox_*`` volume folder under the configured EDR local
+    root and relocates any file named ``<pid>.<ext>`` (26-char CTX
+    product_id) to the location that the active config dictates.
+    Idempotent: a second run does nothing.
+
+    Typical use: after switching ``[edr.local].with_pid`` between
+    ``false`` and ``true``, run this once to bring existing downloads
+    (and any co-located derived files) into the new layout.
+    """
+    from planetarypy.instruments.mro.ctx.ctx_edr import _edr_local_folder
+
+    root = _edr_local_folder()
+    if not root.is_dir():
+        typer.echo(f"No CTX storage at {root}", err=True)
+        raise typer.Exit(1)
+
+    moved = 0
+    skipped = 0
+    conflicts = 0
+    for vol_dir in sorted(root.glob("mrox_*")):
+        if not vol_dir.is_dir():
+            continue
+        for f in vol_dir.iterdir():
+            if not f.is_file():
+                continue
+            head, sep, _ = f.name.partition(".")
+            if not sep or len(head) != 26:
+                continue
+            pid = head
+            target = _edr_local_folder(volume=vol_dir.name, pid=pid) / f.name
+            if f.resolve() == target.resolve():
+                skipped += 1
+                continue
+            if target.exists():
+                typer.echo(
+                    f"[conflict] {f} → {target} (target already exists, skipping)",
+                    err=True,
+                )
+                conflicts += 1
+                continue
+            if dry_run:
+                typer.echo(f"[dry-run] {f} → {target}")
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                f.rename(target)
+                typer.echo(f"{f} → {target}")
+            moved += 1
+    verb = "would move" if dry_run else "moved"
+    typer.echo(
+        f"{verb}: {moved}; already in place: {skipped}; conflicts: {conflicts}",
+        err=True,
+    )
+
 
 # ── spicer ───────────────────────────────────────────────────────────
 

@@ -17,7 +17,7 @@ from planetarypy.instruments import utils
 from planetarypy.instruments.mro.ctx.ctx_edr import (
     CTXCONFIG,
     EDR,
-    ctx_storage_folder,
+    _calib_folder,
 )
 from planetarypy.utils import catch_isis_error, file_variations
 
@@ -87,7 +87,7 @@ class Calib:
         # the canonical planetarypy_data archive (e.g. GapPipeline rundirs).
         if self._workdir_override is not None:
             return self._workdir_override
-        return ctx_storage_folder("calib", volume=self.edr.volume, pid=self.pid)
+        return _calib_folder(volume=self.edr.volume, pid=self.pid)
 
     @property
     def cub_path(self):
