@@ -439,7 +439,9 @@ def ctx_migrate(
     for vol_dir in sorted(root.glob("mrox_*")):
         if not vol_dir.is_dir():
             continue
-        for f in vol_dir.iterdir():
+        # Walk recursively so files already nested in <pid>/ subfolders
+        # get tallied as "already in place", not silently skipped.
+        for f in vol_dir.rglob("*"):
             if not f.is_file():
                 continue
             head, sep, _ = f.name.partition(".")

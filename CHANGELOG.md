@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.6] - 2026-04-24
+
+### Fixed
+- `plp ctx-migrate` now walks each `mrox_*` volume recursively, so files already nested in `<pid>/` subfolders are counted as "already in place" instead of being silently skipped. Before this fix, a post-migration re-run reported `already in place: 0`, which looked alarming even though no moves were needed. After: the summary reflects the actual number of pid-matching files found.
+
 ## [0.53.5] - 2026-04-24
 
 ### Added
