@@ -17,7 +17,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup Conda
       uses: conda-incubator/setup-miniconda@v3
@@ -29,7 +29,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
         channels: conda-forge
         channel-priority: strict
-        auto-activate-base: false
+        auto-activate: false
         conda-remove-defaults: true
 
     - name: Cache conda env
