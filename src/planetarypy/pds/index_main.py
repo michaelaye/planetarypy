@@ -13,7 +13,7 @@ from loguru import logger
 from yarl import URL
 
 from ..config import config
-from ..utils import have_internet, url_retrieve
+from ..utils import atomic_write, have_internet, url_retrieve
 from .dynamic_index import (
     DYNAMIC_URL_HANDLERS,  # registry of dynamic index handlers
     DynamicRemoteHandler,
@@ -247,7 +247,10 @@ class Index:
         try:
             df = self.read_index_data()
             logger.debug(f"Storing {self.index_key} as parquet")
-            df.to_parquet(self.local_parq_path)
+            # Atomic write so concurrent workers (parallel pytest-xdist,
+            # multiprocessing) can't tear this shared cache file.
+            with atomic_write(self.local_parq_path) as tmp:
+                df.to_parquet(tmp)
             logger.info(f"Finished converting {self.index_key} to parquet format.")
         except Exception as e:
             logger.error(f"Error converting {self.index_key} to parquet: {e}")

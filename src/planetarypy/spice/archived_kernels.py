@@ -36,6 +36,7 @@ from yarl import URL
 
 from ..datetime_format_converters import fromdoyformat
 from ..pds.index_logging import AccessLog
+from ..utils import atomic_write
 from ..utils import url_retrieve
 from .config import BASE_URL, KERNEL_STORAGE, NAIF_URL
 
@@ -211,9 +212,11 @@ def get_datasets():
     logger.debug(
         f"Parsed datasets table: {df.shape[0]} missions x {df.shape[1]} columns"
     )
-    # Write/update cache and log times
+    # Write/update cache and log times. Atomic to protect parallel
+    # readers/writers from seeing a half-written csv.
     try:
-        df.to_csv(DATASETS_CACHE)
+        with atomic_write(DATASETS_CACHE) as tmp:
+            df.to_csv(tmp)
         logger.debug(f"Wrote datasets cache to {DATASETS_CACHE}")
     finally:
         # Record both last update and last check

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.7] - 2026-04-24
+
+### Fixed
+- **Race-safe parquet/csv cache writes.** When parallel test workers (pytest-xdist) both triggered a first-time PDS index download (e.g. `get_index("mro.hirise.rdr")` from `test_spicer.TestSolarAzimuth`), two workers would finish downloading the `.lbl` + `.tab` files and simultaneously call `df.to_parquet(path)` into the same file. The non-atomic write produced a torn parquet, with the next reader hitting `OSError: Couldn't deserialize thrift: TProtocolException: Invalid data`. Same class of race existed for the SPICE archived-kernels `datasets.csv` cache via `df.to_csv(path)`. Both are now routed through a new `planetarypy.utils.atomic_write` context manager: each writer writes to a per-PID scratch file and atomically renames into place; the first concurrent finisher wins, later finishers silently drop their copy. Verified under an 8-thread stress test.
+
+### Added
+- `planetarypy.utils.atomic_write(path)` — context manager yielding a per-PID scratch `Path`; on clean exit, atomically renames it onto `path`. Reusable for any library-level cache write that can race.
+
 ## [0.53.6] - 2026-04-24
 
 ### Fixed

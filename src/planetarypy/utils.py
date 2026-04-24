@@ -3,6 +3,7 @@ import datetime as dt
 import email.utils as eut
 import http.client as httplib
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -36,6 +37,7 @@ __all__ = [
     "get_remote_timestamp",
     "check_url_exists",
     "url_retrieve",
+    "atomic_write",
     "have_internet",
     "file_variations",
     "catch_isis_error",
@@ -232,6 +234,42 @@ def compare_remote_file(
 
     except (requests.RequestException, requests.Timeout) as e:
         return {"has_updates": False, "remote_tmp_path": None, "error": str(e)}
+
+
+@contextmanager
+def atomic_write(path):
+    """Context manager yielding a per-PID scratch path; on clean exit,
+    atomically moves it to ``path``.
+
+    Use around any library-level write to a shared cache file (parquet,
+    csv, etc.) that could race under parallel test workers or concurrent
+    processes:
+
+        with atomic_write(cache_path) as tmp:
+            df.to_parquet(tmp)
+
+    First concurrent writer to finish wins; later writers discover
+    ``path`` already exists after completing their own scratch write
+    and silently drop their copy rather than overwriting. On exception
+    inside the ``with`` block the scratch file is cleaned up.
+    """
+    path = Path(path)
+    tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.tmp")
+    try:
+        yield tmp
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+    if not tmp.exists():
+        return
+    if path.exists():
+        tmp.unlink(missing_ok=True)
+        return
+    try:
+        tmp.replace(path)
+    except FileNotFoundError:
+        if not path.exists():
+            raise
 
 
 def url_retrieve(
