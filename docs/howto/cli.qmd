@@ -1,0 +1,133 @@
+---
+title: "Command-Line Interface"
+---
+
+PlanetaryPy provides a unified CLI via the `plp` command.
+
+## Installation
+
+```bash
+pip install planetarypy
+```
+
+The `plp` command is automatically available after installation.
+
+## Commands
+
+### `plp fetch` — Download a PDS product
+
+```bash
+plp fetch <key> <product_id> [OPTIONS]
+```
+
+Download a PDS data product by its dotted key and product identifier.
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `key` | Dotted product key, e.g. `mro.ctx.edr` |
+| `product_id` | Product identifier, e.g. `P02_001916_2221_XI_42N027W` |
+
+**Options:**
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--force` | `-f` | Re-download even if already cached locally |
+| `--label-only` | `-l` | Download only the label file |
+| `--here` | `-H` | Download into current directory instead of planetarypy storage |
+| `--folder` | `-d` | Print the local folder on stdout instead of the per-file paths (composes with `cd`) |
+
+**Stdout behaviour:** by default `plp fetch` emits one absolute file path per line on stdout, so shell substitution like `qgis (plp fetch ...)` passes every downloaded file as an argument. With `--folder` it emits a single line — the local directory — so `cd (plp fetch --folder ...)` works.
+
+**Examples:**
+
+```bash
+# Download a CTX EDR image to planetarypy storage
+plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W
+
+# Download into the current working directory
+plp fetch --here mro.ctx.edr P02_001916_2221_XI_42N027W
+
+# Download only the label file
+plp fetch --label-only cassini.iss.edr_sat 1_N1523786525.118
+
+# Open every downloaded file in qgis (default stdout = file paths)
+qgis (plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W)
+
+# cd into the product folder (--folder = single-line stdout)
+cd (plp fetch --folder mro.ctx.edr P02_001916_2221_XI_42N027W)
+```
+
+To discover available product keys:
+
+```python
+from planetarypy.catalog import list_missions, list_instruments, list_products
+
+list_missions()              # → ['cassini', 'mro', 'lro', ...]
+list_instruments("mro")      # → ['ctx', 'hirise', 'crism', ...]
+list_products("mro.ctx")     # → ['edr']
+```
+
+### `plp ctxqv` — CTX quickview
+
+```bash
+plp ctxqv <imgid> [OPTIONS]
+```
+
+Show a downsampled quickview of a CTX image. Automatically uses the best
+available processing level: map-projected > calibrated > cube > raw EDR.
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `imgid` | CTX product ID (short or full), e.g. `J05_046771_1950` |
+
+**Options:**
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--stride` | `-s` | Downsample factor (default: 10) |
+| `--save` | `-o` | Save to PNG file instead of displaying |
+| `--stretch` | `-p` | Percentile stretch as `low,high` (default: `1,99`). Use `none` to disable |
+| `--edr` | | Force raw EDR quickview, skip calibrated files |
+
+**Examples:**
+
+```bash
+# Display quickview in a window
+plp ctxqv J05_046771_1950
+
+# Save to file with higher resolution
+plp ctxqv J05_046771_1950 --stride 5 --save output.png
+
+# Force raw EDR (skip calibrated products)
+plp ctxqv --edr J05_046771_1950
+```
+
+### `plp catalog build` — Build the PDS catalog
+
+```bash
+plp catalog build [OPTIONS]
+```
+
+Build the PDS catalog database from pdr-tests definitions. The catalog is
+stored as a DuckDB file under `~/planetarypy_data/catalog/`.
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--force` | Force rebuild from scratch (otherwise skips if already built) |
+| `--validate-urls` | Run URL validation via HTTP HEAD after building |
+
+**Examples:**
+
+```bash
+# Build catalog (first time or incremental)
+plp catalog build
+
+# Force full rebuild
+plp catalog build --force
+```

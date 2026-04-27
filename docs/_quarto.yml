@@ -46,6 +46,7 @@ website:
     - title: "How-To"
       contents:
         - howto/index.qmd
+        - howto/cli.qmd
         - howto/howto_spice_archived.ipynb
         - howto/ctx_edr.ipynb
         - howto/ctx_calib.ipynb
