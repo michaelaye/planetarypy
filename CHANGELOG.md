@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.56.0] - 2026-04-27
+
+### Added
+- **`plp fetch --folder` / `-d`** flag prints the local folder on stdout (single line) instead of the per-file absolute paths. Composes with shell `cd`:
+
+    ```fish
+    cd (plp fetch --folder mro.ctx.edr P02_001916_2221_XI_42N027W)
+    ```
+
+  Default behavior is unchanged — without the flag, `plp fetch` still emits one absolute file path per line, so `qgis (plp fetch …)` style multi-arg command substitution keeps working.
+
 ## [0.55.0] - 2026-04-27
 
 ### Changed
