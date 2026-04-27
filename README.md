@@ -101,14 +101,20 @@ into a local DuckDB database.
 
 The interface to getting data is via `fetch_product()` based on a dotted product key and
 a PDS product ID.
-If the product is available locally, the path will be returned.
-If it is not, it will be downloaded, stored in a systematic fashion organized by
-mission and instrument, and then the local path will be returned.
+Files are cached locally — subsequent calls for the same product are no-ops.
+On success, a `DownloadedProduct` dataclass is returned bundling everything the caller
+typically needs: the local folder, the absolute paths of every file written, and a
+convenience pointer to the PDS label file.
 
 ```python
 from planetarypy.catalog import fetch_product
 
-path = fetch_product("mro.ctx.edr", "P02_001916_2221_XI_42N027W")
+result = fetch_product("mro.ctx.edr", "P02_001916_2221_XI_42N027W")
+
+result.local_dir   # PosixPath('.../mro/ctx/edr/P02_001916_2221_XI_42N027W')
+result.files       # [PosixPath('.../*.IMG'), PosixPath('.../*.LBL')]
+result.label_file  # PosixPath('.../*.LBL')  (or None if no label)
+result.product_id  # 'P02_001916_2221_XI_42N027W'  (canonical, post-normalization)
 ```
 
 Direct data access is currently supported for 58 product types across 29 instruments
@@ -116,8 +122,8 @@ on 15 missions, resolved via PDS cumulative index files.
 
 ### Reading
 
-For now, the library returns the path to the object and the user needs to sort out the
-reading process.
+`DownloadedProduct.files` and `.label_file` give you ready-to-open paths;
+`.local_dir` is there for tools that want a folder.
 The [Planetary Data Reader (pdr)](https://github.com/MillionConcepts/pdr) can be used
 to read most PDS3 and PDS4 products into memory.
 

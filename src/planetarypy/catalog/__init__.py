@@ -25,6 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 from planetarypy.catalog._objects import Mission, Instrument  # noqa: F401
+from planetarypy.catalog._resolver import DownloadedProduct  # noqa: F401
 from loguru import logger
 
 from planetarypy.config import config
@@ -488,32 +489,56 @@ def fetch_product(
     files: list[str] | None = None,
     label_only: bool = False,
     force: bool = False,
-) -> Path:
-    """Download a product and return the local directory path.
+) -> DownloadedProduct:
+    """Download a PDS product and return where it landed plus what was written.
 
     Parameters
     ----------
     key : str
-        Either a dotted key 'mission.instrument.product_type' or just mission
+        Either a dotted key ``'mission.instrument.product_type'`` or just the
+        mission name (in which case ``instrument`` and ``product_key`` are
+        required).
     product_id : str
-        Product identifier (e.g. '1_N1523786525.118')
+        Product identifier, e.g. ``'P02_001916_2221_XI_42N027W'``.
+        Accepts the bare-PID form returned by
+        :func:`planetarypy.pds.get_example_pid`; PDS path/extension and
+        flight-software version suffixes are normalized away during
+        matching.
     instrument : str, optional
-        Instrument name, required if key is not a dotted key
+        Instrument name. Required when ``key`` is just a mission.
     product_key : str, optional
-        Product type key, required if key is not a dotted key
+        Product type key. Required when ``key`` is just a mission.
     files : list[str] | None
-        Specific filenames to download. None = all files.
+        Specific filenames to download. ``None`` (default) downloads every
+        file the resolver returns for this product.
     label_only : bool
-        If True, download only the label file.
+        If ``True``, download only the PDS label file. Mutually exclusive
+        with a populated ``files`` argument.
     force : bool
-        If True, re-download even if files exist locally.
+        If ``True``, re-download even if files already exist locally.
 
     Returns
     -------
-    Path
-        Local directory containing the downloaded product files
+    DownloadedProduct
+        Bundle containing ``local_dir`` (folder), ``files`` (absolute paths
+        of every file written by this call), ``label_file`` (convenience
+        pointer to the PDS label, if any), and ``product_id`` (the
+        canonical identifier the resolver matched).
+
+    Examples
+    --------
+    >>> from planetarypy.catalog import fetch_product
+    >>> r = fetch_product("mro.ctx.edr", "P02_001916_2221_XI_42N027W")
+    >>> r.local_dir
+    PosixPath('.../mro/ctx/edr/P02_001916_2221_XI_42N027W')
+    >>> r.files
+    [PosixPath('.../P02_001916_2221_XI_42N027W.IMG'),
+     PosixPath('.../P02_001916_2221_XI_42N027W.LBL')]
+    >>> r.label_file.name
+    'P02_001916_2221_XI_42N027W.LBL'
     """
     from planetarypy.catalog._resolver import (
+        DownloadedProduct,
         resolve_product,
         download_product,
         _local_product_dir,
@@ -528,10 +553,22 @@ def fetch_product(
 
     resolved = resolve_product(mission, instrument, product_key, product_id)
     local_dir = _local_product_dir(mission, instrument, product_key, resolved.product_id)
-    download_product(
+    written = download_product(
         resolved, local_dir, files=files, label_only=label_only, force=force,
     )
-    return local_dir
+
+    label_path: Path | None = None
+    if resolved.label_file:
+        candidate = local_dir / resolved.label_file
+        if candidate in written:
+            label_path = candidate
+
+    return DownloadedProduct(
+        product_id=resolved.product_id,
+        local_dir=local_dir,
+        files=written,
+        label_file=label_path,
+    )
 
 
 def get_product_urls(

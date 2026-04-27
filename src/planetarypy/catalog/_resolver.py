@@ -60,6 +60,55 @@ class ResolvedProduct:
         return None
 
 
+@dataclass(frozen=True)
+class DownloadedProduct:
+    """Result of a successful :func:`planetarypy.catalog.fetch_product` call.
+
+    Bundles **where** a PDS product landed on disk with **which** files were
+    actually written. Lets callers reach for either piece without having to
+    glue them back together themselves:
+
+    - ``local_dir`` — the folder, useful for tools that take a directory
+      (e.g. ``isis import``, ``rsync``, custom batch loops).
+    - ``files`` — the absolute paths of every file written by this call,
+      useful for opening / processing immediately.
+    - ``label_file`` — convenience pointer to the PDS ``.LBL`` (or ``.XML``
+      for PDS4) when one was downloaded; ``None`` when the product type
+      has no label or it wasn't part of the requested file set.
+    - ``product_id`` — the canonical PID the resolver actually matched
+      (may differ from what the user passed in: case-normalized,
+      bare-PID-normalized, or selected from an ambiguous match).
+
+    Examples
+    --------
+    >>> from planetarypy.catalog import fetch_product
+    >>> r = fetch_product("mro.ctx.edr", "P02_001916_2221_XI_42N027W")
+    >>> r.local_dir
+    PosixPath('.../mro/ctx/edr/P02_001916_2221_XI_42N027W')
+    >>> [p.name for p in r.files]
+    ['P02_001916_2221_XI_42N027W.IMG', 'P02_001916_2221_XI_42N027W.LBL']
+    >>> r.label_file.read_text()[:80]
+    'PDS_VERSION_ID                = PDS3 ...'
+    """
+
+    product_id: str
+    """Canonical product identifier — what the resolver matched against."""
+
+    local_dir: Path
+    """Absolute path to the directory containing the downloaded files."""
+
+    files: list[Path]
+    """Absolute paths of every file actually written by this call.
+
+    May be a subset of ``ResolvedProduct.files`` when ``label_only=True``
+    or an explicit ``files=`` filter was passed to ``fetch_product``.
+    """
+
+    label_file: Path | None = None
+    """Pointer to the PDS label file (``.LBL`` / ``.XML``) if it was
+    downloaded by this call, else ``None``."""
+
+
 # ── Storage resolver registry ─────────────────────────────────────
 #
 # Instrument modules can register custom storage resolvers so that
