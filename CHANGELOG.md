@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.55.0] - 2026-04-27
+
+### Changed
+- **`planetarypy.catalog.fetch_product()` now returns a `DownloadedProduct` dataclass** instead of a bare `Path`. The CLI already printed absolute file paths to stdout (so `qgis (plp fetch …)` shell substitution worked) but the API silently discarded the file list and gave callers only the directory. The new bundle plumbs both pieces through:
+    - `result.product_id` — canonical PID the resolver matched (post bare-PID normalization).
+    - `result.local_dir` — `Path` to the folder.
+    - `result.files` — `list[Path]` of every file actually written by this call (subset when `label_only=True` or an explicit `files=` filter is passed).
+    - `result.label_file` — convenience pointer to the PDS `.LBL` / `.XML` if it was among the downloaded files, else `None`.
+  
+  **Migration**: callers that previously did `path = fetch_product(...)` should switch to `result.local_dir`. The new dataclass is also re-exported as `from planetarypy.catalog import DownloadedProduct` for type hints / `isinstance` checks.
+
 ## [0.54.0] - 2026-04-27
 
 ### Added
