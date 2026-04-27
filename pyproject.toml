@@ -130,3 +130,13 @@ extend-ignore = ["E203", "E701"]
 current_version = "0.53.7"
 commit = true
 tag = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "src/planetarypy/__init__.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
