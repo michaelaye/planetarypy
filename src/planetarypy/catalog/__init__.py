@@ -325,7 +325,12 @@ def list_products(
     instrument : str, optional
         Instrument name, required if key is not a dotted key
     include_phases : bool
-        If True, return a DataFrame with normalized_type, phase, and product_key columns.
+        If True, return a DataFrame with ``normalized_type``, ``phase``,
+        ``format``, ``product_key`` and ``source`` columns. The ``source``
+        column carries the pdr-tests definition folder (e.g. ``dawn__vir``
+        vs ``dawn_certified__vir``) and explains why an instrument can have
+        multiple rows that share the other four — they're parallel archive
+        provenances for the same logical product.
         If False (default), return a deduplicated list of normalized type names.
     """
     if instrument is None:
@@ -335,11 +340,12 @@ def list_products(
     con = get_catalog()
     if include_phases:
         df = con.execute(
-            """SELECT pt.normalized_type, pt.phase, pt.format, pt.product_key
+            """SELECT pt.normalized_type, pt.phase, pt.format,
+                      pt.product_key, pt.folder_name AS source
                FROM product_types pt
                JOIN instruments i USING (folder_name)
                WHERE i.mission = ? AND i.instrument = ?
-               ORDER BY pt.normalized_type, pt.phase, pt.format""",
+               ORDER BY pt.normalized_type, pt.phase, pt.format, source""",
             [mission, instrument],
         ).fetchdf()
         con.close()
