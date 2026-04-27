@@ -47,12 +47,14 @@ def fetch(
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
     label_only: bool = typer.Option(False, "--label-only", "-l", help="Download only the label file"),
     here: bool = typer.Option(False, "--here", "-H", help="Download into current directory instead of planetarypy storage"),
+    folder: bool = typer.Option(False, "--folder", "-d", help="Print the local folder instead of file paths (composes with `cd`)"),
 ):
     """Download a PDS product by ID.
 
     Examples:
         plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W
         plp fetch --here mro.ctx.edr P02_001916_2221_XI_42N027W
+        cd (plp fetch --folder mro.ctx.edr P02_001916_2221_XI_42N027W)
     """
     from pathlib import Path
 
@@ -76,11 +78,14 @@ def fetch(
                 mission, instrument, product_key, resolved.product_id,
             )
         download_product(resolved, local_dir, label_only=label_only, force=force)
-        # Final resolved paths go to stdout (and only stdout) so that
-        # shell command substitution — e.g. `qgis (plp fetch …)` —
-        # captures just the file paths, not the diagnostic chatter.
-        for f in resolved.files:
-            typer.echo(local_dir / f)
+        # Stdout-only payload so shell command substitution composes:
+        #   --folder         -> single line, the folder        (cd (plp fetch --folder …))
+        #   default          -> one line per file, full paths  (qgis (plp fetch …))
+        if folder:
+            typer.echo(local_dir)
+        else:
+            for f in resolved.files:
+                typer.echo(local_dir / f)
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
