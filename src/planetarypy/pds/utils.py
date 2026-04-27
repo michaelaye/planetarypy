@@ -8,6 +8,7 @@ __all__ = [
     "get_instrument_names",
     "get_index_names",
     "print_available_indexes",
+    "get_example_pid",
 ]
 
 from .static_index import ConfigHandler
@@ -157,3 +158,79 @@ def print_available_indexes(
                 print(f"{m_indent}{i_indent}{idx_prefix}{index}")
 
     return None
+
+
+# Fallback product-id columns to try when an index has no matching
+# IndexConfig entry in the catalog registry. Order matters.
+_PID_COL_FALLBACKS = ("PRODUCT_ID", "FILE_NAME", "IMAGE_ID", "OBSERVATION_ID")
+
+
+def get_example_pid(instr_key: str) -> str:
+    """Return an example product ID from a registered PDS index.
+
+    Looks up an arbitrary product identifier from the cumulative index
+    associated with ``instr_key`` — useful for CLI examples, completion
+    seeds, smoke tests, and notebook demos.
+
+    Parameters
+    ----------
+    instr_key : str
+        Dotted index key in the form ``<mission>.<instrument>.<index>``,
+        e.g. ``"mro.ctx.edr"`` or ``"cassini.iss.index"``. Must be one of
+        the keys registered in ``~/.planetarypy_index_urls.toml`` or in
+        the dynamic handler registry.
+
+    Returns
+    -------
+    str
+        A product identifier from the index, stripped of PDS whitespace
+        padding.
+
+    Raises
+    ------
+    ValueError
+        If ``instr_key`` is not a registered index, or if the index
+        contains no recognizable product-id column.
+    """
+    registered = set(_all_dotted_index_keys())
+    if instr_key not in registered:
+        raise ValueError(
+            f"Unknown index key: {instr_key!r}. "
+            "Use planetarypy.pds.print_available_indexes() to list valid keys."
+        )
+
+    # Prefer the product-id column configured in the catalog INDEX_REGISTRY
+    # for this index (handles non-standard cases like UVIS using FILE_NAME),
+    # then fall back to common conventions.
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+
+    candidate_cols: list[str] = []
+    for cfg in INDEX_REGISTRY.values():
+        if cfg.index_key == instr_key or instr_key in cfg.extra_index_keys:
+            candidate_cols.append(cfg.product_id_col)
+            break
+    for fallback in _PID_COL_FALLBACKS:
+        if fallback not in candidate_cols:
+            candidate_cols.append(fallback)
+
+    # Lazy import: planetarypy.pds.__init__ imports from this module.
+    from planetarypy.pds import get_index
+
+    df = get_index(instr_key, allow_refresh=False)
+
+    for col in candidate_cols:
+        if col not in df.columns:
+            continue
+        series = df[col].dropna().astype(str).str.strip()
+        series = series[series != ""]
+        if series.empty:
+            continue
+        # Skip "UNK" placeholder rows (e.g. early Galileo SSI cruise frames)
+        # but fall back to it if every row is UNK.
+        non_unk = series[series.str.upper() != "UNK"]
+        return non_unk.iloc[0] if not non_unk.empty else series.iloc[0]
+
+    raise ValueError(
+        f"No product-id column found in index {instr_key!r}. "
+        f"Tried: {list(candidate_cols)}. Available columns: {list(df.columns)}"
+    )

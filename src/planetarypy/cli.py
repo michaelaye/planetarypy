@@ -541,5 +541,43 @@ def spicer(
     typer.echo()
 
 
+# ── example_pid ──────────────────────────────────────────────────────
+
+
+def _complete_index_key(incomplete: str) -> list[str]:
+    """Tab completion: registered dotted index keys."""
+    try:
+        from planetarypy.pds.utils import _all_dotted_index_keys
+        return [k for k in _all_dotted_index_keys() if k.startswith(incomplete)]
+    except Exception:
+        return []
+
+
+@app.command("example_pid")
+def example_pid(
+    key: str = typer.Argument(
+        help="Dotted index key, e.g. mro.ctx.edr",
+        autocompletion=_complete_index_key,
+    ),
+):
+    """Print an example product ID from a registered PDS index.
+
+    Useful as a seed for `plp fetch`, demo notebooks, and smoke tests.
+
+    Examples:
+        plp example_pid mro.ctx.edr
+        plp example_pid cassini.iss.index
+    """
+    from planetarypy.pds import get_example_pid
+
+    try:
+        pid = get_example_pid(key)
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(pid)
+
+
 def main():
     app()
