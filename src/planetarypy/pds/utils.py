@@ -164,6 +164,45 @@ def print_available_indexes(
 # IndexConfig entry in the catalog registry. Order matters.
 _PID_COL_FALLBACKS = ("PRODUCT_ID", "FILE_NAME", "IMAGE_ID", "OBSERVATION_ID")
 
+# Known PDS file extensions to strip when the picked value is a filename
+# rather than a bare PID (e.g. cassini.uvis.index stores
+# "/COUVIS_0001/DATA/D1999_007/EUV1999_007_17_05.LBL" in its FILE_NAME column).
+_PDS_FILE_EXTENSIONS = (
+    ".LBL", ".IMG", ".TAB", ".DAT", ".FIT", ".JP2", ".QUB", ".XML",
+)
+
+import re as _re  # noqa: E402
+
+_PDS_EXT_RE = _re.compile(
+    r"\.(?:" + "|".join(e.lstrip(".") for e in _PDS_FILE_EXTENSIONS) + r")$",
+    _re.IGNORECASE,
+)
+# Trailing flight-software / version suffix on otherwise-bare PIDs, e.g.
+# cassini.iss.index stores "1_N1454725799.122" where ".122" is the
+# FLIGHT_SOFTWARE_VERSION_ID, not part of the PID itself.
+_VERSION_SUFFIX_RE = _re.compile(r"\.\d+$")
+
+
+def _bare_pid(value: str) -> str:
+    """Normalize a PDS index value into its bare product identifier.
+
+    Two-step strategy:
+    1. If the value's basename ends in a known PDS file extension
+       (``.LBL``, ``.IMG``, ``.TAB`` …), treat it as a path-with-file
+       and return the bare stem (drops directories *and* extension).
+       Handles e.g. cassini.uvis.index FILE_NAME values.
+    2. Otherwise, strip a trailing ``.<digits>`` version suffix only.
+       Keeps slashes that are part of the PID intact (e.g. mgs.moc.edr
+       PRODUCT_IDs of the form ``FHA/00435`` where ``/`` is a separator,
+       not a path).
+    """
+    from pathlib import PurePosixPath
+
+    name = PurePosixPath(value).name or value
+    if _PDS_EXT_RE.search(name):
+        return _PDS_EXT_RE.sub("", name)
+    return _VERSION_SUFFIX_RE.sub("", value)
+
 
 def get_example_pid(instr_key: str) -> str:
     """Return an example product ID from a registered PDS index.
@@ -228,7 +267,8 @@ def get_example_pid(instr_key: str) -> str:
         # Skip "UNK" placeholder rows (e.g. early Galileo SSI cruise frames)
         # but fall back to it if every row is UNK.
         non_unk = series[series.str.upper() != "UNK"]
-        return non_unk.iloc[0] if not non_unk.empty else series.iloc[0]
+        picked = non_unk.iloc[0] if not non_unk.empty else series.iloc[0]
+        return _bare_pid(picked)
 
     raise ValueError(
         f"No product-id column found in index {instr_key!r}. "

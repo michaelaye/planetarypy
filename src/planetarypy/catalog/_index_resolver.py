@@ -604,10 +604,15 @@ def resolve_from_index(
     if row is None:
         return None
 
-    # Use the canonical product_id from the index, not the user's input
+    # Use the canonical product_id from the index, not the user's input.
+    # Normalize via _bare_pid so this matches what get_example_pid returns
+    # for the same row — keeps storage paths sane on indexes whose PID
+    # column is a full FILE_NAME (e.g. cassini.uvis.index).
+    from planetarypy.pds.utils import _bare_pid
+
     canonical_pid = _get_column(row, config.product_id_col, "PRODUCT_ID")
     if canonical_pid:
-        canonical_pid = canonical_pid.strip()
+        canonical_pid = _bare_pid(canonical_pid.strip())
     else:
         canonical_pid = product_id
 
@@ -679,13 +684,30 @@ def _find_product_in_index(
     Raises MultipleProductsError if an ambiguous match is found
     (e.g. observation ID matching multiple product variants).
     """
+    from planetarypy.pds.utils import _bare_pid
+
     pid = product_id.strip()
+    pid_bare = _bare_pid(pid).upper()
 
     # Build ordered list of columns to try
     cols = [config.product_id_col]
     for fallback in ("PRODUCT_ID", "FILE_NAME", "IMAGE_ID", "OBSERVATION_ID"):
         if fallback not in cols and fallback in df.columns:
             cols.append(fallback)
+
+    def _resolve_matches(matches: pd.DataFrame, col: str, kind: str) -> pd.Series:
+        if len(matches) == 1:
+            return matches.iloc[0]
+        pid_col = config.product_id_col
+        if pid_col in df.columns:
+            distinct_pids = matches[pid_col].str.strip().unique()
+            if len(distinct_pids) > 1:
+                pid_list = ", ".join(sorted(distinct_pids))
+                raise MultipleProductsError(
+                    f"'{product_id}' matches {len(distinct_pids)} products "
+                    f"(matched via {col}{kind}): {pid_list}"
+                )
+        return matches.iloc[-1]
 
     for col in cols:
         if col not in df.columns:
@@ -703,20 +725,18 @@ def _find_product_in_index(
         # Case-insensitive match
         mask = series.str.upper() == pid.upper()
         if mask.any():
-            matches = df.loc[mask]
-            if len(matches) == 1:
-                return matches.iloc[0]
-            # Multiple matches — check if they're distinct products
-            pid_col = config.product_id_col
-            if pid_col in df.columns:
-                distinct_pids = matches[pid_col].str.strip().unique()
-                if len(distinct_pids) > 1:
-                    pid_list = ", ".join(sorted(distinct_pids))
-                    raise MultipleProductsError(
-                        f"'{product_id}' matches {len(distinct_pids)} products "
-                        f"(matched via {col}): {pid_list}"
-                    )
-            return matches.iloc[-1]
+            return _resolve_matches(df.loc[mask], col, "")
+
+        # Bare-PID match: same two-step normalization as
+        # planetarypy.pds.utils._bare_pid on both sides. Lets users pass:
+        #   "EUV1999_007_17_05"  (bare basename, not "/.../foo.LBL")
+        #   "1_N1454725799"      (no flight-software ".122" suffix)
+        # while preserving PIDs whose "/" is a separator, not a path
+        # (e.g. mgs.moc.edr "FHA/00435").
+        bare = series.apply(_bare_pid).str.upper()
+        mask = bare == pid_bare
+        if mask.any():
+            return _resolve_matches(df.loc[mask], col, " bare-PID")
 
     return None
 
