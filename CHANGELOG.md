@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.54.0] - 2026-04-27
+
+### Added
+- **`planetarypy.pds.get_example_pid(instr_key)`** — generic helper that returns a sample product ID for any index registered in `~/.planetarypy_index_urls.toml` (or the dynamic handler registry). Useful as a seed for `plp fetch` demos, notebook examples, smoke tests, and tab-completion fixtures — previously each instrument module had to ship its own ad-hoc example PID. Resolves the product-id column via the catalog `INDEX_REGISTRY` when available (so non-standard cases like `cassini.uvis` using `FILE_NAME` as the PID column are handled correctly), then falls back to `PRODUCT_ID` / `FILE_NAME` / `IMAGE_ID` / `OBSERVATION_ID`. Skips `"UNK"` placeholder rows (e.g. early Galileo SSI cruise frames whose `PRODUCT_ID` is literally `"UNK"`) but degrades gracefully if every row is UNK. Raises `ValueError` on unknown index keys.
+- **`plp example_pid <key>`** — CLI surface for the same. Prints the PID to stdout (so it composes with `plp fetch`), exits non-zero on unknown keys, and supports tab-completion over the registered dotted index keys.
+
+### Changed
+- **PIDs are now normalized to a bare canonical form** at both ends of the round trip. `get_example_pid` and the catalog `_find_product_in_index` / `resolve_from_index` go through a shared `_bare_pid` normalizer so `plp example_pid <key>` output composes directly with `plp fetch <key> <pid>`. Two-step rule:
+    1. If the value's basename ends in a known PDS file extension (`.LBL .IMG .TAB .DAT .FIT .JP2 .QUB .XML`), strip path + extension. (e.g. `cassini.uvis.index` `FILE_NAME` of `/COUVIS_0001/.../EUV1999_007_17_05.LBL` → `EUV1999_007_17_05`.)
+    2. Else strip a trailing `.<digits>` version suffix only. (e.g. `cassini.iss.index` PRODUCT_ID `1_N1454725799.122`, where `.122` is the FLIGHT_SOFTWARE_VERSION_ID, → `1_N1454725799`.)
+    3. Else preserve the value verbatim — keeps slashes intact when they're PID separators rather than paths (e.g. `mgs.moc.edr` `FHA/00435`, `cassini.vims.index` `1/1294638283_1`). An earlier naïve form mishandled this and would have collapsed 7677 distinct MGS MOC PIDs into a single bare form.
+- `ResolvedProduct.product_id` returned from `resolve_from_index` is now also the bare form, so the per-product storage folder created by `_local_product_dir` no longer contains nested archive paths for indexes whose PID column stores a full FILE_NAME.
+
+### Fixed
+- **`src/planetarypy/__init__.py.__version__`** was stuck at `0.41.2` because no `[[tool.bumpversion.files]]` entries existed in the existing `[tool.bumpversion]` config; recent releases (0.53.5–0.53.7) bumped only `pyproject.toml`. Resynced and now wired so future `bump-my-version bump <part>` runs keep both files in sync.
+
 ## [0.53.7] - 2026-04-24
 
 ### Fixed
