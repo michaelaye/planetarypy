@@ -10,6 +10,7 @@ from planetarypy.pds.utils import (
     get_example_pid,
     get_index_names,
     get_instrument_names,
+    get_meta,
     get_mission_names,
     print_available_indexes,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "get_instrument_names",
     "get_index_names",
     "get_example_pid",
+    "get_meta",
 ]
 
 

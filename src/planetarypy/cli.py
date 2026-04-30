@@ -584,5 +584,69 @@ def example_pid(
     typer.echo(pid)
 
 
+# ── meta ─────────────────────────────────────────────────────────────
+
+
+@app.command("meta")
+def meta(
+    key: str = typer.Argument(
+        help="Dotted index key, e.g. mro.ctx.edr",
+        autocompletion=_complete_index_key,
+    ),
+    product_id: str = typer.Argument(
+        help="Product identifier",
+        autocompletion=_complete_product_id,
+    ),
+    long: bool = typer.Option(
+        False, "--long", "-l",
+        help="Request the long form when the index has a custom display "
+             "(no effect on indexes that always return the full row).",
+    ),
+):
+    """Print the metadata row for a product from its PDS cumulative index.
+
+    Thin wrapper around ``planetarypy.pds.get_meta(key, product_id, long=...)``.
+    Matches the product ID against the configured (or conventional) PID
+    column, tolerant of case and PDS path/extension/version-suffix
+    decoration. Indexes may register custom display logic (short summaries,
+    multi-row aggregation, …) which the ``--long`` flag toggles into the
+    full-row form.
+
+    Examples:
+        plp meta mro.ctx.edr P02_001916_2221_XI_42N027W
+        plp meta cassini.iss.index 1_N1454725799
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.pds import get_meta
+
+    try:
+        row = get_meta(key, product_id, long=long)
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    title_pid = (
+        row.get("PRODUCT_ID")
+        or row.get("OBSERVATION_ID")
+        or row.get("FILE_NAME")
+        or product_id
+    )
+    table = Table(
+        title=f"{key} — {str(title_pid).strip()}",
+        title_style="bold",
+        header_style="bold magenta",
+        show_lines=False,
+        pad_edge=False,
+    )
+    table.add_column("Field", style="cyan", no_wrap=True)
+    table.add_column("Value", overflow="fold")
+    for col, val in row.items():
+        table.add_row(str(col), "" if val is None else str(val))
+
+    Console().print(table)
+
+
 def main():
     app()

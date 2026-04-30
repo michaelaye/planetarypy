@@ -9,6 +9,8 @@ __all__ = [
     "get_index_names",
     "print_available_indexes",
     "get_example_pid",
+    "get_meta",
+    "reorder_meta_row",
 ]
 
 from .static_index import ConfigHandler
@@ -273,4 +275,140 @@ def get_example_pid(instr_key: str) -> str:
     raise ValueError(
         f"No product-id column found in index {instr_key!r}. "
         f"Tried: {list(candidate_cols)}. Available columns: {list(df.columns)}"
+    )
+
+
+def reorder_meta_row(row):
+    """Reorder a meta row's fields to ``[*_ID/FILE_NAME] + [*ANGLE*] + rest``.
+
+    Used by the generic ``get_meta`` path and by per-instrument handlers
+    that want the same ordering for their long-form output.
+    """
+
+    def _is_id_field(name: str) -> bool:
+        upper = str(name).upper()
+        return (
+            "_ID" in upper
+            or upper in {
+                "FILE_NAME", "FILE_SPECIFICATION_NAME",
+                "FILE_NAME_SPECIFICATION", "PATH_NAME",
+            }
+        )
+
+    cols = list(row.index)
+    id_cols = [c for c in cols if _is_id_field(c)]
+    angle_cols = [c for c in cols
+                  if "ANGLE" in str(c).upper() and c not in id_cols]
+    rest = [c for c in cols if c not in id_cols and c not in angle_cols]
+    return row.reindex(id_cols + angle_cols + rest)
+
+
+def get_meta(instr_key: str, product_id: str, long: bool = False):
+    """Return the metadata row for a product ID from a registered PDS index.
+
+    Generalizes lookup across all indexes by trying the catalog-registered
+    product-id column first, then common fallbacks. Matching is tolerant
+    of case differences and PDS path/extension/version-suffix decoration
+    (same normalization as ``_bare_pid``).
+
+    Indexes registered in :mod:`planetarypy.pds.meta_display` get
+    instrument-specific shaping (e.g. HiRISE EDR collapses one
+    observation's 28 channel rows into a short per-color summary).
+
+    Parameters
+    ----------
+    instr_key : str
+        Dotted index key, e.g. ``"mro.ctx.edr"`` or ``"cassini.iss.index"``.
+    product_id : str
+        Product identifier to look up. May be bare (e.g.
+        ``"P02_001916_2221_XI_42N027W"``) or include a PDS path/extension.
+    long : bool
+        Per-instrument long-form toggle (currently used by HiRISE: with an
+        obsid input, picks the RED3_1 channel and returns the full row).
+        Generic indexes ignore this flag.
+
+    Returns
+    -------
+    pandas.Series
+        The matched row, indexed by column name and pre-ordered for display.
+        String values are stripped of PDS whitespace padding.
+
+    Raises
+    ------
+    ValueError
+        If ``instr_key`` is not registered, or no row matches ``product_id``.
+    """
+    registered = set(_all_dotted_index_keys())
+    if instr_key not in registered:
+        raise ValueError(
+            f"Unknown index key: {instr_key!r}. "
+            "Use planetarypy.pds.print_available_indexes() to list valid keys."
+        )
+
+    # Per-instrument override: HiRISE etc. own their entire match/shape pipeline.
+    from planetarypy.pds.meta_display import get_handler
+
+    handler = get_handler(instr_key)
+    if handler is not None:
+        return handler(instr_key, product_id, long=long)
+
+    # Prefer the configured product-id column when this index has an entry
+    # in the catalog INDEX_REGISTRY (handles non-standard cases like UVIS
+    # using FILE_NAME); otherwise fall back to common conventions.
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+
+    candidate_cols: list[str] = []
+    for cfg in INDEX_REGISTRY.values():
+        if cfg.index_key == instr_key or instr_key in cfg.extra_index_keys:
+            candidate_cols.append(cfg.product_id_col)
+            break
+    for fallback in _PID_COL_FALLBACKS:
+        if fallback not in candidate_cols:
+            candidate_cols.append(fallback)
+
+    from planetarypy.pds import get_index
+
+    df = get_index(instr_key, allow_refresh=False)
+
+    pid = str(product_id).strip()
+    pid_bare = _bare_pid(pid)
+    # Bare-PID pass is only meaningful when at least one side is decorated
+    # (path/extension/version suffix). On bare-vs-bare it's a slow no-op —
+    # mro.hirise.edr's 2.6M-row PRODUCT_ID column burns ~4 s for nothing.
+    input_is_decorated = pid_bare != pid
+    pid_bare_upper = pid_bare.upper()
+
+    # Cheap probe: does this column carry decoration anywhere in a sample?
+    _DECORATION_RE = _re.compile(
+        r"\.\d+$|\.(?:lbl|img|tab|dat|fit|jp2|qub|xml)$", _re.IGNORECASE,
+    )
+
+    for col in candidate_cols:
+        if col not in df.columns:
+            continue
+        series = df[col].astype(str).str.strip()
+
+        mask = series == pid
+        if not mask.any():
+            mask = series.str.upper() == pid.upper()
+        if not mask.any():
+            # Skip the per-row Python apply when neither side could possibly
+            # need normalization.
+            sample = series.head(500)
+            column_is_decorated = sample.str.contains(
+                _DECORATION_RE, regex=True, na=False
+            ).any()
+            if input_is_decorated or column_is_decorated:
+                mask = series.apply(_bare_pid).str.upper() == pid_bare_upper
+        if mask.any():
+            row = df.loc[mask].iloc[-1].copy()
+            # Strip PDS whitespace padding from string values for display.
+            for k, v in row.items():
+                if isinstance(v, str):
+                    row[k] = v.strip()
+            return reorder_meta_row(row)
+
+    raise ValueError(
+        f"Product {product_id!r} not found in index {instr_key!r}. "
+        f"Tried columns: {[c for c in candidate_cols if c in df.columns]}."
     )

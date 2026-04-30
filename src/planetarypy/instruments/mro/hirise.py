@@ -16,6 +16,7 @@ Examples
 >>> prod.download()
 """
 
+import re
 import warnings
 from pathlib import Path
 
@@ -166,6 +167,105 @@ def get_metadata(product_id: str, index: str = "rdr") -> dict:
         raise ValueError(f"Product {pid} not found in {idx_key} index")
 
     return row.iloc[0].to_dict()
+
+
+_HIRISE_CHANNEL_RE = re.compile(r"_(RED|BG|IR)\d+_\d$", re.IGNORECASE)
+"""Tail of a HiRISE channel-level PRODUCT_ID, e.g. ``_RED4_1``, ``_BG13_0``."""
+
+
+_HIRISE_META_SHORT_FIELDS = (
+    "OBSERVATION_ID",
+    "OBSERVATION_START_TIME",
+    "SOLAR_LONGITUDE",
+    "LOCAL_TIME",
+    "IMAGE_CENTER_LATITUDE",
+    "IMAGE_CENTER_LONGITUDE",
+    "EMISSION_ANGLE",
+    "INCIDENCE_ANGLE",
+    "PHASE_ANGLE",
+    "RATIONALE_DESC",
+)
+_HIRISE_META_PER_COLOR_FIELDS = ("IMAGE_LINES", "LINE_SAMPLES", "SCALED_PIXEL_WIDTH")
+
+
+def _is_hirise_channel_pid(value: str) -> bool:
+    """True when a HiRISE id has a channel suffix (full PRODUCT_ID, not obsid)."""
+    return bool(_HIRISE_CHANNEL_RE.search(str(value)))
+
+
+def format_meta(index_key: str, product_id: str, *, long: bool = False):
+    """Shape a HiRISE EDR/RDR meta row for ``plp meta`` / ``get_meta``.
+
+    Decision tree:
+
+    - Input has a channel suffix (``..._RED4_1``, ``..._BG13_0``, ``..._IR10_1``)
+      → return that channel's full row.
+    - Input is a bare obsid (``PSP_003092_0985``):
+        - ``long=False`` (default): short summary across the whole observation,
+          with detector-config fields (IMAGE_LINES / LINE_SAMPLES /
+          SCALED_PIXEL_WIDTH) split per color (RED / BG / IR).
+        - ``long=True``: full row picked from CCD ``RED3`` channel ``1``
+          (falls back to any RED, then any row, if absent).
+    """
+    import pandas as pd
+
+    from planetarypy.pds import get_index
+    from planetarypy.pds.utils import reorder_meta_row
+
+    df = get_index(index_key, allow_refresh=False)
+    pid = str(product_id).strip()
+
+    if _is_hirise_channel_pid(pid):
+        s = df["PRODUCT_ID"].astype(str).str.strip()
+        rows = df[s.str.upper() == pid.upper()]
+        if rows.empty:
+            raise ValueError(f"Product {pid!r} not found in {index_key}.")
+        return reorder_meta_row(_strip_str_values(rows.iloc[0]))
+
+    s = df["OBSERVATION_ID"].astype(str).str.strip()
+    rows = df[s.str.upper() == pid.upper()]
+    if rows.empty:
+        raise ValueError(f"Observation {pid!r} not found in {index_key}.")
+
+    if long:
+        ccd = rows["CCD_NAME"].astype(str).str.strip().str.upper()
+        chan = rows["CHANNEL_NUMBER"].astype(str).str.strip()
+        match = rows[(ccd == "RED3") & (chan == "1")]
+        if match.empty:
+            red = rows[ccd.str.startswith("RED")]
+            match = red if not red.empty else rows
+        return reorder_meta_row(_strip_str_values(match.iloc[0]))
+
+    # Short summary (default for an obsid query).
+    out: dict[str, object] = {}
+    first = rows.iloc[0]
+    for f in _HIRISE_META_SHORT_FIELDS:
+        if f in rows.columns:
+            v = first[f]
+            out[f] = v.strip() if isinstance(v, str) else v
+
+    ccd = rows["CCD_NAME"].astype(str).str.strip().str.upper()
+    color = ccd.str.extract(r"^(RED|BG|IR)")[0]
+    for f in _HIRISE_META_PER_COLOR_FIELDS:
+        if f not in rows.columns:
+            continue
+        for c in ("RED", "BG", "IR"):
+            sub = rows.loc[color == c, f]
+            if sub.empty:
+                continue
+            uniq = sub.astype(str).str.strip().unique()
+            out[f"{f} ({c})"] = uniq[0] if len(uniq) == 1 else " / ".join(uniq)
+
+    return pd.Series(out)
+
+
+def _strip_str_values(row):
+    """Return a copy of ``row`` with PDS whitespace stripped from string cells."""
+    out = row.copy()
+    for k, v in out.items():
+        if isinstance(v, str):
+            out[k] = v.strip()
+    return out
 
 
 def sun_azimuth_from_top(product_id: str, index: str = "rdr") -> float:
