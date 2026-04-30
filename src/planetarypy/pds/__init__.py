@@ -13,6 +13,7 @@ from planetarypy.pds.utils import (
     get_meta,
     get_mission_names,
     print_available_indexes,
+    read_index_slice,
 )
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "get_index_names",
     "get_example_pid",
     "get_meta",
+    "read_index_slice",
 ]
 
 

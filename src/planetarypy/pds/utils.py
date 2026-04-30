@@ -10,6 +10,7 @@ __all__ = [
     "print_available_indexes",
     "get_example_pid",
     "get_meta",
+    "read_index_slice",
     "reorder_meta_row",
 ]
 
@@ -279,6 +280,50 @@ def get_example_pid(instr_key: str) -> str:
     raise ValueError(
         f"No product-id column found in index {instr_key!r}. "
         f"Tried: {list(candidate_cols)}. Available columns: {list(df.columns)}"
+    )
+
+
+def read_index_slice(
+    index_key: str,
+    filters=None,
+    columns: list[str] | None = None,
+):
+    """Read a column-projected, predicate-pushed-down slice of a PDS index.
+
+    Use this in place of :func:`get_index` whenever you only need a few
+    columns or a few rows. Parquet is columnar at the storage level, so
+    column projection avoids reading the bytes of unused columns;
+    predicate pushdown filters at the row-group level via min/max
+    statistics, skipping irrelevant chunks entirely. On the HiRISE EDR
+    index (2.6 M rows) a per-obsid lookup goes from ~3.3 s to ~0.03 s.
+
+    Parameters
+    ----------
+    index_key : str
+        Dotted index key (e.g. ``"mro.hirise.edr"``).
+    filters : list, optional
+        PyArrow predicate-pushdown filters in the form
+        ``[(column, op, value)]`` or DNF-style nested lists. ``op`` is
+        one of ``"="``, ``"!="``, ``"<"``, ``"<="``, ``">"``, ``">="``,
+        ``"in"``, ``"not in"``. Values are compared byte-equal — match
+        the canonical (typically uppercase, unpadded) form stored in
+        parquet.
+    columns : list of str, optional
+        Subset of columns to read. ``None`` (default) loads all columns.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The filtered, projected slice. Empty if no rows match.
+    """
+    import pandas as pd
+
+    from planetarypy.pds import Index
+
+    idx = Index(index_key)
+    idx.ensure_parquet()
+    return pd.read_parquet(
+        idx.local_parq_path, columns=columns, filters=filters,
     )
 
 

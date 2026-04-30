@@ -200,41 +200,55 @@ def _is_hirise_channel_pid(value: str) -> bool:
     return bool(_HIRISE_CHANNEL_RE.search(str(value)))
 
 
+_HIRISE_RDR_COLOR_SUFFIXES = ("_RED", "_COLOR", "_IRB")
+
+
 def format_meta(index_key: str, product_id: str, *, long: bool = False):
-    """Shape a HiRISE EDR/RDR meta row for ``plp meta`` / ``get_meta``.
+    """Shape a HiRISE meta row for ``plp meta`` / ``get_meta``.
 
-    Decision tree:
+    Routes to the EDR or RDR formatter depending on ``index_key``: the
+    two indexes have very different schemas (EDR has channel rows with
+    ``CCD_NAME``/``CHANNEL_NUMBER``; RDR has merged-color rows with
+    ``MAP_*`` / ``MINIMUM/MAXIMUM_LAT/LON`` and no CCD columns) and
+    accept different product-id shapes.
 
-    - Input has a channel suffix (``..._RED4_1``, ``..._BG13_0``, ``..._IR10_1``)
-      → return that channel's full row.
-    - Input is a bare obsid (``PSP_003092_0985``):
-        - ``long=False`` (default): short summary across the whole observation,
-          with detector-config fields (IMAGE_LINES / LINE_SAMPLES /
-          SCALED_PIXEL_WIDTH) split per color (RED / BG / IR).
-        - ``long=True``: full row picked from CCD ``RED3`` channel ``1``
-          (falls back to any RED, then any row, if absent).
+    Reads the parquet via predicate pushdown + column projection so even
+    a 2.6M-row HiRISE EDR index is interrogated in tens of milliseconds
+    instead of seconds.
+    """
+    pid = str(product_id).strip().upper()
+    if index_key.endswith(".rdr"):
+        return _format_rdr_meta(index_key, pid)
+    return _format_edr_meta(index_key, pid, long=long)
+
+
+def _format_edr_meta(index_key: str, pid: str, *, long: bool):
+    """EDR shape: channel rows keyed by ``..._{RED,BG,IR}<n>_<chan>``.
+
+    - Channel-suffixed PID → that channel's full row.
+    - Bare obsid + ``long=False`` (default) → short per-color summary
+      across all CCDs of the observation.
+    - Bare obsid + ``long=True`` → full row picked from CCD ``RED3``
+      channel ``1`` (falls back to any RED, then any row).
     """
     import pandas as pd
 
-    from planetarypy.pds import get_index
-    from planetarypy.pds.utils import reorder_meta_row
-
-    df = get_index(index_key, allow_refresh=False)
-    pid = str(product_id).strip()
+    from planetarypy.pds.utils import read_index_slice, reorder_meta_row
 
     if _is_hirise_channel_pid(pid):
-        s = df["PRODUCT_ID"].astype(str).str.strip()
-        rows = df[s.str.upper() == pid.upper()]
+        rows = read_index_slice(
+            index_key, filters=[("PRODUCT_ID", "=", pid)],
+        )
         if rows.empty:
             raise ValueError(f"Product {pid!r} not found in {index_key}.")
         return reorder_meta_row(_strip_str_values(rows.iloc[0]))
 
-    s = df["OBSERVATION_ID"].astype(str).str.strip()
-    rows = df[s.str.upper() == pid.upper()]
-    if rows.empty:
-        raise ValueError(f"Observation {pid!r} not found in {index_key}.")
+    obsid_filter = [("OBSERVATION_ID", "=", pid)]
 
     if long:
+        rows = read_index_slice(index_key, filters=obsid_filter)
+        if rows.empty:
+            raise ValueError(f"Observation {pid!r} not found in {index_key}.")
         ccd = rows["CCD_NAME"].astype(str).str.strip().str.upper()
         chan = rows["CHANNEL_NUMBER"].astype(str).str.strip()
         match = rows[(ccd == "RED3") & (chan == "1")]
@@ -243,7 +257,15 @@ def format_meta(index_key: str, product_id: str, *, long: bool = False):
             match = red if not red.empty else rows
         return reorder_meta_row(_strip_str_values(match.iloc[0]))
 
-    # Short summary (default for an obsid query).
+    short_cols = list(dict.fromkeys(
+        list(_HIRISE_META_SHORT_FIELDS)
+        + list(_HIRISE_META_PER_COLOR_FIELDS)
+        + ["CCD_NAME"]
+    ))
+    rows = read_index_slice(index_key, columns=short_cols, filters=obsid_filter)
+    if rows.empty:
+        raise ValueError(f"Observation {pid!r} not found in {index_key}.")
+
     out: dict[str, object] = {}
     first = rows.iloc[0]
     for f in _HIRISE_META_SHORT_FIELDS:
@@ -264,6 +286,38 @@ def format_meta(index_key: str, product_id: str, *, long: bool = False):
             out[f"{f} ({c})"] = uniq[0] if len(uniq) == 1 else " / ".join(uniq)
 
     return pd.Series(out)
+
+
+def _format_rdr_meta(index_key: str, pid: str):
+    """RDR shape: one row per merged color product (``..._RED``, ``_COLOR``, ``_IRB``).
+
+    - Color-suffixed PID → that exact PRODUCT_ID row.
+    - Bare obsid → the observation's ``_RED`` row (representative full
+      product), falling back to whatever's there.
+
+    There is no per-channel concept and no short/long distinction —
+    every row is already a full mapped product.
+    """
+    from planetarypy.pds.utils import read_index_slice, reorder_meta_row
+
+    if any(pid.endswith(s) for s in _HIRISE_RDR_COLOR_SUFFIXES):
+        rows = read_index_slice(
+            index_key, filters=[("PRODUCT_ID", "=", pid)],
+        )
+        if rows.empty:
+            raise ValueError(f"Product {pid!r} not found in {index_key}.")
+        return reorder_meta_row(_strip_str_values(rows.iloc[0]))
+
+    rows = read_index_slice(
+        index_key, filters=[("OBSERVATION_ID", "=", pid)],
+    )
+    if rows.empty:
+        raise ValueError(f"Observation {pid!r} not found in {index_key}.")
+
+    pid_col = rows["PRODUCT_ID"].astype(str).str.strip().str.upper()
+    red = rows[pid_col.str.endswith("_RED")]
+    pick = red.iloc[0] if not red.empty else rows.iloc[0]
+    return reorder_meta_row(_strip_str_values(pick))
 
 
 def _strip_str_values(row):
