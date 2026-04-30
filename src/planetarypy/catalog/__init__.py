@@ -495,6 +495,7 @@ def fetch_product(
     files: list[str] | None = None,
     label_only: bool = False,
     force: bool = False,
+    local_dir: Path | None = None,
 ) -> DownloadedProduct:
     """Download a PDS product and return where it landed plus what was written.
 
@@ -522,6 +523,10 @@ def fetch_product(
         with a populated ``files`` argument.
     force : bool
         If ``True``, re-download even if files already exist locally.
+    local_dir : Path, optional
+        Override the storage location. When ``None`` (default), the
+        catalog's per-instrument layout is used
+        (``{storage_root}/{mission}/{instrument}/{product_type}/{pid}/``).
 
     Returns
     -------
@@ -558,7 +563,10 @@ def fetch_product(
         raise ValueError("Provide either a dotted key or all three arguments")
 
     resolved = resolve_product(mission, instrument, product_key, product_id)
-    local_dir = _local_product_dir(mission, instrument, product_key, resolved.product_id)
+    if local_dir is None:
+        local_dir = _local_product_dir(
+            mission, instrument, product_key, resolved.product_id,
+        )
     written = download_product(
         resolved, local_dir, files=files, label_only=label_only, force=force,
     )

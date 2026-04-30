@@ -79,6 +79,23 @@ def _parse_pid(product_id: str) -> tuple[str, list[str], str]:
     raise ValueError(f"Cannot parse HiRISE product ID: {product_id}")
 
 
+def browse_url(product_id: str, annotated: bool = True) -> str:
+    """Return the HiRISE EXTRAS browse-JPEG URL for a product ID.
+
+    Resolves the EXTRAS path on the U. Arizona HiRISE server. EDR
+    products only have a clean browse; RDR/COLOR products have both
+    clean (``.browse.jpg``) and annotated (``.abrowse.jpg``) variants.
+    """
+    pid, parts, data_level = _parse_pid(product_id)
+    obs_id = f"{parts[0]}_{parts[1]}_{parts[2]}"
+    orbit_dir = _orbit_range(int(parts[1]))
+    if data_level == "EDR" or not annotated:
+        filename = f"{pid}.browse.jpg"
+    else:
+        filename = f"{pid}.abrowse.jpg"
+    return f"{HIRISE_BASE}/EXTRAS/{data_level}/{parts[0]}/{orbit_dir}/{obs_id}/{filename}"
+
+
 def get_browse(product_id: str, annotated: bool = True,
                dest: Path | None = None, force: bool = False) -> Path:
     """Download a HiRISE browse JPEG and return its local path.
@@ -106,20 +123,10 @@ def get_browse(product_id: str, annotated: bool = True,
     Path
         Local path to the browse JPEG.
     """
+    url = browse_url(product_id, annotated=annotated)
     pid, parts, data_level = _parse_pid(product_id)
-    prefix = parts[0]
-    orbit = int(parts[1])
     obs_id = f"{parts[0]}_{parts[1]}_{parts[2]}"
-    orbit_dir = _orbit_range(orbit)
-
-    if data_level == "EDR":
-        filename = f"{pid}.browse.jpg"
-    elif annotated:
-        filename = f"{pid}.abrowse.jpg"
-    else:
-        filename = f"{pid}.browse.jpg"
-
-    url = f"{HIRISE_BASE}/EXTRAS/{data_level}/{prefix}/{orbit_dir}/{obs_id}/{filename}"
+    filename = url.rsplit("/", 1)[-1]
 
     if dest is not None:
         outpath = Path(dest) / filename
@@ -1159,3 +1166,46 @@ def create_red_mosaic(obsid: str, ccds: list[int] = (4, 5), **kwargs) -> Path:
     See :func:`create_mosaic` for full parameter documentation.
     """
     return create_mosaic(obsid, color="red", ccds=ccds, **kwargs)
+
+
+def create_mosaics(
+    obsid: str,
+    colors=("red",),
+    ccds: list[int] | None = None,
+    mapfile: str | Path | None = None,
+    overwrite: bool = False,
+    **kwargs,
+) -> dict[str, Path]:
+    """Create one HiRISE mosaic per requested color.
+
+    A thin orchestration wrapper around :func:`create_mosaic`. The
+    ``ccds`` selection only applies to the RED color group (other
+    colors have only 2 CCDs each, so subsetting isn't meaningful).
+
+    Parameters
+    ----------
+    obsid : str
+        HiRISE observation ID.
+    colors : sequence of str
+        Any subset of ``("red", "ir", "bg")``.
+    ccds : list of int, optional
+        CCD numbers to include — applied only to the RED mosaic.
+    mapfile, overwrite, **kwargs
+        Forwarded to :func:`create_mosaic`.
+
+    Returns
+    -------
+    dict[str, Path]
+        Mapping color name → mosaic path.
+    """
+    out: dict[str, Path] = {}
+    for color in colors:
+        out[color] = create_mosaic(
+            obsid,
+            color=color,
+            ccds=ccds if color == "red" else None,
+            mapfile=mapfile,
+            overwrite=overwrite,
+            **kwargs,
+        )
+    return out

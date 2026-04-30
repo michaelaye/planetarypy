@@ -58,34 +58,26 @@ def fetch(
     """
     from pathlib import Path
 
-    from planetarypy.catalog._resolver import (
-        resolve_product,
-        download_product,
-        _local_product_dir,
-    )
-
-    mission, instrument, product_key = key.split(".")
+    from planetarypy.catalog import fetch_product, get_product_urls
 
     typer.echo(f"Resolving {key} / {product_id}...", err=True)
     try:
-        resolved = resolve_product(mission, instrument, product_key, product_id)
-        for f in resolved.files:
-            typer.echo(f"URL: {resolved.url_stem}/{f}", err=True)
-        if here:
-            local_dir = Path.cwd()
-        else:
-            local_dir = _local_product_dir(
-                mission, instrument, product_key, resolved.product_id,
-            )
-        download_product(resolved, local_dir, label_only=label_only, force=force)
+        for url in get_product_urls(key, product_id).values():
+            typer.echo(f"URL: {url}", err=True)
+
+        downloaded = fetch_product(
+            key, product_id,
+            local_dir=Path.cwd() if here else None,
+            label_only=label_only, force=force,
+        )
         # Stdout-only payload so shell command substitution composes:
         #   --folder         -> single line, the folder        (cd (plp fetch --folder …))
         #   default          -> one line per file, full paths  (qgis (plp fetch …))
         if folder:
-            typer.echo(local_dir)
+            typer.echo(downloaded.local_dir)
         else:
-            for f in resolved.files:
-                typer.echo(local_dir / f)
+            for f in downloaded.files:
+                typer.echo(f)
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
@@ -128,17 +120,10 @@ def hibrowse(
         plp hibrowse PSP_003092_0985              (defaults to RDR RED)
     """
     from pathlib import Path
-    from planetarypy.instruments.mro.hirise import get_browse, _parse_pid, _orbit_range, HIRISE_BASE
+    from planetarypy.instruments.mro.hirise import browse_url, get_browse
 
     # Show URL immediately so user knows we're waiting on the server
-    pid, parts, data_level = _parse_pid(product_id)
-    obs_id = f"{parts[0]}_{parts[1]}_{parts[2]}"
-    orbit = int(parts[1])
-    suffix = "abrowse.jpg" if annotated else "browse.jpg"
-    typer.echo(
-        f"Fetching {HIRISE_BASE}/EXTRAS/{data_level}/{parts[0]}/{_orbit_range(orbit)}/{obs_id}/{pid}.{suffix}",
-        err=True,
-    )
+    typer.echo(f"Fetching {browse_url(product_id, annotated=annotated)}", err=True)
 
     try:
         dest = Path.cwd() if here else None
@@ -236,7 +221,7 @@ def himos(
         plp himos PSP_003092_0985 --red --ir --bg    (all three colors)
         plp himos PSP_003092_0985 --map mymap.map    (custom projection)
     """
-    from planetarypy.instruments.mro.hirise import create_mosaic
+    from planetarypy.instruments.mro.hirise import create_mosaics
 
     if not red and not ir and not bg:
         red = True
@@ -251,22 +236,17 @@ def himos(
 
     ccd_nums = [int(n) for n in ccds.split(",")] if ccds else None
 
-    for color in colors:
-        typer.echo(f"\n{'='*60}")
-        typer.echo(f"Processing {obsid} — {color.upper()} mosaic")
-        typer.echo(f"{'='*60}")
-        try:
-            path = create_mosaic(
-                obsid,
-                color=color,
-                ccds=ccd_nums if color == "red" else None,
-                mapfile=mapfile,
-                overwrite=overwrite,
-            )
-            typer.echo(f"Mosaic: {path}")
-        except Exception as e:
-            typer.echo(f"Error processing {color.upper()}: {e}", err=True)
-            raise typer.Exit(1)
+    try:
+        results = create_mosaics(
+            obsid, colors=colors, ccds=ccd_nums,
+            mapfile=mapfile, overwrite=overwrite,
+        )
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    for color, path in results.items():
+        typer.echo(f"{color.upper()} mosaic: {path}")
 
 
 # ── CTX commands ────────────────────────────────────────────────────
