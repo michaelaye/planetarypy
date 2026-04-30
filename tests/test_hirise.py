@@ -197,27 +197,32 @@ class TestOrbitRange:
 
 class TestObsidCompletion:
     def test_complete_from_cache(self, tmp_path):
-        """Test completion against a manually created cache file."""
-        from planetarypy.instruments.mro import hirise
+        """Generic complete_pid() should drive HiRISE obsid completion via
+        the IndexConfig.completion_id_col registry entry.
+        """
+        from planetarypy.pds import complete_pid
+        from planetarypy.pds import utils as pds_utils
 
-        # Create a small fake cache
+        # Pre-seed a sorted cache where complete_pid expects it (sidesteps
+        # any actual index download).
         cache = tmp_path / "obsids.txt"
-        cache.write_text("ESP_013800_1820\nESP_013801_1210\nPSP_003092_0985\nPSP_003092_1715\n")
+        cache.write_text(
+            "ESP_013800_1820\nESP_013801_1210\nPSP_003092_0985\nPSP_003092_1715\n"
+        )
 
-        # Monkey-patch the cache path
-        orig = hirise._obsid_cache_path
-        hirise._obsid_cache_path = lambda index="edr": cache
+        orig = pds_utils._pid_cache_path
+        pds_utils._pid_cache_path = lambda key: cache
         try:
-            matches = hirise.complete_obsid("PSP_003092")
+            matches = complete_pid("PSP_003092", "mro.hirise.edr")
             assert matches == ["PSP_003092_0985", "PSP_003092_1715"]
 
-            matches = hirise.complete_obsid("ESP_01380")
+            matches = complete_pid("ESP_01380", "mro.hirise.edr")
             assert len(matches) == 2
 
-            matches = hirise.complete_obsid("XYZ")
+            matches = complete_pid("XYZ", "mro.hirise.edr")
             assert matches == []
         finally:
-            hirise._obsid_cache_path = orig
+            pds_utils._pid_cache_path = orig
 
 
 class TestExtHelper:

@@ -7,6 +7,7 @@ from pandas import DataFrame
 
 from planetarypy.pds.index_main import Index, InventoryIndex
 from planetarypy.pds.utils import (
+    complete_pid,
     get_example_pid,
     get_index_names,
     get_instrument_names,
@@ -14,6 +15,7 @@ from planetarypy.pds.utils import (
     get_mission_names,
     print_available_indexes,
     read_index_slice,
+    rebuild_pid_cache,
 )
 
 __all__ = [
@@ -27,6 +29,8 @@ __all__ = [
     "get_example_pid",
     "get_meta",
     "read_index_slice",
+    "complete_pid",
+    "rebuild_pid_cache",
 ]
 
 

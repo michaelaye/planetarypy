@@ -86,6 +86,27 @@ class IndexConfig:
     even though the index records them in uppercase.
     """
 
+    completion_id_col: str = ""
+    """Column to surface for shell tab completion.
+
+    Empty (default) means "use ``product_id_col``" — the natural choice
+    for indexes whose products map 1:1 to PIDs (CTX, UVIS, ISS, …). Set
+    explicitly for indexes where the user types a coarser identifier:
+    HiRISE EDR/RDR set this to ``OBSERVATION_ID`` so users complete
+    ``PSP_003092_0985`` rather than each of the 28 channel PRODUCT_IDs.
+    """
+
+    pid_strip_prefix_re: str = ""
+    """Regex pattern to strip from the start of a bare PID.
+
+    Applied AFTER :func:`planetarypy.pds.utils._bare_pid` (which removes
+    PDS path/extension and trailing ``.NNN`` version suffixes). Used for
+    indexes whose stored PIDs carry a leading housekeeping prefix that
+    users typically omit — e.g. cassini.iss stores
+    ``1_N1454725799.122`` and users type ``N1454725799``, so this is set
+    to ``r"^.{1}_"`` for both ISS variants.
+    """
+
 
 # ── Registry ──────────────────────────────────────────────────────────
 # Maps catalog (mission, instrument, product_key) → IndexConfig.
@@ -103,6 +124,7 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
         file_spec_col="FILE_NAME_SPECIFICATION",
         volume_id_col="",
         lowercase_paths=False,
+        completion_id_col="OBSERVATION_ID",
     ),
     ("mro", "hirise", "rdr"): IndexConfig(
         index_key="mro.hirise.rdr",
@@ -110,6 +132,7 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
         file_spec_col="FILE_NAME_SPECIFICATION",
         volume_id_col="",
         lowercase_paths=False,
+        completion_id_col="OBSERVATION_ID",
     ),
     ("mro", "hirise", "dtm"): IndexConfig(
         index_key="mro.hirise.dtm",
@@ -117,6 +140,7 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
         file_spec_col="FILE_NAME_SPECIFICATION",
         volume_id_col="",
         lowercase_paths=False,
+        completion_id_col="OBSERVATION_ID",
     ),
     ("mro", "crism", "mtrdr"): IndexConfig(
         index_key="mro.crism.mtrdr",
@@ -177,10 +201,12 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
     ("cassini", "iss", "edr_sat"): IndexConfig(
         index_key="cassini.iss.index",
         seti_volume_group="COISS_2xxx",
+        pid_strip_prefix_re=r"^.{1}_",
     ),
     ("cassini", "iss", "edr_evj"): IndexConfig(
         index_key="cassini.iss_cruise.index",
         seti_volume_group="COISS_1xxx",
+        pid_strip_prefix_re=r"^.{1}_",
     ),
     ("cassini", "cirs", "jupiter"): IndexConfig(
         index_key="cassini.cirs.cube_point_index",

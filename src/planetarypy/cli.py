@@ -22,18 +22,29 @@ app = typer.Typer(
 
 
 def _complete_product_id(ctx: click.Context, args: list[str], incomplete: str) -> list[str]:
-    """Context-aware tab completion for product IDs based on the key argument."""
+    """Context-aware tab completion for product IDs based on the key argument.
+
+    Routes the dotted ``key`` argument to :func:`planetarypy.pds.complete_pid`,
+    which handles every registered PDS index uniformly (per-index column
+    selection, prefix stripping, and bare-PID normalization come from
+    :class:`planetarypy.catalog._index_resolver.IndexConfig`). Both forms are
+    accepted: a direct index key (``cassini.iss.index``, used by ``plp meta``)
+    or a catalog product key (``cassini.iss.edr_sat``, used by ``plp fetch``).
+    """
     key = ctx.params.get("key", "")
     if not key:
         return []
     try:
-        if key == "mro.ctx.edr":
-            from planetarypy.instruments.mro.ctx.ctx_edr import complete_ctx_pid
-            return complete_ctx_pid(incomplete)
-        if key.startswith("mro.hirise"):
-            from planetarypy.instruments.mro.hirise import complete_obsid
-            index = "edr" if "edr" in key else "rdr"
-            return complete_obsid(incomplete, index=index)
+        from planetarypy.pds import complete_pid
+        from planetarypy.pds.utils import _all_dotted_index_keys
+
+        if key in _all_dotted_index_keys():
+            return complete_pid(incomplete, key)
+
+        from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+        parts = tuple(key.split("."))
+        if len(parts) == 3 and parts in INDEX_REGISTRY:
+            return complete_pid(incomplete, INDEX_REGISTRY[parts].index_key)
     except Exception:
         pass
     return []
@@ -88,14 +99,14 @@ def fetch(
 
 def _complete_hirise_obsid_rdr(incomplete: str) -> list[str]:
     """Tab-completion for HiRISE obsids with RDR products (browse, RDR fetch)."""
-    from planetarypy.instruments.mro.hirise import complete_obsid
-    return complete_obsid(incomplete, index="rdr")
+    from planetarypy.pds import complete_pid
+    return complete_pid(incomplete, "mro.hirise.rdr")
 
 
 def _complete_hirise_obsid_edr(incomplete: str) -> list[str]:
     """Tab-completion for HiRISE obsids from EDR index (all observations)."""
-    from planetarypy.instruments.mro.hirise import complete_obsid
-    return complete_obsid(incomplete, index="edr")
+    from planetarypy.pds import complete_pid
+    return complete_pid(incomplete, "mro.hirise.edr")
 
 
 @app.command()
@@ -254,8 +265,8 @@ def himos(
 
 def _complete_ctx_pid(incomplete: str) -> list[str]:
     """Tab-completion callback for CTX product IDs."""
-    from planetarypy.instruments.mro.ctx.ctx_edr import complete_ctx_pid
-    return complete_ctx_pid(incomplete)
+    from planetarypy.pds import complete_pid
+    return complete_pid(incomplete, "mro.ctx.edr")
 
 
 @app.command()

@@ -4,6 +4,7 @@ This module provides common, general-purpose utility functions for the PDS subpa
 """
 
 __all__ = [
+    "complete_pid",
     "get_mission_names",
     "get_instrument_names",
     "get_index_names",
@@ -11,6 +12,7 @@ __all__ = [
     "get_example_pid",
     "get_meta",
     "read_index_slice",
+    "rebuild_pid_cache",
     "reorder_meta_row",
 ]
 
@@ -186,6 +188,38 @@ _PDS_EXT_RE = _re.compile(
 _VERSION_SUFFIX_RE = _re.compile(r"\.\d+$")
 
 
+def _index_config_for(index_key: str):
+    """Return the catalog ``IndexConfig`` matching ``index_key``, or None."""
+    try:
+        from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+        for cfg in INDEX_REGISTRY.values():
+            if cfg.index_key == index_key or index_key in cfg.extra_index_keys:
+                return cfg
+    except Exception:
+        pass
+    return None
+
+
+def _normalize_pid(value: str, index_key: str | None = None) -> str:
+    """Bare-PID normalization with optional per-index prefix stripping.
+
+    Applies :func:`_bare_pid` first (path/extension and ``.NNN`` version
+    suffix); then, if ``index_key`` resolves to an :class:`IndexConfig`
+    with a non-empty ``pid_strip_prefix_re``, removes that pattern from
+    the start (e.g. cassini.iss ``1_N1454725799`` → ``N1454725799``).
+
+    Idempotent: passing an already-normalized value through again is a
+    no-op, so the same function can normalize both stored values and
+    user input before comparison.
+    """
+    bare = _bare_pid(value)
+    if index_key is not None:
+        cfg = _index_config_for(index_key)
+        if cfg is not None and cfg.pid_strip_prefix_re:
+            bare = _re.sub(cfg.pid_strip_prefix_re, "", bare)
+    return bare
+
+
 def _bare_pid(value: str) -> str:
     """Normalize a PDS index value into its bare product identifier.
 
@@ -327,6 +361,117 @@ def read_index_slice(
     )
 
 
+def _pid_cache_path(index_key: str):
+    """Per-index sorted PID-cache file under the configured storage_root."""
+    from pathlib import Path
+
+    from planetarypy.config import config
+
+    parts = index_key.split(".")
+    if len(parts) != 3:
+        raise ValueError(
+            f"Expected dotted key 'mission.instrument.indexname', got {index_key!r}"
+        )
+    mission, instrument, indexname = parts
+    return Path(config.storage_root) / mission / instrument / f"pids_{indexname}.txt"
+
+
+def _completion_id_col_for(index_key: str) -> str:
+    """Column to use for shell tab completion of an index.
+
+    Honors :attr:`IndexConfig.completion_id_col` when set (e.g. HiRISE
+    surfaces ``OBSERVATION_ID`` so users tab through obsids, not the
+    28× more numerous channel PRODUCT_IDs); otherwise falls back to
+    ``product_id_col``, then to ``PRODUCT_ID``.
+    """
+    try:
+        from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+        for cfg in INDEX_REGISTRY.values():
+            if cfg.index_key == index_key or index_key in cfg.extra_index_keys:
+                return cfg.completion_id_col or cfg.product_id_col
+    except Exception:
+        pass
+    return "PRODUCT_ID"
+
+
+def rebuild_pid_cache(index_key: str):
+    """Rebuild the sorted bare-PID cache for an index.
+
+    Reads only the configured completion column via column projection,
+    normalizes each value through :func:`_normalize_pid` (PDS
+    path/extension, version suffix, and per-index prefix), uppercases
+    for prefix matching, deduplicates, and writes a sorted text file.
+    """
+    cache = _pid_cache_path(index_key)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    pid_col = _completion_id_col_for(index_key)
+    df = read_index_slice(index_key, columns=[pid_col])
+    series = (
+        df[pid_col]
+        .dropna()
+        .astype(str)
+        .str.strip()
+    )
+    series = series[series != ""]
+    bare = series.map(lambda v: _normalize_pid(v, index_key)).str.upper()
+    bare = bare[bare != ""].drop_duplicates().sort_values()
+    cache.write_text("\n".join(bare) + "\n")
+    return cache
+
+
+def complete_pid(
+    incomplete: str, index_key: str, *, max_results: int = 50,
+) -> list[str]:
+    """Return registered product IDs matching a prefix, for tab completion.
+
+    Backed by a sorted text cache built on first use from the index's
+    configured product-id column (``PRODUCT_ID`` for most indexes,
+    ``FILE_NAME`` for cassini.uvis, etc.). PDS path/extension and
+    flight-software version suffixes are normalized away so the user
+    types the bare PID they expect (``EUV1999_007_17_05`` not
+    ``/COUVIS_0001/.../EUV1999_007_17_05.LBL``; ``1_N1454725799`` not
+    ``1_N1454725799.122``).
+
+    Parameters
+    ----------
+    incomplete : str
+        Prefix to match against (case-insensitive).
+    index_key : str
+        Dotted index key, e.g. ``"cassini.uvis.index"``.
+    max_results : int
+        Cap on matches (default 50, plenty for shell completion).
+
+    Returns
+    -------
+    list of str
+        Sorted, uppercased matches. Empty list if anything goes wrong
+        (the shell completion path must never raise).
+    """
+    try:
+        cache = _pid_cache_path(index_key)
+        if not cache.is_file():
+            rebuild_pid_cache(index_key)
+    except Exception:
+        return []
+
+    prefix = incomplete.upper()
+    matches: list[str] = []
+    try:
+        with open(cache) as f:
+            for line in f:
+                pid = line.rstrip()
+                if pid.startswith(prefix):
+                    matches.append(pid)
+                    if len(matches) >= max_results:
+                        break
+                elif matches:
+                    # Sorted file: stop once we pass the prefix range.
+                    break
+    except Exception:
+        return []
+    return matches
+
+
 def reorder_meta_row(row):
     """Reorder a meta row's fields to ``[*_ID/FILE_NAME] + [*ANGLE*] + rest``.
 
@@ -420,12 +565,13 @@ def get_meta(instr_key: str, product_id: str, long: bool = False):
     df = get_index(instr_key, allow_refresh=False)
 
     pid = str(product_id).strip()
-    pid_bare = _bare_pid(pid)
-    # Bare-PID pass is only meaningful when at least one side is decorated
-    # (path/extension/version suffix). On bare-vs-bare it's a slow no-op —
-    # mro.hirise.edr's 2.6M-row PRODUCT_ID column burns ~4 s for nothing.
-    input_is_decorated = pid_bare != pid
-    pid_bare_upper = pid_bare.upper()
+    pid_norm = _normalize_pid(pid, instr_key)
+    # Bare/normalized pass is only meaningful when at least one side is
+    # decorated (path/extension/version suffix or per-index prefix). On
+    # bare-vs-bare it's a slow no-op — mro.hirise.edr's 2.6M-row
+    # PRODUCT_ID column would burn ~4 s for nothing.
+    input_is_decorated = pid_norm != pid
+    pid_norm_upper = pid_norm.upper()
 
     # Cheap probe: does this column carry decoration anywhere in a sample?
     _DECORATION_RE = _re.compile(
@@ -447,8 +593,13 @@ def get_meta(instr_key: str, product_id: str, long: bool = False):
             column_is_decorated = sample.str.contains(
                 _DECORATION_RE, regex=True, na=False
             ).any()
-            if input_is_decorated or column_is_decorated:
-                mask = series.apply(_bare_pid).str.upper() == pid_bare_upper
+            cfg = _index_config_for(instr_key)
+            has_index_prefix = bool(cfg and cfg.pid_strip_prefix_re)
+            if input_is_decorated or column_is_decorated or has_index_prefix:
+                mask = (
+                    series.apply(lambda v: _normalize_pid(v, instr_key))
+                    .str.upper() == pid_norm_upper
+                )
         if mask.any():
             row = df.loc[mask].iloc[-1].copy()
             # Strip PDS whitespace padding from string values for display.
