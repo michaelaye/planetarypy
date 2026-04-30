@@ -266,10 +266,14 @@ def get_example_pid(instr_key: str) -> str:
         series = series[series != ""]
         if series.empty:
             continue
-        # Skip "UNK" placeholder rows (e.g. early Galileo SSI cruise frames)
-        # but fall back to it if every row is UNK.
-        non_unk = series[series.str.upper() != "UNK"]
-        picked = non_unk.iloc[0] if not non_unk.empty else series.iloc[0]
+        # Skip "UNK" placeholder rows (early Galileo SSI cruise frames) and
+        # CRU-prefixed product IDs (MRO/CTX cruise data — not representative
+        # of mapping-phase products). Fall back to them if nothing else exists.
+        usable = series[
+            (series.str.upper() != "UNK")
+            & ~series.str.upper().str.startswith("CRU")
+        ]
+        picked = usable.iloc[0] if not usable.empty else series.iloc[0]
         return _bare_pid(picked)
 
     raise ValueError(
