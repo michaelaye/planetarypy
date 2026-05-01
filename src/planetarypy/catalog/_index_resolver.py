@@ -204,7 +204,7 @@ INDEX_REGISTRY: dict[tuple[str, str, str], IndexConfig] = {
         pid_strip_prefix_re=r"^.{1}_",
     ),
     ("cassini", "iss", "edr_evj"): IndexConfig(
-        index_key="cassini.iss_cruise.index",
+        index_key="cassini.iss.cruise_index",
         seti_volume_group="COISS_1xxx",
         pid_strip_prefix_re=r"^.{1}_",
     ),
