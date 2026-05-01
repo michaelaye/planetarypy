@@ -401,6 +401,419 @@ def catalog_build(
         typer.echo(f"URL validation: {counts}")
 
 
+# ── catalog: browsing helpers + cross-reference to INDEX_REGISTRY ───
+
+
+def _complete_index_key(incomplete: str) -> list[str]:
+    """Tab completion: registered dotted index keys."""
+    try:
+        from planetarypy.pds.utils import _all_dotted_index_keys
+        return [k for k in _all_dotted_index_keys() if k.startswith(incomplete)]
+    except Exception:
+        return []
+
+
+def _fetchable_sets():
+    """Return three sets covering which catalog entries are fetchable.
+
+    A catalog (mission, instrument, product_key) triple is "fetchable"
+    when ``INDEX_REGISTRY`` has an entry for it — meaning ``plp fetch``
+    can resolve a product through the registered cumulative index.
+    """
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+    triples = set(INDEX_REGISTRY.keys())
+    return {
+        "products": triples,
+        "instruments": {(m, i) for (m, i, _) in triples},
+        "missions": {m for (m, _, _) in triples},
+    }
+
+
+def _catalog_show_mission(mission: str, fetchable):
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.catalog import list_instruments
+
+    instruments = list_instruments(mission)
+    if not instruments:
+        typer.echo(f"Unknown mission: {mission!r}", err=True)
+        raise typer.Exit(1)
+
+    table = Table(
+        title=f"{mission} instruments",
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    table.add_column("instrument", style="cyan", no_wrap=True)
+    table.add_column("fetchable product types", overflow="fold")
+
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+    for inst in instruments:
+        keys = sorted(
+            f"{p} → {cfg.index_key}"
+            for (m, i, p), cfg in INDEX_REGISTRY.items()
+            if (m, i) == (mission, inst)
+        )
+        table.add_row(inst, "\n".join(keys) if keys else "")
+    Console().print(table)
+
+
+def _catalog_show_instrument(mission: str, instrument: str, fetchable):
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.catalog import list_products
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+
+    products = list_products(f"{mission}.{instrument}")
+    if not products:
+        typer.echo(f"Unknown mission.instrument: {mission!r}.{instrument!r}", err=True)
+        raise typer.Exit(1)
+
+    # `list_products` returns normalized_type names; the registry is keyed by
+    # raw product_key. Show both perspectives.
+    table = Table(
+        title=f"{mission}.{instrument} product types",
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    table.add_column("normalized type", style="cyan")
+    table.add_column("registered fetchable variants", overflow="fold")
+
+    by_type: dict[str, list[str]] = {}
+    for (m, i, p), cfg in INDEX_REGISTRY.items():
+        if (m, i) != (mission, instrument):
+            continue
+        # Best-effort: use the first prefix segment of product_key as the type.
+        norm = p.split("_", 1)[0].lower()
+        by_type.setdefault(norm, []).append(f"{p} → {cfg.index_key}")
+
+    for ptype in products:
+        variants = by_type.get(ptype, [])
+        table.add_row(ptype, "\n".join(variants))
+    # Surface any registry entries whose product_key didn't map to a normalized type.
+    for ptype, variants in by_type.items():
+        if ptype not in products:
+            table.add_row(ptype + " (extra)", "\n".join(variants))
+    Console().print(table)
+
+
+@catalog_app.command("list")
+def catalog_list(
+    key: str = typer.Argument(
+        None,
+        help="Optional dotted key: 'mission' or 'mission.instrument'. "
+             "Omit to list missions.",
+    ),
+):
+    """Browse the pdr-tests catalog inventory.
+
+    Examples:
+        plp catalog list                       # all missions
+        plp catalog list cassini               # cassini instruments
+        plp catalog list cassini.iss           # cassini.iss product types
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    fetchable = _fetchable_sets()
+
+    if key is None:
+        from planetarypy.catalog import list_missions, summary
+
+        summary_df = summary().set_index("mission")
+        missions = list_missions()
+        table = Table(
+            title=f"PDS catalog — {len(missions)} missions",
+            title_style="bold",
+            header_style="bold magenta",
+            pad_edge=False,
+        )
+        table.add_column("mission", style="cyan", no_wrap=True)
+        table.add_column("instruments", justify="right")
+        table.add_column("product types", justify="right")
+        table.add_column("products", justify="right")
+        table.add_column("fetchable", justify="center")
+        for m in missions:
+            row = summary_df.loc[m] if m in summary_df.index else None
+            instr_n = int(row["instruments"]) if row is not None else 0
+            ptype_n = int(row["product_types"]) if row is not None else 0
+            prod_n = int(row["products"]) if row is not None else 0
+            mark = "✓" if m in fetchable["missions"] else ""
+            table.add_row(m, str(instr_n), str(ptype_n), str(prod_n), mark)
+        Console().print(table)
+        return
+
+    parts = key.split(".")
+    if len(parts) == 1:
+        _catalog_show_mission(parts[0], fetchable)
+    elif len(parts) == 2:
+        _catalog_show_instrument(parts[0], parts[1], fetchable)
+    else:
+        typer.echo(
+            f"Too many dotted parts in {key!r}. Use 'plp catalog show <key>' "
+            "for product-type detail.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+
+@catalog_app.command("show")
+def catalog_show(
+    key: str = typer.Argument(
+        ...,
+        help="Dotted key 'mission.instrument.product_key' for full detail.",
+    ),
+):
+    """Show full catalog + INDEX_REGISTRY info for a single product type."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+
+    parts = key.split(".")
+    if len(parts) != 3:
+        typer.echo(
+            f"Expected 'mission.instrument.product_key', got {key!r}.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    mission, instrument, product_key = parts
+
+    cfg = INDEX_REGISTRY.get((mission, instrument, product_key))
+
+    table = Table(
+        title=f"{key}",
+        title_style="bold",
+        header_style="bold magenta",
+        show_header=False,
+        pad_edge=False,
+    )
+    table.add_column("field", style="cyan", no_wrap=True)
+    table.add_column("value", overflow="fold")
+    table.add_row("mission", mission)
+    table.add_row("instrument", instrument)
+    table.add_row("product_key", product_key)
+
+    if cfg is None:
+        table.add_row("fetchable", "no — no INDEX_REGISTRY entry")
+    else:
+        table.add_row("fetchable", "yes")
+        table.add_row("  index_key", cfg.index_key)
+        if cfg.archive_url:
+            table.add_row("  archive_url", cfg.archive_url)
+        if cfg.seti_volume_group:
+            table.add_row("  seti_volume_group", cfg.seti_volume_group)
+        if cfg.extra_index_keys:
+            table.add_row("  extra_index_keys", ", ".join(cfg.extra_index_keys))
+        table.add_row("  product_id_col", cfg.product_id_col)
+        if cfg.completion_id_col:
+            table.add_row("  completion_id_col", cfg.completion_id_col)
+        if cfg.pid_strip_prefix_re:
+            table.add_row("  pid_strip_prefix_re", cfg.pid_strip_prefix_re)
+
+    # Sample-products count from catalog DB (best-effort; may not be built yet)
+    try:
+        from planetarypy.catalog import example_products
+        df = example_products(mission, instrument, product_key)
+        table.add_row("catalog sample products", str(len(df)))
+    except Exception:
+        pass
+
+    Console().print(table)
+
+
+@catalog_app.command("search")
+def catalog_search(
+    query: str = typer.Argument(..., help="Substring to search across catalog fields."),
+):
+    """Search the catalog (mission/instrument/product_key/product_id)."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.catalog import search
+
+    df = search(query)
+    if df.empty:
+        typer.echo(f"No catalog entries match {query!r}.")
+        return
+
+    table = Table(
+        title=f"Catalog search: {query!r}  ({len(df)} hits)",
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    for col in df.columns:
+        table.add_column(str(col), overflow="fold")
+    for _, row in df.iterrows():
+        table.add_row(*[str(v) if v is not None else "" for v in row])
+    Console().print(table)
+
+
+@catalog_app.command("summary")
+def catalog_summary():
+    """Per-mission counts of instruments, product types, and products."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.catalog import summary
+
+    df = summary()
+    table = Table(title="Catalog summary", title_style="bold",
+                  header_style="bold magenta", pad_edge=False)
+    for col in df.columns:
+        table.add_column(str(col),
+                         justify="right" if col != "mission" else "left",
+                         style="cyan" if col == "mission" else None,
+                         no_wrap=(col == "mission"))
+    for _, row in df.iterrows():
+        table.add_row(*[str(v) for v in row])
+    Console().print(table)
+
+
+@catalog_app.command("ambiguous")
+def catalog_ambiguous():
+    """List instruments whose mission/instrument mapping is ambiguous."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.catalog import ambiguous_mappings
+
+    df = ambiguous_mappings()
+    if df.empty:
+        typer.echo("No ambiguous mappings.")
+        return
+    table = Table(title=f"Ambiguous mappings ({len(df)})",
+                  title_style="bold", header_style="bold magenta", pad_edge=False)
+    for col in df.columns:
+        table.add_column(str(col), overflow="fold")
+    for _, row in df.iterrows():
+        table.add_row(*[str(v) for v in row])
+    Console().print(table)
+
+
+# ── indexes: registered PDS index browse ─────────────────────────────
+
+indexes_app = typer.Typer(help="Browse and manage registered PDS indexes.")
+app.add_typer(indexes_app, name="indexes")
+
+
+@indexes_app.command("list")
+def indexes_list(
+    mission: str = typer.Option(None, "--mission", "-m",
+                                help="Filter to one mission (e.g. 'cassini')."),
+    instrument: str = typer.Option(
+        None, "--instrument", "-i",
+        help="Filter to one instrument; requires --mission.",
+    ),
+):
+    """Tree of registered indexes (the operational fetch surface)."""
+    from planetarypy.pds import print_available_indexes
+
+    if instrument and not mission:
+        typer.echo("--instrument requires --mission.", err=True)
+        raise typer.Exit(1)
+    print_available_indexes(filter_mission=mission, filter_instrument=instrument)
+
+
+@indexes_app.command("info")
+def indexes_info(
+    key: str = typer.Argument(..., help="Dotted index key, e.g. cassini.iss.index",
+                              autocompletion=_complete_index_key),
+):
+    """Show config + cache status for a registered PDS index."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.pds import Index
+    from planetarypy.pds.utils import (
+        _all_dotted_index_keys,
+        _completion_id_col_for,
+        _index_config_for,
+    )
+
+    if key not in _all_dotted_index_keys():
+        typer.echo(f"Unknown index key: {key!r}.", err=True)
+        raise typer.Exit(1)
+
+    idx = Index(key)
+    cfg = _index_config_for(key)
+
+    table = Table(title=key, title_style="bold", show_header=False, pad_edge=False)
+    table.add_column("field", style="cyan", no_wrap=True)
+    table.add_column("value", overflow="fold")
+
+    table.add_row("index_key", key)
+    try:
+        table.add_row("remote URL", str(idx.url) if idx.url else "(unresolved)")
+    except Exception as e:
+        table.add_row("remote URL", f"(error: {e})")
+    table.add_row("remote type", idx.remote_type)
+
+    parq = idx.local_parq_path
+    if parq.is_file():
+        size_mb = parq.stat().st_size / 1e6
+        table.add_row("local cached", f"yes — {parq}  ({size_mb:.1f} MB)")
+    else:
+        table.add_row("local cached", "no")
+
+    table.add_row(
+        "completion column", _completion_id_col_for(key)
+    )
+    if cfg is not None:
+        table.add_row("PID column", cfg.product_id_col)
+        if cfg.pid_strip_prefix_re:
+            table.add_row("pid_strip_prefix_re", cfg.pid_strip_prefix_re)
+        if cfg.archive_url:
+            table.add_row("archive_url", cfg.archive_url)
+        if cfg.seti_volume_group:
+            table.add_row("seti_volume_group", cfg.seti_volume_group)
+
+    # Catalog cross-reference
+    catalog_keys = []
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+    for (m, i, p), c in INDEX_REGISTRY.items():
+        if c.index_key == key or key in c.extra_index_keys:
+            catalog_keys.append(f"{m}.{i}.{p}")
+    if catalog_keys:
+        table.add_row("catalog entries", "\n".join(sorted(catalog_keys)))
+
+    Console().print(table)
+
+
+@indexes_app.command("refresh")
+def indexes_refresh(
+    config: bool = typer.Option(
+        False, "--config",
+        help="Force-refresh upstream URL config (planetarypy_index_urls.toml).",
+    ),
+    cache: str = typer.Option(None, "--cache",
+                              help="Re-download a specific index's cumulative parquet.",
+                              autocompletion=_complete_index_key),
+):
+    """Refresh upstream index config or re-download a single index."""
+    if not config and not cache:
+        typer.echo("Pass --config to refresh the upstream URL TOML, "
+                   "or --cache <KEY> to re-download a single index.", err=True)
+        raise typer.Exit(1)
+
+    if config:
+        from planetarypy.pds.static_index import ConfigHandler
+        h = ConfigHandler(force_update=True)
+        typer.echo(f"Refreshed upstream config → {h.path}")
+
+    if cache:
+        from planetarypy.pds import Index
+        idx = Index(cache, force_config_update=False)
+        typer.echo(f"Re-downloading {cache} ...", err=True)
+        idx.download(force=True)
+        typer.echo(f"Cached at: {idx.local_parq_path}")
+
+
 # ── CTX housekeeping ────────────────────────────────────────────────
 
 
@@ -538,15 +951,6 @@ def spicer(
 
 
 # ── example_pid ──────────────────────────────────────────────────────
-
-
-def _complete_index_key(incomplete: str) -> list[str]:
-    """Tab completion: registered dotted index keys."""
-    try:
-        from planetarypy.pds.utils import _all_dotted_index_keys
-        return [k for k in _all_dotted_index_keys() if k.startswith(incomplete)]
-    except Exception:
-        return []
 
 
 @app.command("example_pid")
