@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.58.1] - 2026-05-01
+
+### Fixed
+- **`get_example_pid()` now returns the canonical user-facing PID form** (the same shape `complete_pid` caches and `get_meta` accepts), instead of stopping at `_bare_pid` (path/extension and version-suffix only). Indexes with an `IndexConfig.pid_strip_prefix_re` — currently the two cassini.iss variants — were emitting the un-stripped form: `plp example_pid cassini.iss.index` returned `1_N1454725799` while the canonical form is `N1454725799`, so the natural round-trip `plp meta cassini.iss.index (plp example_pid cassini.iss.index)` carried a stale prefix into the meta query. CTX, HiRISE, UVIS, etc. unchanged because they have no prefix-strip rule.
+
+### Changed
+- **Follow [planetarypy_configs#1](https://github.com/planetarypy/planetarypy_configs/pull/1) — Cassini canonical-key rename.** Three sections in the upstream `planetarypy_index_urls.toml` previously violated the `mission.instrument.indexname` dotted-key shape by encoding mission phase or activity mode in the instrument slot. After upstream merge, `INDEX_REGISTRY`'s `("cassini", "iss", "edr_evj")` entry now points at `cassini.iss.cruise_index` instead of `cassini.iss_cruise.index`. UVIS and VIMS occultation variants (`uvis_occ`, `vims_occ`) had no `INDEX_REGISTRY` entries to update — they were only reachable through the static-index registry — so they get the canonical key shape (`cassini.uvis.occ_index`, `cassini.vims.occ_profile_index`, etc.) for free on the next config refresh. Local users with cached parquets at `{storage_root}/cassini/{iss_cruise,uvis_occ,vims_occ}/...` will harmlessly orphan them and re-download under the new paths on first access (~50 MB across all three).
+
 ## [0.58.0] - 2026-04-30
 
 ### Added
