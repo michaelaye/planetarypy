@@ -309,7 +309,11 @@ def get_example_pid(instr_key: str) -> str:
             & ~series.str.upper().str.startswith("CRU")
         ]
         picked = usable.iloc[0] if not usable.empty else series.iloc[0]
-        return _bare_pid(picked)
+        # Use the per-index normalization (path/extension + version suffix +
+        # IndexConfig.pid_strip_prefix_re) so the example matches the
+        # canonical user-facing form returned by complete_pid and accepted
+        # by get_meta — e.g. cassini.iss → 'N1454725799', not '1_N1454725799'.
+        return _normalize_pid(picked, instr_key)
 
     raise ValueError(
         f"No product-id column found in index {instr_key!r}. "
