@@ -434,11 +434,22 @@ def _catalog_show_mission(mission: str, fetchable):
     from rich.table import Table
 
     from planetarypy.catalog import list_instruments
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+    from planetarypy.pds.utils import _all_dotted_index_keys
 
     instruments = list_instruments(mission)
     if not instruments:
         typer.echo(f"Unknown mission: {mission!r}", err=True)
         raise typer.Exit(1)
+
+    # Pre-compute the registered indexes per instrument (from the static
+    # index URL config), so we can distinguish three states for each
+    # instrument: no index at all / indexed-but-no-fetch-resolver / fetchable.
+    indexes_by_inst: dict[str, list[str]] = {}
+    for k in _all_dotted_index_keys():
+        m, i, idx = k.split(".", 2)
+        if m == mission:
+            indexes_by_inst.setdefault(i, []).append(idx)
 
     table = Table(
         title=f"{mission} instruments",
@@ -447,16 +458,23 @@ def _catalog_show_mission(mission: str, fetchable):
         pad_edge=False,
     )
     table.add_column("instrument", style="cyan", no_wrap=True)
+    table.add_column("registered indexes", overflow="fold")
     table.add_column("fetchable product types", overflow="fold")
 
-    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
     for inst in instruments:
-        keys = sorted(
+        idx_names = sorted(indexes_by_inst.get(inst, []))
+        fetch_keys = sorted(
             f"{p} → {cfg.index_key}"
             for (m, i, p), cfg in INDEX_REGISTRY.items()
             if (m, i) == (mission, inst)
         )
-        table.add_row(inst, "\n".join(keys) if keys else "")
+        if fetch_keys:
+            fetch_cell = "\n".join(fetch_keys)
+        elif idx_names:
+            fetch_cell = "(no fetch resolver)"
+        else:
+            fetch_cell = ""
+        table.add_row(inst, ", ".join(idx_names), fetch_cell)
     Console().print(table)
 
 
