@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.1] - 2026-05-03
+
+### Fixed
+- **`plp fetch` now accepts both index_keys and catalog product_keys.** The round-trip `plp fetch (plp example_pid <key>) <pid>` worked for instruments where the registered index_key equals the catalog product_key (`mro.ctx.edr`, `mro.hirise.edr`, …) but broke when one catalog product type was split across multiple parquets — Diviner's catalog `edr` triple maps to indexes `edr1` + `edr2`. `plp example_pid lro.diviner.edr1` would emit a valid PID but `plp fetch lro.diviner.edr1` failed with *"This product type has variable URL paths … no PDS index is available"* because `INDEX_REGISTRY` is keyed by catalog triple, not by index_key. New `_resolve_fetch_triple()` looks the dotted key up first as a catalog triple, then (if absent) as an `index_key` on every `IndexConfig.index_key` / `extra_index_keys` field. Both `catalog.fetch_product()` and `catalog.get_product_urls()` route through it.
+
 ## [0.59.0] - 2026-05-03
 
 ### Added
