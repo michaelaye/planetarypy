@@ -237,21 +237,41 @@ def resolve_product(
             "the PDS index. Check the product_id spelling."
         )
     else:
-        fetchability = classify_product_type(mission, instrument, product_key)
-        if fetchability.status == "unfetchable":
+        # Did the user pass an index_key (e.g. lro.diviner.edr1) where a
+        # catalog product_key (e.g. lro.diviner.edr) was needed? Check
+        # every IndexConfig.index_key / extra_index_keys for a match.
+        from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+
+        user_key = f"{mission}.{instrument}.{product_key}"
+        canonical_key = None
+        for cat_triple, cfg in INDEX_REGISTRY.items():
+            if cfg.index_key == user_key or user_key in cfg.extra_index_keys:
+                canonical_key = ".".join(cat_triple)
+                break
+
+        if canonical_key:
             hint = (
-                f"This product type has variable URL paths "
-                f"({fetchability.reason}) and no PDS index is available. "
-                f"Only the sample products in the catalog can be fetched. "
-                f"Use example_products('{mission}.{instrument}.{product_key}') "
-                f"to see available samples."
+                f"{user_key!r} is an index_key (used by `plp meta` and "
+                f"`plp indexes`), not a catalog product_key. For fetching "
+                f"use {canonical_key!r}. See `plp indexes list "
+                f"{mission}.{instrument}` for the full index → catalog mapping."
             )
         else:
-            hint = (
-                f"No URL pattern or PDS index is available for "
-                f"{mission}.{instrument}.{product_key}. "
-                f"Only sample products from the catalog are available."
-            )
+            fetchability = classify_product_type(mission, instrument, product_key)
+            if fetchability.status == "unfetchable":
+                hint = (
+                    f"This product type has variable URL paths "
+                    f"({fetchability.reason}) and no PDS index is available. "
+                    f"Only the sample products in the catalog can be fetched. "
+                    f"Use example_products('{user_key}') "
+                    f"to see available samples."
+                )
+            else:
+                hint = (
+                    f"No URL pattern or PDS index is available for "
+                    f"{user_key}. "
+                    f"Only sample products from the catalog are available."
+                )
 
     raise ProductNotFoundError(
         f"Product '{product_id}' not found for "

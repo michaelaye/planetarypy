@@ -236,37 +236,6 @@ def get_catalog() -> "duckdb.DuckDBPyConnection":
     return get_connection(config.storage_root)
 
 
-def _resolve_fetch_triple(
-    key: str, instrument: str | None = None, product_key: str | None = None,
-) -> tuple[str, str, str]:
-    """Resolve user-supplied key(s) to a catalog ``(mission, instrument, product_key)``.
-
-    Accepts either form for the dotted-key arg:
-
-    - **catalog product key** (the canonical form, e.g. ``lro.diviner.edr``) —
-      used directly.
-    - **index key** (e.g. ``lro.diviner.edr1``) — looked up in
-      :data:`INDEX_REGISTRY` by ``index_key`` or ``extra_index_keys`` and
-      mapped back to its catalog triple. Lets users compose
-      ``plp fetch (plp example_pid <index_key>)`` even when one catalog
-      product type is split across multiple parquets (Diviner edr1+edr2).
-    """
-    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
-
-    if instrument is not None and product_key is not None:
-        return key, instrument, product_key
-
-    mission, instrument, product_key = _parse_dotted_key(key, 3)
-    triple = (mission, instrument, product_key)
-    if triple in INDEX_REGISTRY:
-        return triple
-    # Maybe the user passed an index_key; map back to its catalog triple.
-    for cat_triple, cfg in INDEX_REGISTRY.items():
-        if cfg.index_key == key or key in cfg.extra_index_keys:
-            return cat_triple
-    return triple  # let resolve_product raise the canonical error
-
-
 def _parse_dotted_key(key: str, expected_parts: int) -> tuple[str, ...]:
     """Parse a dotted key like 'lro.diviner' or 'cassini.iss.edr_sat'.
 
@@ -586,9 +555,12 @@ def fetch_product(
         _local_product_dir,
     )
 
-    mission, instrument, product_key = _resolve_fetch_triple(
-        key, instrument, product_key,
-    )
+    if instrument is None and product_key is None:
+        mission, instrument, product_key = _parse_dotted_key(key, 3)
+    elif instrument is not None and product_key is not None:
+        mission = key
+    else:
+        raise ValueError("Provide either a dotted key or all three arguments")
 
     resolved = resolve_product(mission, instrument, product_key, product_id)
     if local_dir is None:
@@ -636,9 +608,12 @@ def get_product_urls(
     """
     from planetarypy.catalog._resolver import resolve_product
 
-    mission, instrument, product_key = _resolve_fetch_triple(
-        key, instrument, product_key,
-    )
+    if instrument is None and product_key is None:
+        mission, instrument, product_key = _parse_dotted_key(key, 3)
+    elif instrument is not None and product_key is not None:
+        mission = key
+    else:
+        raise ValueError("Provide either a dotted key or all three arguments")
 
     resolved = resolve_product(mission, instrument, product_key, product_id)
     return resolved.file_urls
