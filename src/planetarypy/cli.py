@@ -370,7 +370,7 @@ def ctxqv(
 
 # ── catalog ──────────────────────────────────────────────────────────
 
-catalog_app = typer.Typer(help="PDS catalog management.")
+catalog_app = typer.Typer(help="PDS catalog management.", no_args_is_help=True)
 app.add_typer(catalog_app, name="catalog")
 
 
@@ -698,7 +698,9 @@ def catalog_ambiguous():
 
 # ── indexes: registered PDS index browse ─────────────────────────────
 
-indexes_app = typer.Typer(help="Browse and manage registered PDS indexes.")
+indexes_app = typer.Typer(
+    help="Browse and manage registered PDS indexes.", no_args_is_help=True,
+)
 app.add_typer(indexes_app, name="indexes")
 
 
