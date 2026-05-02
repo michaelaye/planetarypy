@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.2] - 2026-05-03
+
+### Fixed
+- **Reverts the v0.59.1 `fetch_product` index_key fallback.** That patch made `plp fetch lro.diviner.edr1 <pid>` succeed by mapping the index_key back to its catalog triple, but it hid a real ambiguity: `edr1`, `edr2`, and `edr` all returned the same row for the same `product_id` because `_load_index_df` already concatenates the two parquets and searches across both. The product physically lives in only one parquet; silently returning a "match" for the wrong index_key was incorrect. Restored the strict catalog-product_key contract for fetch.
+- **Improved error when an index_key is passed where a catalog product_key was expected.** Replaces the misleading *"variable URL paths … no PDS index is available"* message (an index *was* available, just at the catalog product_key) with a direct pointer at the right key:
+  > `'lro.diviner.edr1'` is an index_key (used by `plp meta` and `plp indexes`), not a catalog product_key. For fetching use `'lro.diviner.edr'`. See `plp indexes list lro.diviner` for the full index → catalog mapping.
+
+  Inspection commands (`plp meta`, `plp indexes`, `plp example_pid`) keep their per-parquet index_keys; fetch operates on the catalog product_key. Different scopes = different keys, by design.
+
 ## [0.59.1] - 2026-05-03
 
 ### Fixed
