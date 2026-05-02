@@ -218,13 +218,37 @@ def build_catalog(force: bool = False) -> dict:
     return stats
 
 
+def _assert_schema_current(con) -> None:
+    """Surface a clear error when the on-disk catalog DB predates the current schema.
+
+    The ``normalized_type`` column on ``product_types`` was introduced in the
+    big PDS-catalog rewrite (planetarypy 0.53+). Older DBs only have
+    ``label_type`` and the binder for queries like ``example_products`` /
+    ``list_products(include_phases=True)`` / ``search`` fails opaquely with
+    ``Binder Error: Table 'pt' does not have a column named 'normalized_type'``.
+    Detect that mismatch up front and tell the caller exactly what to do.
+    """
+    cols = {row[1] for row in con.execute(
+        "PRAGMA table_info(product_types)").fetchall()}
+    if "normalized_type" not in cols:
+        con.close()
+        raise RuntimeError(
+            "Stale catalog DB schema (built with planetarypy ≤ 0.52). "
+            "Run `plp catalog build --force` to rebuild — the source-of-truth "
+            "(pdr-tests + INDEX_REGISTRY) is unchanged, so no data is lost."
+        )
+
+
 def get_catalog() -> "duckdb.DuckDBPyConnection":
     """Open and return a connection to the existing catalog database.
 
     Raises
     ------
     FileNotFoundError
-        If the catalog has not been built yet
+        If the catalog has not been built yet.
+    RuntimeError
+        If the catalog DB exists but its schema predates the current code
+        (e.g. built with planetarypy ≤ 0.52).
     """
     from planetarypy.catalog._schema import get_connection, DB_FILENAME
 
@@ -233,7 +257,9 @@ def get_catalog() -> "duckdb.DuckDBPyConnection":
         raise FileNotFoundError(
             "Catalog database not found. Run build_catalog() first."
         )
-    return get_connection(config.storage_root)
+    con = get_connection(config.storage_root)
+    _assert_schema_current(con)
+    return con
 
 
 def _parse_dotted_key(key: str, expected_parts: int) -> tuple[str, ...]:
