@@ -706,20 +706,151 @@ app.add_typer(indexes_app, name="indexes")
 
 @indexes_app.command("list")
 def indexes_list(
-    mission: str = typer.Option(None, "--mission", "-m",
-                                help="Filter to one mission (e.g. 'cassini')."),
-    instrument: str = typer.Option(
-        None, "--instrument", "-i",
-        help="Filter to one instrument; requires --mission.",
+    key: str = typer.Argument(
+        None,
+        help="Optional dotted key: 'mission' or 'mission.instrument'. "
+             "Omit to list missions.",
+    ),
+    tree: bool = typer.Option(
+        False, "--tree",
+        help="Render as a tree (mirrors planetarypy.pds.print_available_indexes).",
     ),
 ):
-    """Tree of registered indexes (the operational fetch surface)."""
-    from planetarypy.pds import print_available_indexes
+    """Browse the registered PDS indexes (the operational fetch surface).
 
-    if instrument and not mission:
-        typer.echo("--instrument requires --mission.", err=True)
+    Examples:
+        plp indexes list                     # all missions, summary table
+        plp indexes list cassini             # cassini instruments
+        plp indexes list cassini.iss         # cassini.iss indexes (with cache status)
+        plp indexes list --tree              # full tree (legacy print_available_indexes)
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.pds import print_available_indexes
+    from planetarypy.pds.utils import _all_dotted_index_keys
+
+    parts = key.split(".") if key else []
+    if len(parts) > 2:
+        typer.echo(
+            f"Too many dotted parts in {key!r}. Use 'plp indexes info <key>' "
+            "for single-index detail.",
+            err=True,
+        )
         raise typer.Exit(1)
-    print_available_indexes(filter_mission=mission, filter_instrument=instrument)
+
+    if tree:
+        print_available_indexes(
+            filter_mission=parts[0] if parts else None,
+            filter_instrument=parts[1] if len(parts) == 2 else None,
+        )
+        return
+
+    all_keys = _all_dotted_index_keys()
+
+    if not parts:
+        # Mission summary
+        from collections import defaultdict
+        by_mission: dict[str, dict[str, list[str]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        for k in all_keys:
+            m, i, idx = k.split(".", 2)
+            by_mission[m][i].append(idx)
+
+        table = Table(
+            title=f"Registered PDS indexes — {len(by_mission)} missions, "
+                  f"{len(all_keys)} indexes",
+            title_style="bold",
+            header_style="bold magenta",
+            pad_edge=False,
+        )
+        table.add_column("mission", style="cyan", no_wrap=True)
+        table.add_column("instruments", justify="right")
+        table.add_column("indexes", justify="right")
+        table.add_column("breakdown", overflow="fold")
+        for m in sorted(by_mission):
+            instruments = by_mission[m]
+            breakdown = ", ".join(
+                f"{i} ({len(instruments[i])})" for i in sorted(instruments)
+            )
+            n_indexes = sum(len(v) for v in instruments.values())
+            table.add_row(m, str(len(instruments)), str(n_indexes), breakdown)
+        Console().print(table)
+        return
+
+    if len(parts) == 1:
+        mission = parts[0]
+        from collections import defaultdict
+        by_instrument: dict[str, list[str]] = defaultdict(list)
+        for k in all_keys:
+            m, i, idx = k.split(".", 2)
+            if m == mission:
+                by_instrument[i].append(idx)
+        if not by_instrument:
+            typer.echo(f"No registered indexes for mission {mission!r}.", err=True)
+            raise typer.Exit(1)
+
+        table = Table(
+            title=f"{mission} — registered indexes",
+            title_style="bold",
+            header_style="bold magenta",
+            pad_edge=False,
+        )
+        table.add_column("instrument", style="cyan", no_wrap=True)
+        table.add_column("indexes", justify="right")
+        table.add_column("names", overflow="fold")
+        for i in sorted(by_instrument):
+            names = sorted(by_instrument[i])
+            table.add_row(i, str(len(names)), ", ".join(names))
+        Console().print(table)
+        return
+
+    # mission.instrument: per-index table with cache + catalog x-ref
+    from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+    from planetarypy.pds import Index
+
+    mission, instrument = parts
+    matching = sorted(
+        k for k in all_keys
+        if k.startswith(f"{mission}.{instrument}.")
+    )
+    if not matching:
+        typer.echo(
+            f"No registered indexes for {mission!r}.{instrument!r}.", err=True
+        )
+        raise typer.Exit(1)
+
+    catalog_xref: dict[str, list[str]] = {}
+    for (m, i, p), cfg in INDEX_REGISTRY.items():
+        catalog_xref.setdefault(cfg.index_key, []).append(f"{m}.{i}.{p}")
+
+    table = Table(
+        title=f"{mission}.{instrument} — registered indexes",
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    table.add_column("index_key", style="cyan", no_wrap=True)
+    table.add_column("cached", justify="center")
+    table.add_column("size", justify="right")
+    table.add_column("catalog entry", overflow="fold")
+    for k in matching:
+        try:
+            idx = Index(k)
+            parq = idx.local_parq_path
+            if parq.is_file():
+                cached = "✓"
+                size = f"{parq.stat().st_size / 1e6:.1f} MB"
+            else:
+                cached = ""
+                size = ""
+        except Exception:
+            cached = "?"
+            size = ""
+        xref = ", ".join(catalog_xref.get(k, []))
+        table.add_row(k, cached, size, xref)
+    Console().print(table)
 
 
 @indexes_app.command("info")
