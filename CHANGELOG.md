@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.0] - 2026-05-03
+
+### Added
+- **`plp catalog` browsing subcommands** — bring the (until now build-only) `plp catalog` namespace into parity with the API by exposing the existing `planetarypy.catalog.*` browse functions as CLI verbs. Each one renders a Rich table; the catalog browse cross-references the index registry so users can see at a glance which entries are fetchable.
+    - `plp catalog list [KEY]` — three-level drill-down: no arg lists all 65 missions with per-mission counts and a `✓ fetchable` flag (set when at least one product type has an `INDEX_REGISTRY` entry); `KEY=mission` lists instruments with their fetchable variants; `KEY=mission.instrument` lists product types with their `index_key` mappings.
+    - `plp catalog show <KEY>` — full info for a `mission.instrument.product_key` triple, including index_key / archive / SETI volume group / completion column / prefix-strip rule when fetchable, plus the catalog DB sample-products count.
+    - `plp catalog search <QUERY>` — wraps `catalog.search()`.
+    - `plp catalog summary` — wraps `catalog.summary()`.
+    - `plp catalog ambiguous` — wraps `catalog.ambiguous_mappings()` (a tripwire surfacing pdr-tests folder names whose `(mission, instrument)` resolution falls through to the bare-name fallback at `_mission_map.py:1083` — empty today is the *healthy* signal).
+- **`plp indexes` subtree** — new top-level namespace for browsing the *operational fetch surface* (the 78 registered PDS cumulative indexes from `~/.planetarypy_index_urls.toml`), kept visually separate from the `plp catalog` inventory tree to avoid confusing "what exists in PDS" with "what we can actually fetch".
+    - `plp indexes list [KEY]` — three-level drill-down matching `plp catalog list`: missions → instruments → indexes. The `mission.instrument` level surfaces which indexes are cached locally with on-disk size and which have a catalog `product_key` entry. `--tree` falls back to the legacy `print_available_indexes()` tree.
+    - `plp indexes info <KEY>` — `IndexConfig` + cache status for a single registered index, including remote URL, completion column, prefix-strip rule, archive base, and reverse-lookup catalog entries that map to this index.
+    - `plp indexes refresh [--config|--cache <KEY>]` — explicit force-refresh of either the upstream `planetarypy_index_urls.toml` (normally auto-refreshed once per day) or a single index's cumulative `.lbl`/`.tab` + parquet rebuild.
+
+### Fixed
+- **`plp catalog` and `plp indexes` (bare invocation) now print help instead of erroring.** Both subapps lacked `no_args_is_help=True`, so `plp catalog` and `plp indexes` exited 2 with a "Missing argument" message rather than the subcommand list. Now mirrors the parent `app`'s behavior.
+
 ## [0.58.1] - 2026-05-01
 
 ### Fixed
