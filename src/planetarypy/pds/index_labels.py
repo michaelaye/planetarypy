@@ -192,19 +192,34 @@ def _convert_times(df):
         col_data = df[column]
         for miss in missing_strings:
             col_data = col_data.replace(miss, np.nan, regex=True)
-        try:
-            df[column] = pd.to_datetime(col_data)
-        except ValueError:
-            logger.warning(
-                f"Could not convert {column} with one format, trying multiple formats. (slower)"
-            )
+        # Standard pandas parser first (handles ISO 8601, naive datetimes,
+        # most common shapes via dateutil under the hood). errors="coerce"
+        # turns the unparseable rows into NaT instead of aborting on the
+        # first one — important for indexes that mix formats per-row (LAMP
+        # has both ISO calendar 'YYYY-MM-DDTHH:MM:SS.fff' and PDS DOY
+        # 'YYYY-DDDTHH:MM:SS' values in the same START_TIME column,
+        # plus the occasional garbage like '0').
+        parsed = pd.to_datetime(col_data, errors="coerce", format="mixed")
+        # Anywhere the standard parser gave up but the source had a value,
+        # fall back to our DOY-aware converter row by row, also tolerantly:
+        # garbage that neither the standard parser nor DOY can read becomes NaT.
+        def _safe_doy(value):
             try:
-                df[column] = pd.to_datetime(col_data, format="mixed")
-            except ValueError:
-                logger.warning(
-                    f"Mixed-format conversion failed for {column}, trying DOY format converter."
-                )
-                df[column] = df[column].apply(tformats.fromdoyformat)
+                return tformats.fromdoyformat(value)
+            except (ValueError, TypeError):
+                return pd.NaT
+
+        needs_fallback = parsed.isna() & col_data.notna()
+        if needs_fallback.any():
+            n = int(needs_fallback.sum())
+            logger.debug(
+                f"{column}: standard parser handled {len(parsed) - n} rows; "
+                f"applying DOY fallback to {n} remaining."
+            )
+            parsed.loc[needs_fallback] = (
+                col_data.loc[needs_fallback].apply(_safe_doy)
+            )
+        df[column] = parsed
     logger.info("Converted time strings to datetime objects.")
     return df
 
