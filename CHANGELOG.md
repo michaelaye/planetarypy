@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.4] - 2026-05-04
+
+### Changed
+- **`plp catalog list <mission>` now distinguishes three states per instrument** instead of collapsing two of them into a blank cell. The previous two-column view ("instrument" + "fetchable product types") couldn't tell apart (a) instruments with no PDS index registered at all from (b) instruments that *are* indexed but lack a fetch resolver (e.g. `lro.lamp` — its index has no VOLUME_ID column, and the archive splits across `LROLAM_<N>` volume directories that can't be derived from row data). New "registered indexes" column lists the index names from the static config; the fetchable cell now shows `(no fetch resolver)` when at least one index exists but no `INDEX_REGISTRY` entry maps it. The second state matters because `plp meta lro.lamp.edr <pid>` works for those instruments — only `plp fetch` doesn't — and there was no way to discover that asymmetry from the catalog browse before.
+
+### Fixed
+- **`get_index()` / `plp meta` / `plp example_pid` now work on indexes with mixed-format time columns (LAMP).** `_convert_times` previously tried up to four format-detection strategies (auto / mixed / ISO 8601 / DOY) but each had to handle the *whole column* — fine for homogeneous columns, broken for indexes that mix per-row formats. LAMP's `START_TIME` has ISO calendar (`2009-07-06T12:47:18.250`), PDS DOY (`YYYY-DDDTHH:MM:SS`), and the occasional garbage value (`'0'`) all in one column. The chain failed at the strict-ISO step, the DOY fallback raised on the first non-DOY row, and the broad `except` in `convert_to_parquet` swallowed the error — symptom was `FileNotFoundError: …/CUMINDEX.parq` from `plp example_pid lro.lamp.edr` later, with the real cause hidden. Switched to a row-wise approach: `pd.to_datetime(errors="coerce", format="mixed")` parses what pandas can (turning unparseable rows to NaT), then a row-wise `_safe_doy` fills the NaTs with the DOY converter (NaT-tolerant — garbage that neither parser handles becomes NaT instead of aborting the whole conversion). Standard parser covers >99% of indexes; DOY is the targeted fallback for what's left.
+
 ## [0.59.3] - 2026-05-03
 
 ### Fixed
