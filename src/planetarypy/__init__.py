@@ -2,7 +2,7 @@
 
 __author__ = """PlanetaryPy Developers"""
 __email__ = "kmichael.aye@gmail.com"
-__version__ = "0.59.4"
+__version__ = "0.59.5"
 
 __all__ = ["enable_logging"]
 

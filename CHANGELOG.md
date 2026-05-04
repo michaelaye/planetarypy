@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.5] - 2026-05-04
+
+### Fixed
+- **`Index.convert_to_parquet` no longer swallows conversion errors.** Previously, any exception during parsing or parquet writing was caught, logged at ERROR level, and dropped. With loguru disabled-by-default in this library, that error never reached the user — the downstream `pd.read_parquet(self.local_parq_path)` then raised `FileNotFoundError: …/CUMINDEX.parq` from a totally unrelated code path. Two real bugs (LAMP mixed-format times in v0.59.4, cassini.cda.index label/table mismatch below) both manifested as this misleading FileNotFoundError. `convert_to_parquet` now re-raises as `RuntimeError` with the index_key in the message and the original parser exception chained as `__cause__`.
+- **`IndexLabel.index_path` raises a descriptive label/table mismatch error.** When a label's `^TABLE` pointer names a file that doesn't exist on disk (under either case), the previous code logged ERROR and returned a phantom path; downstream `pd.read_csv` then raised an unhelpful *"No such file or directory: index.tab"*. Now raises a `FileNotFoundError` that names the label, the declared table filename, what files ARE present in the directory, and labels the situation as a *publishing inconsistency in the source archive* — not auto-fixable in the local cache. `cassini.cda.index` is the canonical case: SETI publishes the cumulative table as `CUMINDEX.TAB` but the included `CUMINDEX.LBL` declares `^INDEX_TABLE = "INDEX.TAB"` (the per-volume convention). Combined with the `convert_to_parquet` re-raise, users of `plp meta cassini.cda.index <pid>` now see exactly what went wrong on the first try.
+
 ## [0.59.4] - 2026-05-04
 
 ### Changed
