@@ -927,6 +927,69 @@ def indexes_list(
     Console().print(table)
 
 
+@indexes_app.command("peek")
+def indexes_peek(
+    key: str = typer.Argument(
+        ..., help="Dotted index key, e.g. cassini.cda.index",
+        autocompletion=_complete_index_key,
+    ),
+    rows: int = typer.Option(
+        3, "--rows", "-n",
+        help="Number of random rows to show (default 3).",
+    ),
+):
+    """Inspect a registered PDS index: shape, column names, a few random rows.
+
+    Useful when an index has a non-standard schema (e.g. cassini.cda.index
+    has FILE_SPECIFICATION_NAME / DATA_SET_ID instead of the usual
+    PRODUCT_ID column) and you want to see what's actually there before
+    deciding which column to use as the product identifier.
+
+    Output is transposed (one row of the index per column of the table)
+    so it stays readable whether the index has 4 columns or 71.
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.pds import get_index
+    from planetarypy.pds.utils import _all_dotted_index_keys
+
+    if key not in _all_dotted_index_keys():
+        typer.echo(f"Unknown index key: {key!r}.", err=True)
+        raise typer.Exit(1)
+
+    df = get_index(key, allow_refresh=False)
+    n = max(0, min(rows, len(df)))
+    sample = df.sample(n=n) if n > 0 else df.head(0)
+
+    table = Table(
+        title=f"{key} — {len(df):,} rows × {len(df.columns)} cols  "
+              f"(showing {n} random)",
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    table.add_column("field", style="cyan", no_wrap=True)
+    for i in range(n):
+        table.add_column(f"row {i + 1}", overflow="fold")
+    for col in df.columns:
+        values = [
+            "" if pd_isna(sample[col].iloc[i]) else str(sample[col].iloc[i])
+            for i in range(n)
+        ]
+        table.add_row(str(col), *values)
+    Console().print(table)
+
+
+def pd_isna(v):
+    """Lazy-import-friendly NaN check for the peek command."""
+    import pandas as pd
+    try:
+        return bool(pd.isna(v))
+    except (TypeError, ValueError):
+        return False
+
+
 @indexes_app.command("info")
 def indexes_info(
     key: str = typer.Argument(..., help="Dotted index key, e.g. cassini.iss.index",
