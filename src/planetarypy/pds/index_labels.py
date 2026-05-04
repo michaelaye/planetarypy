@@ -128,15 +128,34 @@ class IndexLabel:
 
     @property
     def index_path(self):
-        p = self.path.parent / self.index_name
-        logger.info(f"Looking for index table file at {p}")
-        if not p.exists():
-            # Fudging path name to lower case, opposing label value. (PDS data inconsistency)"
-            p = self.path.parent / self.index_name.lower()
-            logger.warning(f"Index table file not found, now trying {p}")
-        if not p.exists():
-            logger.error("Index table file not found.")
-        return p
+        # Try the label-pointed name verbatim, then a lowercase fallback
+        # (some archives publish lowercase filenames despite an uppercase
+        # label pointer — a benign PDS quirk).
+        for candidate in (self.index_name, self.index_name.lower()):
+            p = self.path.parent / candidate
+            if p.exists():
+                return p
+
+        # Neither variant exists — the label's ^TABLE pointer doesn't
+        # match anything on disk. This is a real publishing inconsistency:
+        # the cumulative table was downloaded under one name (typically
+        # the .LBL stem, e.g. CUMINDEX.TAB) but the label declares a
+        # per-volume canonical name (e.g. INDEX.TAB) that the archive
+        # didn't actually publish at this path.
+        present = sorted(
+            f.name for f in self.path.parent.iterdir() if f.is_file()
+        )
+        raise FileNotFoundError(
+            f"PDS label/table mismatch in {self.path.parent}: "
+            f"the label {self.path.name!r} declares its data table as "
+            f"{self.index_name!r} (^{self.tablename}), but no file with "
+            f"that name (or its lowercase variant) exists in the directory. "
+            f"Files present: {present}. "
+            f"This is a publishing inconsistency in the source archive — "
+            f"the label points at a filename that doesn't match the actual "
+            f"downloaded data table. Not auto-fixable: the alternate file "
+            f"would have to be obtained from the source archive separately."
+        )
 
     @property
     def pvl_lbl(self):
