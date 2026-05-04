@@ -672,6 +672,62 @@ def catalog_search(
     Console().print(table)
 
 
+@catalog_app.command("samples")
+def catalog_samples(
+    key: str = typer.Argument(
+        ...,
+        help="Dotted catalog key 'mission.instrument.product_key'.",
+    ),
+    phase: str = typer.Option(
+        None, "--phase",
+        help="Filter to one mission phase (e.g. 'saturn', 'cruise').",
+    ),
+    limit: int = typer.Option(
+        20, "--limit", "-n",
+        help="Cap rows printed (use 0 for all).",
+    ),
+):
+    """Print the sample products in the catalog DB for a product type.
+
+    Wraps ``planetarypy.catalog.example_products()``. Useful to inspect
+    what's actually catalogued for a given product type, especially for
+    archives without a registered fetch resolver where these samples
+    are the only available products.
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.catalog import example_products
+
+    parts = key.split(".")
+    if len(parts) != 3:
+        typer.echo(
+            f"Expected 'mission.instrument.product_key', got {key!r}.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    df = example_products(key, phase=phase)
+    if df.empty:
+        typer.echo(f"No catalog samples for {key!r}"
+                   + (f" (phase={phase!r})" if phase else "") + ".")
+        return
+
+    shown = df if limit == 0 else df.head(limit)
+    title = f"Catalog samples: {key}"
+    if phase:
+        title += f"  phase={phase!r}"
+    title += f"  ({len(shown)}/{len(df)} rows)"
+
+    table = Table(title=title, title_style="bold",
+                  header_style="bold magenta", pad_edge=False)
+    for col in shown.columns:
+        table.add_column(str(col), overflow="fold")
+    for _, row in shown.iterrows():
+        table.add_row(*[str(v) if v is not None else "" for v in row])
+    Console().print(table)
+
+
 @catalog_app.command("summary")
 def catalog_summary():
     """Per-mission counts of instruments, product types, and products."""
