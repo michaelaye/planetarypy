@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.60.0] - 2026-05-04
+
+### Added
+- **`plp catalog samples <key>`** — print the sample products in the catalog DB for a `mission.instrument.product_key` triple. Wraps `planetarypy.catalog.example_products()` in a Rich table with `--phase` (filter to one mission phase) and `-n / --limit` (cap rows; 0 = all). Useful for inspecting what's actually catalogued for archives without a registered fetch resolver, where these samples are the only available products.
+- **`plp indexes peek <key>`** — inspect a registered PDS index's schema and a few random rows. Output is transposed (one row of the index per column of the table) so it stays readable whether the index has 4 columns (`cassini.cda.index`) or 71 (`mro.hirise.edr`). Default 3 random rows; `-n / --rows N` to vary. Motivated by discovering that `cassini.cda.index` has `FILE_SPECIFICATION_NAME` / `DATA_SET_ID` instead of the usual `PRODUCT_ID` column — peek surfaces the schema before you have to guess which column to use.
+
 ## [0.59.5] - 2026-05-04
 
 ### Fixed
