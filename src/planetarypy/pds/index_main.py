@@ -241,7 +241,15 @@ class Index:
         return False
 
     def convert_to_parquet(self):
-        """Convert the downloaded index files to parquet format."""
+        """Convert the downloaded index files to parquet format.
+
+        Raises
+        ------
+        RuntimeError
+            If parsing the downloaded label/table files or writing the
+            parquet failed. The original parser error is chained as
+            ``__cause__`` so tracebacks still show the underlying reason.
+        """
         logger.info(f"Converting {self.index_key} to parquet format.")
 
         try:
@@ -254,6 +262,10 @@ class Index:
             logger.info(f"Finished converting {self.index_key} to parquet format.")
         except Exception as e:
             logger.error(f"Error converting {self.index_key} to parquet: {e}")
+            raise RuntimeError(
+                f"Could not convert PDS index {self.index_key!r} to parquet: "
+                f"{e}"
+            ) from e
 
     def read_index_data(self, convert_times: bool = True):
         """Read the index data from label and table files."""
