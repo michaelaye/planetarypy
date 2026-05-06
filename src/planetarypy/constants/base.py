@@ -24,108 +24,70 @@ import numpy as np
 import astropy.units as u
 
 
+# Julian century — 100 Julian years, the natural unit for PCK polynomial
+# rate coefficients (POLE_RA, POLE_DEC, quadratic terms). astropy's
+# ``u.cy`` is the "cycle" unit (rotational measure), not century, and
+# ``100 * u.year`` reduces numerically to ``0.01 * yr`` on display. We
+# register a named unit here once for the whole subpackage so
+# generated iauNNNN.py modules can import it without duplicate-
+# registration errors. exclude_prefixes prevents auto-generation of
+# kilo-/mega- variants we don't want polluting the namespace.
+century = u.def_unit("century", 100 * u.year)
+
+
 # ── Constant ────────────────────────────────────────────────────────────
 
 
 class Constant(u.Quantity):
     """A ``Quantity`` with attached PCK provenance metadata.
 
-    Behaves like any other :class:`astropy.units.Quantity` for math and
-    unit operations — composes in formulas, supports ``.to()``, slices,
-    etc. The extra fields are read-only after construction:
+    Behaves like any other :class:`astropy.units.Quantity` for math
+    and unit operations — composes in formulas, supports ``.to()``,
+    slices, etc. View operations (slicing, copying, ufuncs) propagate
+    metadata; explicitly demote to plain ``Quantity`` if you want a
+    metadata-free value.
 
-    - ``name``         — short field name, e.g. ``"GM"``, ``"radii"``
-    - ``body``         — body name, e.g. ``"Mars"``
-    - ``description``  — human-readable description
-    - ``reference``    — citation string (IAU report)
-    - ``iau_year``     — IAU edition year (e.g. ``2015``)
-    - ``pck_source``   — source PCK filename (e.g. ``"pck00011.tpc"``)
-
-    Math operations (``+``, ``-``, ``*``, ``/``, ``**``, ufuncs) preserve
-    the metadata of the *first* operand on a best-effort basis. Use
-    ``.value`` if you want a clean numeric result without metadata; use
-    the metadata on a value that came directly from PCK.
+    Metadata fields (all defaulting to empty/zero):
+    ``name``, ``body``, ``description``, ``reference``, ``iau_year``,
+    ``pck_source``.
     """
 
-    def __new__(
-        cls,
-        value,
-        unit=None,
-        *,
-        name: str = "",
-        body: str = "",
-        description: str = "",
-        reference: str = "",
-        iau_year: int = 0,
-        pck_source: str = "",
-        **kwargs,
-    ):
-        # Accept the same shapes as Quantity: a Quantity, a (value, unit)
-        # pair, or a bare value with separate unit.
+    # Field name → default. Drives both __new__ propagation and
+    # __array_finalize__ inheritance from view-source objects.
+    _META: dict[str, object] = {
+        "name": "", "body": "", "description": "",
+        "reference": "", "iau_year": 0, "pck_source": "",
+    }
+
+    def __new__(cls, value, unit=None, *,
+                name="", body="", description="",
+                reference="", iau_year=0, pck_source=""):
         if isinstance(value, u.Quantity):
-            inst = u.Quantity.__new__(
-                cls, value.value, value.unit, **kwargs
-            )
+            inst = u.Quantity.__new__(cls, value.value, value.unit)
         else:
-            inst = u.Quantity.__new__(cls, value, unit, **kwargs)
-        inst._meta = {
-            "name": name,
-            "body": body,
-            "description": description,
-            "reference": reference,
-            "iau_year": int(iau_year),
-            "pck_source": pck_source,
-        }
+            inst = u.Quantity.__new__(cls, value, unit)
+        inst.name = name
+        inst.body = body
+        inst.description = description
+        inst.reference = reference
+        inst.iau_year = int(iau_year)
+        inst.pck_source = pck_source
         return inst
 
     def __array_finalize__(self, obj):
         super().__array_finalize__(obj)
         if obj is None:
             return
-        # Propagate metadata for view operations (slicing, copying, math
-        # via __array_wrap__). Falls back to empty defaults if obj has
-        # no metadata (unlikely but defensive).
-        self._meta = getattr(obj, "_meta", {
-            "name": "", "body": "", "description": "",
-            "reference": "", "iau_year": 0, "pck_source": "",
-        })
-
-    # Read-only accessors. Don't expose direct dict mutation.
-    @property
-    def name(self) -> str: return self._meta.get("name", "")
-    @property
-    def body(self) -> str: return self._meta.get("body", "")
-    @property
-    def description(self) -> str: return self._meta.get("description", "")
-    @property
-    def reference(self) -> str: return self._meta.get("reference", "")
-    @property
-    def iau_year(self) -> int: return self._meta.get("iau_year", 0)
-    @property
-    def pck_source(self) -> str: return self._meta.get("pck_source", "")
+        for field, default in self._META.items():
+            setattr(self, field, getattr(obj, field, default))
 
     def __repr__(self) -> str:
-        # If we have provenance, surface it. Otherwise behave like a
-        # plain Quantity (no "Constant ..." wrapper) so users don't see
-        # a bare value claiming a type that's not telling them anything.
-        body = self._meta.get("body", "")
-        name = self._meta.get("name", "")
-        year = self._meta.get("iau_year", 0)
-        if body and name and year:
-            try:
-                val = np.asarray(self)
-                if val.shape == ():
-                    val_repr = f"{float(val):.6g}"
-                else:
-                    val_repr = np.array2string(val, precision=6, separator=", ")
-            except Exception:
-                val_repr = repr(np.asarray(self))
-            return (
-                f"<Constant {body}.{name} = {val_repr} {self.unit}  "
-                f"(IAU {year})>"
-            )
-        # Fall through to a plain Quantity-style repr — same content,
-        # no "Constant" prefix.
+        if self.body and self.name and self.iau_year:
+            arr = np.asarray(self)
+            v = (f"{float(arr):.6g}" if arr.shape == ()
+                 else np.array2string(arr, precision=6, separator=", "))
+            return (f"<Constant {self.body}.{self.name} = {v} {self.unit}  "
+                    f"(IAU {self.iau_year})>")
         return repr(u.Quantity(self))
 
 
@@ -190,31 +152,26 @@ class Body:
     def mass(self) -> Optional[u.Quantity]:
         """Body mass derived from ``GM`` and ``astropy.constants.G``.
 
-        Returns plain ``Quantity`` (not ``Constant``) — provenance is
-        "see GM and astropy's G". Returns ``None`` if ``GM`` is unknown.
+        Plain ``Quantity`` — derived values shouldn't claim PCK
+        provenance they don't have. ``None`` when ``GM`` is unknown.
         """
         if self.GM is None:
             return None
         from astropy.constants import G
-        result = (self.GM / G).to(u.kg)
-        # Demote to plain Quantity: derived values shouldn't claim PCK
-        # provenance they don't directly have.
-        return u.Quantity(result.value, result.unit)
+        return (self.GM / G).to(u.kg).value * u.kg
 
     @property
     def density(self) -> Optional[u.Quantity]:
-        """Mean density derived from ``mass`` and triaxial ``radii``.
+        """Mean density from ``mass`` over the triaxial ellipsoid volume.
 
-        Volume is computed as a triaxial ellipsoid:
-        ``V = (4/3) * π * a * b * c``. Returns ``None`` if either ``GM``
-        or ``radii`` is unknown.
+        ``V = (4/3) · π · a · b · c``. ``None`` when either ``GM`` or
+        ``radii`` is unknown.
         """
         if self.GM is None or self.radii is None:
             return None
         a, b, c = self.radii
         volume = (4.0 / 3.0) * np.pi * a * b * c
-        result = (self.mass / volume).to(u.kg / u.m ** 3)
-        return u.Quantity(result.value, result.unit)
+        return (self.mass / volume).to(u.kg / u.m ** 3).value * u.kg / u.m ** 3
 
     def __repr__(self) -> str:
         return (
@@ -237,65 +194,47 @@ class BodyRegistry(dict):
 
     def __init__(self, bodies: Optional[dict] = None):
         super().__init__(bodies or {})
-        self._refresh_name_index()
-
-    def _refresh_name_index(self) -> None:
-        self._by_name = {
-            b.name.upper(): b for b in self.values()
-            if isinstance(b, Body)
-        }
+        self._by_name = {b.name.upper(): b for b in self.values()
+                         if isinstance(b, Body)}
 
     def __getitem__(self, key):
-        if isinstance(key, int):
-            return super().__getitem__(key)
         if isinstance(key, str):
             try:
                 return self._by_name[key.upper()]
             except KeyError:
                 raise KeyError(key) from None
-        raise KeyError(key)
+        return super().__getitem__(key)
 
     def __contains__(self, key) -> bool:
-        if isinstance(key, int):
-            return super().__contains__(key)
         if isinstance(key, str):
             return key.upper() in self._by_name
-        return False
+        return super().__contains__(key)
 
     def find(self, query) -> Optional[Body]:
-        """Best-effort lookup by NAIF id or case-insensitive name.
-
-        Returns ``None`` instead of raising on miss, unlike ``__getitem__``.
-        """
+        """Best-effort lookup by NAIF id or name; ``None`` on miss."""
         try:
             return self[query]
         except KeyError:
             return None
 
-    def by_class(
-        self,
-        body_class: str,
-        parent: Optional[object] = None,
-    ) -> list[Body]:
-        """Filter to a body class, optionally restricted to one parent.
+    def by_class(self, body_class: str, parent=None) -> list[Body]:
+        """Filter by ``body_class``, optionally also by ``parent``.
 
-        ``parent`` may be a NAIF id (``699``), a body name (``"Saturn"``),
-        or a :class:`Body` instance.
+        ``parent`` may be a NAIF id, a body name, or a :class:`Body`.
         """
         results = [b for b in self.values()
                    if isinstance(b, Body) and b.body_class == body_class]
         if parent is None:
             return results
-
         if isinstance(parent, Body):
             parent_id = parent.naif_id
         elif isinstance(parent, int):
             parent_id = parent
         elif isinstance(parent, str):
-            try:
-                parent_id = self._by_name[parent.upper()].naif_id
-            except KeyError:
+            found = self.find(parent)
+            if found is None:
                 return []
+            parent_id = found.naif_id
         else:
             raise TypeError(
                 f"parent must be int, str, or Body; got {type(parent).__name__}"

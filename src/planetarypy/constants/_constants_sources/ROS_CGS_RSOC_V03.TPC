@@ -1,0 +1,110 @@
+KPL/PCK
+
+Comet Churyumov-Gerasimenko -- RSOC Solution
+===========================================================================
+
+ 
+Version and Date
+--------------------------------------------------------
+
+     Version 0.3 -- June 14, 2012 -- J. Vazquez, SRE-OSR/ESA
+                    BODY1000012_LONG_AXIS keyword (deprecated) removed.
+
+     Version 0.2 -- June 4, 2012 -- B. Grieger, SRE-OSR/ESA
+     
+     Version 0.1 -- January 26, 2011 -- M. Kueppers, SRE-OSR/ESA 
+                    Corrected spin axis direction.
+
+     Version 0.0 -- September 9, 2010 -- J. Vazquez, PSA, SRE-OS/ESA
+     
+ 
+ 
+Organization
+--------------------------------------------------------
+ 
+     The sections of this file are as follows.
+ 
+     Introductory Information:
+ 
+         --   Version description
+ 
+         --   Disclaimer
+ 
+         --   Sources
+ 
+     Pck Data:
+ 
+         --   Orientation constants for Comet 67P/Churyumov-Gerasimenko
+ 
+         --   Radii for Comet 67P/Churyumov-Gerasimenko
+ 
+ 
+Version description
+--------------------------------------------------------
+ 
+     This is a PCK containing values for the pole orientation, 
+     rotation period and shape obtained from [2] and [3].
+     
+ 
+Disclaimer
+--------------------------------------------------------
+ 
+     This constants file may not contain the parameter values that you
+     prefer. Note that this file may be readily modified by you or
+     anyone else. PSA suggests that you inspect this file visually
+     before proceeding with any critical or extended data processing.
+ 
+     PSA requests that you update the version section if you modify
+     the file.
+ 
+ 
+Sources
+--------------------------------------------------------
+ 
+     The sources for the constants listed in this file are:
+ 
+        1) ESA Science and Technology Server, Rosetta area,
+           http://sci.esa.int/science-e/www/object/index.cfm?
+           fobjectid=34849
+
+        2) Technical note RO-ESC-TN-5566
+
+Orientation constants for Comet Churyumov-Gerasimenko.
+------------------------------------------------------
+
+     The direction of the rotation axis and the rotation period are based on
+     as of 2012-Mar-30.
+
+     The phase of the rotation is chosen so that at the reference time
+     2014-08-07T12:00:00 TDB the axis of the rotation from J2000 to the comet
+     fixed frame is prependicular to the z-axis.
+
+     \begindata
+ 
+        BODY1000012_POLE_RA       = (  220.0            0.0            0.0 )
+        BODY1000012_POLE_DEC      = (  -70.0            0.0            0.0 )
+        BODY1000012_PM            = (  -86.369364827  679.245283019    0.0 )
+ 
+     \begintext
+
+     An ellipsoid of the same volume as the polyhedron shape model was fitted
+     to the shape model. The optimisation criterion was maximum common volume. 
+     The smallest radius of the ellipsoid was restricted to be along the 
+     z-axis.
+
+     \begindata
+
+        BODY1000012_RADII         = (    2.398          1.887          1.532 )
+
+     \begintext
+
+     Please note that the prime meridian of the comet is rotated 22.39 degrees
+     east from the long axis (X) of the reference frame.
+
+     In order to use the ellipsoid shape model with correct orientation
+     relative to the polyhedron shape model, an auxiliary frame with
+     appropriate rotation relative to the body fixed frame is needed. Such
+     a frame named 67P/C-G_ELLIPSOID is provided in the kernel ROS_CGS_AUX_V01.TF.
+     E.g., in calls to SINCPT, the name 67P/C-G_ELLIPSOID has to be passed
+     as body-fixed, body-centered target body frame.
+     
