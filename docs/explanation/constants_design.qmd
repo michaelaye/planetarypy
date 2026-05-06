@@ -1,0 +1,384 @@
+---
+title: "Constants Sub-package — Design"
+date: "2026-05-06"
+---
+
+This chapter records the design decisions behind `planetarypy.constants` —
+why it looks the way it does, what alternatives were considered, and why
+they were rejected. It complements the API reference rather than
+duplicating it: read this if you want to understand *why*, not *how*.
+
+## Goal
+
+Provide a clean, easy-to-use interface to the per-body cartographic and
+physical constants published by NAIF in the SPICE *Planetary Constants
+Kernel* (PCK) — radii, GMs, pole orientations, prime meridians, rotation
+rates — for the ~140 solar-system bodies the PCK covers. Plus build in a
+**time-travel mechanism** so comparative studies against older
+publications can be reproduced exactly: any analysis must be able to pin
+the IAU report edition that was current when the source paper was
+written.
+
+## Inspiration: how astropy does this
+
+`astropy.constants` already solves the same shape of problem for
+fundamental physical constants, and we deliberately mirror its pattern:
+
+* Sibling submodules `astropy.constants.iau2015`, `iau2018`, `codata2018`,
+  etc., each exposing the same symbol names with version-specific values.
+* The top-level `astropy.constants` re-exports the current default; older
+  editions are reachable by explicit import path.
+* No runtime "switch" — time-travel is *just choosing a different import
+  path*. Trivially safe, no global state.
+* Astropy doesn't ship the upstream codata source files at runtime — the
+  per-edition modules contain pre-computed `Constant` objects, generated
+  once per release.
+
+We reproduce all four of these properties.
+
+## How we read PCK files (and why we don't use spiceypy at runtime)
+
+Three options were on the table:
+
+### Option A — Pure custom PCK parser
+
+Write our own parser for the PCK kernel-pool format
+(`BODY499_RADII = (3396.19, 3396.19, 3376.20)` style assignments).
+
+* **Pros:** no SPICE dependency at all.
+* **Cons:** non-trivial parser to maintain; drift risk on every new PCK
+  release as NAIF tweaks the grammar.
+
+Rejected: maintenance cost for a problem that's already solved by SPICE.
+
+### Option B — Use `spiceypy` at runtime
+
+Call `furnsh(pck_path)` and `gdpool("BODY499_RADII", …)` whenever the
+user asks for a constant.
+
+* **Pros:** authoritative parser (same one SPICE uses); no parser to maintain.
+* **Cons:**
+    * **Kernel pool is global state.** Loading both `pck00010.tpc` and
+      `pck00011.tpc` simultaneously to compare IAU 2009 vs IAU 2015
+      requires `furnsh`/`unload` cycles, with race conditions if anyone
+      else in the same Python session is using SPICE for ephemerides.
+    * `spiceypy` lives in the `[spice]` optional extra. Making constants
+      core-required would either drag SPICE into core or hide constants
+      behind the optional install — both worse.
+    * Slow startup: paying SPICE's load cost just to read a few floats.
+
+Rejected: the global kernel pool breaks the time-travel design. iau2009
+and iau2015 modules need to coexist in one process without conflict.
+
+### Option C — Pre-process PCK files at build time *(chosen)*
+
+Use `spiceypy` as a **build-time oracle**, not a runtime dependency.
+
+A maintainer-only script (`scripts/regenerate_constants.py`):
+
+1. Loads each PCK with spiceypy.
+2. Walks every body that has at least one PCK pool variable.
+3. Extracts the relevant fields (`RADII`, `GM`, `POLE_RA`, `POLE_DEC`,
+   `PM`, etc.).
+4. Writes a generated Python module
+   `src/planetarypy/constants/iauNNNN.py` containing one `Body(...)`
+   block per body, with all values pre-computed as
+   `astropy.units.Quantity` literals.
+
+The script is run once per upstream PCK release. The generated `.py`
+files are committed alongside the source `.tpc` kernels under
+`_pck_sources/`. The runtime package never imports `spiceypy`.
+
+This gives us:
+
+* **Zero SPICE dependency at runtime** — `planetarypy.constants` works
+  in environments without `[spice]` installed.
+* **No global-pool problem** — every IAU edition is a separate
+  module of immutable Python data; both can be imported and used
+  side-by-side without interference.
+* **Authoritative parsing** — `spiceypy` is still the parser; we never
+  hand-roll PCK grammar.
+* **Reproducible artifacts** — checking in both the source PCK *and* the
+  generated module means CI can re-run the regenerator and verify the
+  output hasn't drifted (drift = bug).
+
+## PCK ↔ IAU report mapping
+
+Confirmed from NAIF's `aareadme.txt`:
+
+| PCK file              | Released  | IAU report edition                     |
+|-----------------------|-----------|----------------------------------------|
+| `pck00010.tpc`        | 2011-10-21 | IAU 2009 (Archinal et al., 2010)       |
+| `pck00011.tpc`        | 2022-12-27 | IAU 2015 (Archinal et al., 2018) [^1]  |
+| `pck00011_n0066.tpc`  | 2022-12-27 | same as `pck00011.tpc`, packaged for SPICE Toolkit N0066 |
+
+[^1]: NAIF's `aareadme.txt` calls out this PCK as encoding the IAU 2015
+    Working Group report; the published paper appeared in 2018 but the
+    report itself is dated 2015.
+
+So at the time of this writing **NAIF ships PCKs for two IAU editions**:
+2009 and 2015. There is no IAU 2018 PCK from NAIF yet. The architecture
+handles new editions cleanly: drop the new `.tpc` file in
+`_pck_sources/`, add an entry to `PCK_BY_IAU` in the regenerator, run the
+script. No code changes elsewhere.
+
+If a user genuinely needs IAU 2018 values before NAIF packages them, the
+project policy is *"we mirror what NAIF ships"* — no hand-authored
+`iau2018.py` from the published paper. The regenerator script is the
+single source of truth.
+
+## Body coverage: parse everything, discover via helpers
+
+Two approaches were considered:
+
+* **Curated** — hand-pick ~30–50 well-known bodies (planets, classical
+  moons, mission-visited small bodies). Modules stay small (~200 lines);
+  maintainer reviews each addition.
+* **Exhaustive** — auto-include every body in the PCK that has at least
+  one relevant pool variable. ~140 bodies. Modules grow to ~1400 lines
+  but coverage is automatic.
+
+The exhaustive option won, with a key UX provision: **discovery
+helpers** that classify bodies by NAIF ID convention so users can
+navigate without having to know all 140 names:
+
+```python
+from planetarypy.constants import (
+    sun, planets, moons, asteroids, comets, dwarf_planets,
+    bodies, find_body, mission_visited,
+)
+
+planets()              # all 9 planets including Pluto
+moons(of="Saturn")     # all Saturn moons in PCK
+asteroids()            # all NAIF 2NNNNNN bodies
+mission_visited()      # union of mission-visited asteroids + comets
+find_body("Bennu")     # case-insensitive name lookup
+find_body(606)         # NAIF ID lookup
+```
+
+Classification is **auto-derived from the NAIF ID scheme** (no per-body
+maintenance):
+
+* `naif_id == 10` → `sun`
+* `1 ≤ naif_id ≤ 9` → `barycenter` *(skipped — no PCK data)*
+* `100 ≤ naif_id ≤ 999`, `naif_id % 100 == 99` → `planet`
+* `100 ≤ naif_id ≤ 999`, otherwise → `moon` (with `parent` derivable as `(id // 100) * 100 + 99`)
+* `1_000_000 ≤ naif_id < 2_000_000` → `comet`
+* `2_000_000 ≤ naif_id < 3_000_000` → `asteroid`
+
+Two orthogonal flags are **curated overlays** in the regenerator script
+because they're not derivable from the ID scheme:
+
+* `dwarf_planet` — IAU classification (Pluto, Ceres, …). Pluto appears
+  in *both* `planets()` and `dwarf_planets()` — overlap is OK and matches
+  IAU's dual classification.
+* `mission_visited` — humanity has actually flown by, orbited, or landed
+  on this body (Bennu, Ryugu, Eros, Ceres, Vesta, 67P, Tempel 1, …).
+
+Body classification stops at "moon" — irregular-vs-regular distinction
+is a semantic call (orbital eccentricity / inclination thresholds), not
+derivable from NAIF ID. `Body.is_irregular` could be added later as a
+curated overlay if planetary scientists ask for it.
+
+`moons()` with no argument returns a flat list across all planets, for
+consistency with `planets()` and `asteroids()`.
+
+## What fields each body carries
+
+The PCK exposes more per-body data than just the headline values. We
+think of the field set as four layers, of which we ship three:
+
+### Layer 1 — Static physical properties *(always included)*
+
+* `radii` — triaxial body radii (a, b, c) as a 3-element Quantity in km
+* `GM` — gravitational parameter, Quantity in km³/s²
+
+### Layer 2 — Orientation at J2000 *(included where present)*
+
+The most commonly-cited values in publications:
+
+* `pole_ra` — right ascension of north pole at J2000 (Quantity, deg)
+* `pole_dec` — declination of north pole at J2000 (Quantity, deg)
+* `pm` — prime meridian angle at J2000 (Quantity, deg)
+* `rotation_rate` — sidereal rotation rate (Quantity, deg/day) —
+  the linear coefficient of the PM polynomial
+
+These are scalar values at J2000, ready to use without time evaluation.
+
+### Layer 3 — Polynomial coefficients *(included where present)*
+
+For users who need accurate orientation at any epoch, the full
+`(J2000_value, rate, quadratic)` tuples for each rotational element:
+
+* `pole_ra_coeffs` — tuple of 3 Quantities
+* `pole_dec_coeffs` — tuple of 3 Quantities
+* `pm_coeffs` — tuple of 3 Quantities
+
+Layer 3 is essentially free — the regenerator extracts all three values
+from `gdpool` regardless. Layer 2 is just the first element of each
+Layer 3 tuple, exposed separately for convenience.
+
+### Layer 4 — Nutation/precession *(out of scope for v1)*
+
+`NUT_PREC_RA / NUT_PREC_DEC / NUT_PREC_PM` arrays plus parent-system
+`NUT_PREC_ANGLES` are useless without an evaluator that combines them
+with time and the parent angles to compute periodic orientation
+corrections. Implementing the evaluator would mean re-implementing
+SPICE's `bodeul` / `pxform` — non-trivial and duplicative of work users
+who need this level of accuracy already have via `spiceypy` directly.
+
+Documented escape hatch:
+
+> *For time-evolved body orientation including nutation/precession,
+> use* `spiceypy.pxform` *or the* `planets` *package —*
+> `planetarypy.constants` *exposes the static PCK values, not the
+> orientation evaluator.*
+
+Could be revisited in a future version if real demand emerges.
+
+### Derived attributes *(computed at module-build time)*
+
+Mathematically free, commonly cited, baked into the generated module:
+
+* `mean_radius` — `(a+b+c)/3`, Quantity in km
+* `volume_radius` — `(a·b·c)^(1/3)`, spherical-equivalent radius
+* `flattening` — `(a−c)/a`, dimensionless
+
+### Derived attributes *(computed at access time)*
+
+Lazy properties that depend on `astropy.constants`:
+
+* `Body.mass` — `(self.GM / astropy.constants.G).to(u.kg)`
+* `Body.density` — `self.mass / ((4/3) · π · a · b · c)`
+
+These use astropy's `G` at call time, so the value reflects whatever
+codata edition astropy currently uses. The IAU-version-locked part is
+`GM` (different per `planetarypy.constants` submodule); `G` is a CODATA
+fundamental, not an IAU value. That matches how IAU reports actually
+treat the variables.
+
+## `Constant` vs plain `Quantity`
+
+Every Layer-1, Layer-2, Layer-3 value is a `Constant` — a thin subclass
+of `astropy.units.Quantity` that carries provenance metadata:
+
+```python
+class Constant(astropy.units.Quantity):
+    name           # e.g. "GM"
+    body           # e.g. "Mars"
+    description    # e.g. "Gravitational parameter"
+    reference      # e.g. "IAU 2015 — Archinal et al. ..."
+    iau_year       # e.g. 2015
+    pck_source     # e.g. "pck00011.tpc"
+```
+
+Math operations correctly demote to plain `Quantity` (so
+`Mars.GM * Saturn.GM` doesn't pretend to belong to either body), via
+`__array_finalize__` — astropy's own `Constant` does the same.
+
+### Why a subclass at all
+
+Three possible representations were considered:
+
+1. **Plain `Quantity` everywhere**, with provenance recoverable only via
+   the import path (`iau2015.Mars` tells you year + body).
+2. **Plain `Quantity` + sidecar lookup** function:
+   `info(Mars.GM) → {"reference": ..., "description": ..., ...}`.
+3. **`Constant` subclass with attached metadata** (chosen).
+
+The whole point of separate `iauNNNN` modules is *provenance traceability
+for reproducibility studies*. If a reader of someone else's notebook
+sees `Mars.GM = 42828.374` with no source attached, the package has
+failed at its main job. Attaching the metadata to the value itself is
+the most direct way to deliver on that promise:
+
+```python
+# Self-describing, no out-of-band lookup needed
+print(f"using Mars.GM = {Mars.GM} ({Mars.GM.reference})")
+
+# Iteration over discovered bodies preserves provenance
+for body in planets():
+    print(body.name, body.GM, body.GM.reference)
+```
+
+The repr is also genuinely informative for interactive notebook use:
+
+```
+>>> Mars.GM
+<Constant Mars.GM = 42828.374 km3 / s2  (IAU 2015)>
+```
+
+The cost is bounded — ~30-50 lines of subclassing in `base.py`, mostly
+boilerplate to make `__array_finalize__` correctly drop metadata on
+math operations. We're not inventing anything; astropy's
+`astropy.constants.Constant` is the template.
+
+### Where plain `Quantity` is preferred
+
+For **derived** values (`Body.mass`, `Body.density`), we use plain
+`Quantity` — their provenance is *"see GM and G if you care"*, not a
+specific PCK line. The type distinction tells you whether the value
+was published or computed:
+
+| Type           | Source                          |
+|----------------|---------------------------------|
+| `Constant`     | Came directly from a PCK field  |
+| `Quantity`     | Computed from one or more PCKs / astropy values |
+
+That's a meaningful signal, not noise.
+
+## Natural / fundamental constants — defer to astropy
+
+We do not redefine `G`, `c`, `h`, `k_B`, `M_sun`, `R_sun`, `M_earth`, etc.
+Astropy already curates these with codata editioning, uncertainty
+tracking, and per-IAU-year submodules of its own. The boundary is clean:
+
+| What                                     | Source                  |
+|------------------------------------------|-------------------------|
+| `G`, `c`, `h`, `k_B`, `M_sun`, …         | `astropy.constants`     |
+| Per-body radii, GM, pole, PM (140 bodies)| `planetarypy.constants` |
+
+A user pinning both worlds to IAU 2015:
+
+```python
+from astropy.constants.iau2015 import G, M_sun
+from planetarypy.constants.iau2015 import Mars, Saturn
+```
+
+For headline values astropy *also* exposes (e.g. `Sun.mass` from PCK GM
+divided by `G` should match `astropy.constants.iau2015.M_sun` to within
+rounding), the documentation recommends astropy's value as authoritative;
+`planetarypy.constants` exists to fill in the per-body detail astropy
+doesn't carry.
+
+## Generated code, drift detection, and CI
+
+The generated `iauNNNN.py` modules are checked in alongside their source
+`.tpc` files. CI runs `regenerate_constants.py iau2009 iau2015` on PRs
+that touch `_pck_sources/` or the script itself, and fails if the output
+diverges from what's committed. This catches the otherwise-easy mistake
+of "edited the script but forgot to re-run it." `spiceypy` is in the
+`[spice]` extra, which CI already installs for the SPICE-related test
+matrix; no new infrastructure required.
+
+## Summary of decisions
+
+| Decision                              | Choice                                                     |
+|---------------------------------------|------------------------------------------------------------|
+| Pattern after                         | `astropy.constants` per-edition submodules                 |
+| PCK reading                           | Build-time spiceypy oracle, generated `.py` modules        |
+| Runtime SPICE dependency              | None                                                       |
+| IAU editions shipped initially        | 2009 (`pck00010.tpc`), 2015 (`pck00011.tpc`)               |
+| Default IAU edition                   | 2015 (latest NAIF ships)                                   |
+| Body coverage                         | Exhaustive — every body in the PCK                         |
+| Discovery                             | Helpers (`planets()`, `moons(of=…)`, `asteroids()`, …)     |
+| Body classification                   | Auto-derived from NAIF ID; stops at "moon"                 |
+| Curated overlays                      | `dwarf_planet` + `mission_visited`, in regenerator script  |
+| PCK fields included                   | Layers 1–3 (static, J2000 orientation, polynomial coeffs)  |
+| PCK fields excluded                   | Layer 4 (NUT_PREC) — out of scope, defer to spiceypy       |
+| Derived attrs (built-time)            | `mean_radius`, `volume_radius`, `flattening`               |
+| Derived attrs (lazy)                  | `mass` (uses astropy `G`), `density`                       |
+| PCK values type                       | `Constant` (Quantity subclass with provenance metadata)    |
+| Derived values type                   | plain `Quantity`                                           |
+| Fundamental constants                 | Defer to `astropy.constants`                               |
+| Drift detection                       | CI re-runs regenerator on PRs touching sources or script   |

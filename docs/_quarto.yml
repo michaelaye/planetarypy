@@ -56,6 +56,7 @@ website:
         - explanation/config_flow_diagram.qmd
         - explanation/pds_index_config.qmd
         - explanation/pds_index_download_flows.qmd
+        - explanation/constants_design.qmd
     - title: "API Reference"
       contents: "{{ contents }}"
 
