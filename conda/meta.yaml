@@ -1,0 +1,64 @@
+{% set version = "0.61.0" %}
+
+package:
+  name: planetarypy
+  version: {{ version }}
+
+source:
+  url: https://pypi.org/packages/source/p/planetarypy/planetarypy-{{ version }}.tar.gz
+  sha256: 6f2641f4d59d5a50abef792b9ddf6c9c45e8315b3bfcf0671ab88caba1ea56c1
+
+build:
+  entry_points:
+    - plp = planetarypy.cli:main
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  number: 0
+
+requirements:
+  host:
+    - python >=3.11
+    - hatchling
+    - pip
+  run:
+    - python >=3.11
+    - astropy
+    - typer >=0.9
+    - fastcore
+    - numpy
+    - pandas
+    - pooch
+    - pvl
+    - lxml
+    - python-dateutil
+    - requests
+    - tomlkit
+    - tqdm
+    - yarl
+    - loguru
+    - python-duckdb
+    - rasterio
+    - pyproj
+    - rioxarray
+
+test:
+  imports:
+    - planetarypy
+    - planetarypy.constants
+    - planetarypy.pds
+  commands:
+    - pip check
+    - plp --help
+  requires:
+    - pip
+    - python
+
+about:
+  home: https://github.com/planetarypy/planetarypy
+  summary: Python tools for planetary science data access — PDS indexes, SPICE kernels, instrument data, and per-body constants
+  license: BSD-3-Clause
+  license_file: LICENSE
+
+extra:
+  recipe-maintainers:
+    - michaelaye
