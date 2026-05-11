@@ -60,10 +60,13 @@ website:
     - title: "API Reference"
       contents: "{{ contents }}"
 
+filters:
+  - _abbreviations.lua             # wraps known acronyms in <abbr> for tooltips
+
 format:
   html:
     theme:
-      dark: [darkly]
+      dark: [superhero]
       light: [flatly]
     toc: true
     toc-depth: 3
@@ -73,6 +76,7 @@ format:
     css:
       - styles.css
       - reference/_styles-quartodoc.css
+      - _styles-abbr.css           # styled tooltips for <abbr> tags
 
 # Read the generated sidebar definitions
 metadata-files:
@@ -129,6 +133,18 @@ quartodoc:
         - spice.archived_kernels
         - spice.config
         - spice.generic_kernels
+
+    - title: Constants
+      desc: |
+        Per-body parameters from NAIF SPICE PCK kernels and NASA NSSDC
+        fact sheets, plus thin re-exports of astropy's fundamental
+        physics constants. The generated `iau2009` / `iau2015` modules
+        each hold ~145 Body instances and are intentionally not
+        auto-documented here — see the source for the per-body listing.
+      contents:
+        - constants
+        - constants.base
+        - constants.nssdc
 
     # - title: ISIS
     #   contents:

@@ -87,7 +87,7 @@ A maintainer-only script (`scripts/regenerate_constants.py`):
 
 The script is run once per upstream PCK release. The generated `.py`
 files are committed alongside the source `.tpc` kernels under
-`_pck_sources/`. The runtime package never imports `spiceypy`.
+`_sources/`. The runtime package never imports `spiceypy`.
 
 This gives us:
 
@@ -119,7 +119,7 @@ Confirmed from NAIF's `aareadme.txt`:
 So at the time of this writing **NAIF ships PCKs for two IAU editions**:
 2009 and 2015. There is no IAU 2018 PCK from NAIF yet. The architecture
 handles new editions cleanly: drop the new `.tpc` file in
-`_pck_sources/`, add an entry to `PCK_BY_IAU` in the regenerator, run the
+`_sources/`, add an entry to `PCK_BY_IAU` in the regenerator, run the
 script. No code changes elsewhere.
 
 If a user genuinely needs IAU 2018 values before NAIF packages them, the
@@ -269,7 +269,7 @@ class Constant(astropy.units.Quantity):
     description    # e.g. "Gravitational parameter"
     reference      # e.g. "IAU 2015 — Archinal et al. ..."
     iau_year       # e.g. 2015
-    pck_source     # e.g. "pck00011.tpc"
+    source     # e.g. "pck00011.tpc"
 ```
 
 Math operations correctly demote to plain `Quantity` (so
@@ -355,7 +355,7 @@ doesn't carry.
 
 The generated `iauNNNN.py` modules are checked in alongside their source
 `.tpc` files. CI runs `regenerate_constants.py iau2009 iau2015` on PRs
-that touch `_pck_sources/` or the script itself, and fails if the output
+that touch `_sources/` or the script itself, and fails if the output
 diverges from what's committed. This catches the otherwise-easy mistake
 of "edited the script but forgot to re-run it." `spiceypy` is in the
 `[spice]` extra, which CI already installs for the SPICE-related test

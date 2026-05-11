@@ -33,6 +33,8 @@ See ``docs/explanation/constants_design.qmd`` for the design rationale.
 
 from __future__ import annotations
 
+import gzip
+import json
 import re
 import sys
 import tomllib
@@ -50,6 +52,109 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCES_DIR = REPO_ROOT / "src/planetarypy/constants/_constants_sources"
 OUT_DIR = REPO_ROOT / "src/planetarypy/constants"
 MANIFEST_PATH = REPO_ROOT / "scripts/constants_kernels.toml"
+NSSDC_ARCHIVE_PATH = REPO_ROOT / "src/planetarypy/constants/nssdc/parsed_archive.json.gz"
+
+# NAIF id → NSSDC archive body key. Mirrors _NSSDC_NAIF in
+# nssdc/__init__.py so the merge knows which PCK bodies have NSSDC data.
+_NSSDC_BY_NAIF: dict[int, str] = {
+    10:  "sun",
+    199: "mercury",
+    299: "venus",
+    399: "earth",
+    301: "moon",
+    499: "mars",
+    599: "jupiter",
+    699: "saturn",
+    799: "uranus",
+    899: "neptune",
+    999: "pluto",
+}
+
+# Fields populated from PCK; NSSDC values for these are NOT merged into
+# the top-level Body (PCK wins for cartographic/orientation). NSSDC
+# values for these fields remain accessible via Mars.at_time(date) for
+# pre-PCK dates and via the explicit nssdc submodule.
+_PCK_DERIVED_FIELDS: frozenset[str] = frozenset({
+    "radii", "GM", "long_axis",
+    "pole_ra", "pole_dec", "pm", "rotation_rate",
+    "pole_ra_coeffs", "pole_dec_coeffs", "pm_coeffs",
+    "mean_radius", "volume_radius", "flattening",
+})
+
+# NSSDC unit string (after _normalize_unit) → astropy expression to emit
+# in the generated Python source. Mirrors _UNIT_MAP in nssdc/_loader.py
+# but for code-emission rather than runtime coercion.
+_NSSDC_UNIT_EMIT: dict[Optional[str], tuple[str, float]] = {
+    "km": ("u.km", 1.0),
+    "kg": ("u.kg", 1.0),
+    "kg/m^3": ("u.kg / u.m ** 3", 1.0),
+    "m/s^2": ("u.m / u.s ** 2", 1.0),
+    "km/s": ("u.km / u.s", 1.0),
+    "deg": ("u.deg", 1.0),
+    "K": ("u.K", 1.0),
+    "hrs": ("u.hour", 1.0),
+    "days": ("u.day", 1.0),
+    "mb": ("u.mbar", 1.0),
+    "bar": ("u.bar", 1.0),
+    "bars": ("u.bar", 1.0),
+    "Pa": ("u.Pa", 1.0),
+    "atm": ("u.bar", 1.01325),
+    "AU": ("u.au", 1.0),
+    "W/m^2": ("u.W / u.m ** 2", 1.0),
+    "10^24 kg": ("u.kg", 1e24),
+    "10^15 kg": ("u.kg", 1e15),
+    "10^10 km^3": ("u.km ** 3", 1e10),
+    "10^12 km^3": ("u.km ** 3", 1e12),
+    "10^6 km": ("u.km", 1e6),
+    "10^6 km^3/s^2": ("u.km ** 3 / u.s ** 2", 1e6),
+    "10^9 km^3/s^2": ("u.km ** 3 / u.s ** 2", 1e9),
+    "10^20 kg": ("u.kg", 1e20),
+    "10^21 kg": ("u.kg", 1e21),
+    "10^22 kg": ("u.kg", 1e22),
+    "10^23 kg": ("u.kg", 1e23),
+    "10^25 kg": ("u.kg", 1e25),
+    "10^26 kg": ("u.kg", 1e26),
+    "10^27 kg": ("u.kg", 1e27),
+    "10^29 kg": ("u.kg", 1e29),
+    "10^30 kg": ("u.kg", 1e30),
+    None: ("u.dimensionless_unscaled", 1.0),
+    "": ("u.dimensionless_unscaled", 1.0),
+    "ppm": ("u.dimensionless_unscaled", 1e-6),
+}
+
+
+def _normalize_nssdc_unit(raw: Optional[str]) -> Optional[str]:
+    if raw is None:
+        return None
+    s = raw.strip()
+    s = re.sub(r"^x\s+", "", s)
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+
+def load_nssdc_lookup() -> dict[int, dict]:
+    """NAIF id → {'page_date', 'wayback_url', 'fields'} for the latest NSSDC
+    capture of each body present in the archive. Empty dict if the archive
+    isn't built yet (regenerator continues, just no NSSDC merge)."""
+    if not NSSDC_ARCHIVE_PATH.is_file():
+        print(f"  (no NSSDC archive at {NSSDC_ARCHIVE_PATH}; skipping merge)",
+              file=sys.stderr)
+        return {}
+    with gzip.open(NSSDC_ARCHIVE_PATH, "rt", encoding="utf-8") as f:
+        archive = json.load(f)
+    out: dict[int, dict] = {}
+    for body, sheet in archive["fact_sheet"].items():
+        if not sheet["captures"]:
+            continue
+        # Find the matching NAIF id
+        naif_id = next(
+            (nid for nid, name in _NSSDC_BY_NAIF.items() if name == body),
+            None,
+        )
+        if naif_id is None:
+            continue
+        out[naif_id] = sheet["captures"][-1]   # latest capture
+    return out
 
 
 # ── Manifest ────────────────────────────────────────────────────────────
@@ -298,6 +403,77 @@ def extract_body(naif_id: int) -> dict:
     return body
 
 
+def _body_dataclass_fields() -> set[str]:
+    """Names of fields the Body dataclass actually accepts.
+
+    Loads base.py directly via importlib so the regenerator works even
+    when iau2009.py / iau2015.py are stale (e.g. the very thing this
+    script is about to fix). Going through `planetarypy.constants` would
+    transitively import the iauNNNN modules, which may not yet be
+    consistent with the current base.py.
+    """
+    import importlib.util
+    base_path = OUT_DIR / "base.py"
+    mod_name = "_constants_base_isolated"
+    spec = importlib.util.spec_from_file_location(mod_name, base_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = module        # dataclass needs this for FQN lookup
+    try:
+        spec.loader.exec_module(module)
+        return set(module.Body.__dataclass_fields__.keys())
+    finally:
+        sys.modules.pop(mod_name, None)
+
+
+def merge_nssdc(body: dict, nssdc_lookup: dict[int, dict],
+                allowed_attrs: set[str]) -> None:
+    """Add NSSDC fields to a body's `nssdc_fields` map (PCK fields untouched).
+
+    Only adds fields that:
+      - exist as attributes on the Body dataclass;
+      - are not in PCK_DERIVED_FIELDS (PCK wins for those at build time);
+      - have a non-None value in the NSSDC capture;
+      - have a unit string the emitter can produce.
+    """
+    body["nssdc_fields"] = {}
+    body["nssdc_source_date"] = None
+    capture = nssdc_lookup.get(body["naif_id"])
+    if capture is None:
+        return
+    # Prefer NSSDC's own "Last Updated" footer date over the Wayback
+    # crawl timestamp; pick a verb that says which we're showing.
+    page_date = capture.get("page_date")
+    if page_date:
+        date_str, verb = page_date, "updated"
+    else:
+        ts = capture["wayback_timestamp"]
+        date_str, verb = f"{ts[0:4]}-{ts[4:6]}-{ts[6:8]}", "crawled"
+    body["nssdc_source_date"] = date_str
+    body_short = _NSSDC_BY_NAIF[body["naif_id"]]
+    body["nssdc_source_string"] = (
+        f"NSSDC {body_short}fact.html {verb} {date_str}"
+    )
+    for field_name, field_data in capture["fields"].items():
+        if field_name not in allowed_attrs:
+            continue   # NSSDC has fields Body doesn't model; skip silently
+        if field_name in _PCK_DERIVED_FIELDS:
+            continue
+        if field_data.get("value") is None:
+            continue
+        unit = _normalize_nssdc_unit(field_data.get("unit"))
+        emit = _NSSDC_UNIT_EMIT.get(unit)
+        if emit is None:
+            continue   # unknown unit, skip rather than emit broken code
+        unit_expr, scale = emit
+        scaled_value = float(field_data["value"]) * scale
+        body["nssdc_fields"][field_name] = {
+            "value": scaled_value,
+            "unit_expr": unit_expr,
+            "raw": field_data["value"],
+            "raw_unit": field_data.get("unit"),
+        }
+
+
 # ── Python identifier generation ────────────────────────────────────────
 
 def py_alias(name: str, taken: set[str], naif_id: int) -> str:
@@ -391,6 +567,29 @@ def format_body_block(body: dict, py_name: str) -> str:
     if "flattening" in body and body["flattening"] is not None:
         lines.append(f"    flattening={body['flattening']!r},")
 
+    # NSSDC-merged fields (only present for the ~11 bodies with NSSDC fact
+    # sheets). Each emitted as an inline-kwarg Constant carrying its own
+    # NSSDC provenance via `_nssdc_meta` plus a per-body source date.
+    nssdc_fields = body.get("nssdc_fields") or {}
+    if nssdc_fields:
+        source_str = body["nssdc_source_string"]
+        for attr in sorted(nssdc_fields):
+            f = nssdc_fields[attr]
+            qty = f"{f['value']!r} * {f['unit_expr']}"
+            desc = (
+                f"NSSDC field {attr!r} "
+                f"(raw={f['raw']!r}, unit={f['raw_unit']!r})"
+            )
+            lines.append(
+                f"    {attr}=Constant(\n"
+                f"        {qty},\n"
+                f"        name={attr!r}, body={py_name!r},\n"
+                f"        description={desc!r},\n"
+                f"        source={source_str!r},\n"
+                f"        **_nssdc_meta,\n"
+                f"    ),"
+            )
+
     lines.append(")")
     return "\n".join(lines)
 
@@ -403,7 +602,7 @@ def format_module(year: int, pck_filename: str, reference: str,
 DO NOT EDIT: this module is regenerated by ``scripts/regenerate_constants.py``
 from the upstream NAIF PCK file plus the auxiliary kernels listed in
 ``scripts/constants_kernels.toml``. To update: edit the manifest, drop
-the new file(s) in ``src/planetarypy/constants/_pck_sources/``, and
+the new file(s) in ``src/planetarypy/constants/_sources/``, and
 rerun the script.
 
 Reference: {reference}
@@ -416,7 +615,16 @@ PCK_SOURCE = {pck_filename!r}
 IAU_YEAR = {year}
 REFERENCE = {reference!r}
 
-_meta = dict(reference=REFERENCE, iau_year=IAU_YEAR, pck_source=PCK_SOURCE)
+_meta = dict(reference=REFERENCE, iau_year=IAU_YEAR, source=PCK_SOURCE)
+
+# Provenance kwargs used by NSSDC-merged Constants (per-body `source` is
+# spelled out at each call-site since each body's fact-sheet capture date
+# differs).
+NSSDC_REFERENCE = (
+    "NASA NSSDC Planetary Fact Sheets, Williams D.R. (NSSDC, GSFC), "
+    "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"
+)
+_nssdc_meta = dict(reference=NSSDC_REFERENCE, iau_year=0)
 
 
 '''
@@ -457,7 +665,7 @@ def regenerate(iau_year: int, common: list[KernelEntry], edition: Edition) -> No
         raise FileNotFoundError(
             f"Missing PCK: {pck_path}\n"
             f"  Download from: {edition.url}\n"
-            f"  Drop in _pck_sources/ before running."
+            f"  Drop in _sources/ before running."
         )
     missing_common = [
         k for k in common if not (SOURCES_DIR / k.file).is_file()
@@ -494,6 +702,12 @@ def regenerate(iau_year: int, common: list[KernelEntry], edition: Edition) -> No
     # GM kernel (gm_de440.tpc) defines GMs for planet barycenters but
     # users want `Mars.GM` to be the planet, not its barycenter.
     bodies = [b for b in bodies if b["body_class"] != "barycenter"]
+
+    # Merge NSSDC fields into bodies that have a fact sheet.
+    nssdc_lookup = load_nssdc_lookup()
+    allowed_attrs = _body_dataclass_fields()
+    for body in bodies:
+        merge_nssdc(body, nssdc_lookup, allowed_attrs)
 
     text = format_module(
         iau_year, edition.pck, edition.reference, bodies,

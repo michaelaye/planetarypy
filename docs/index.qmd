@@ -11,6 +11,7 @@ Python tools for planetary science data access.
 - **PDS Catalog** — 65 missions, 2042 product types, searchable via DuckDB
 - **Direct data access** — `fetch_product("mro.ctx.edr", "PRODUCT_ID")` for 58 product types across 15 missions
 - **37 SPICE missions** — date-filtered kernel subsets via NAIF
+- **Planetary constants** — per-body PCK values (radii, GM, poles) for ~145 bodies plus NSSDC fact-sheet parameters (bond albedo, surface pressure, satellite count, …), time-indexed for reproducibility studies ([Zenodo archive](https://doi.org/10.5281/zenodo.20122987)); fundamental physics constants (`G`, `c`, `M_sun`) re-exported from astropy in the same namespace
 - **Unified CLI** — `plp fetch`, `plp hibrowse`, `plp ctxqv`, `plp catalog build`
 
 ```bash

@@ -160,3 +160,10 @@ current_diffs_files/
 mro_hirise.toml
 *.profraw
 *.prt
+
+# Working design docs — deleted by hand when the work lands
+Plans/
+
+# Raw NSSDC HTML corpus — kept locally for re-deriving the parsed archive,
+# but lives on Zenodo (10.5281/zenodo.20122987) for distribution.
+src/planetarypy/constants/nssdc/_raw/

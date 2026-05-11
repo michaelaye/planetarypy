@@ -35,6 +35,30 @@ import astropy.units as u
 century = u.def_unit("century", 100 * u.year)
 
 
+# Publication dates of the IAU PCK editions we ship. ``Body.at_time``
+# uses these to pick the edition that would have been current on the
+# requested date — older dates get the older edition, dates before any
+# PCK publication fall back to NSSDC entirely.
+#
+# Sorted *oldest-first* so resolution iterates and picks the latest
+# edition published on-or-before the target date.
+_PCK_EDITION_DATES: list[tuple[str, int]] = [
+    ("2010-10-21", 2009),   # pck00010.tpc — Archinal et al. 2011
+    ("2018-09-20", 2015),   # pck00011.tpc — Archinal et al. 2018
+]
+_PCK_VALIDITY_START = _PCK_EDITION_DATES[0][0]
+
+# Set of dataclass-field names whose default values come from PCK. When
+# Body.at_time is called and PCK is valid for the date, these fields
+# are kept from the source Body rather than overlaid from NSSDC.
+_PCK_DERIVED_FIELDS: frozenset[str] = frozenset({
+    "radii", "GM", "long_axis",
+    "pole_ra", "pole_dec", "pm", "rotation_rate",
+    "pole_ra_coeffs", "pole_dec_coeffs", "pm_coeffs",
+    "mean_radius", "volume_radius", "flattening",
+})
+
+
 # ── Constant ────────────────────────────────────────────────────────────
 
 
@@ -49,19 +73,19 @@ class Constant(u.Quantity):
 
     Metadata fields (all defaulting to empty/zero):
     ``name``, ``body``, ``description``, ``reference``, ``iau_year``,
-    ``pck_source``.
+    ``source``.
     """
 
     # Field name → default. Drives both __new__ propagation and
     # __array_finalize__ inheritance from view-source objects.
     _META: dict[str, object] = {
         "name": "", "body": "", "description": "",
-        "reference": "", "iau_year": 0, "pck_source": "",
+        "reference": "", "iau_year": 0, "source": "",
     }
 
     def __new__(cls, value, unit=None, *,
                 name="", body="", description="",
-                reference="", iau_year=0, pck_source=""):
+                reference="", iau_year=0, source=""):
         if isinstance(value, u.Quantity):
             inst = u.Quantity.__new__(cls, value.value, value.unit)
         else:
@@ -71,7 +95,7 @@ class Constant(u.Quantity):
         inst.description = description
         inst.reference = reference
         inst.iau_year = int(iau_year)
-        inst.pck_source = pck_source
+        inst.source = source
         return inst
 
     def __array_finalize__(self, obj):
@@ -82,12 +106,17 @@ class Constant(u.Quantity):
             setattr(self, field, getattr(obj, field, default))
 
     def __repr__(self) -> str:
-        if self.body and self.name and self.iau_year:
+        # Rich repr requires body+name to identify *what* the value is.
+        # The provenance tag prefers IAU year (PCK-sourced constants
+        # carry one) and falls back to the raw source string for
+        # NSSDC-sourced constants where iau_year is intentionally 0.
+        if self.body and self.name and (self.iau_year or self.source):
             arr = np.asarray(self)
             v = (f"{float(arr):.6g}" if arr.shape == ()
                  else np.array2string(arr, precision=6, separator=", "))
+            tag = f"IAU {self.iau_year}" if self.iau_year else self.source
             return (f"<Constant {self.body}.{self.name} = {v} {self.unit}  "
-                    f"(IAU {self.iau_year})>")
+                    f"({tag})>")
         return repr(u.Quantity(self))
 
 
@@ -146,6 +175,61 @@ class Body:
     volume_radius: Optional[Constant] = None
     flattening: Optional[float] = None
 
+    # ── NSSDC-sourced fields (typically not in PCK) ─────────────────────
+    # These are populated from the latest NSSDC fact-sheet capture during
+    # build-time merge. Default to None for bodies the NSSDC archive
+    # doesn't cover (most asteroids/moons; only major planets + Sun + Moon
+    # + class summaries have NSSDC fact sheets).
+    equatorial_radius: Optional[Constant] = None
+    polar_radius: Optional[Constant] = None
+    volumetric_mean_radius: Optional[Constant] = None
+    core_radius: Optional[Constant] = None
+    ellipticity: Optional[Constant] = None
+    mean_density: Optional[Constant] = None
+    surface_gravity: Optional[Constant] = None
+    surface_acceleration: Optional[Constant] = None
+    surface_acceleration_eq: Optional[Constant] = None
+    surface_acceleration_pole: Optional[Constant] = None
+    escape_velocity: Optional[Constant] = None
+    bond_albedo: Optional[Constant] = None
+    geometric_albedo: Optional[Constant] = None
+    v_band_magnitude: Optional[Constant] = None
+    solar_irradiance: Optional[Constant] = None
+    black_body_temperature: Optional[Constant] = None
+    topographic_range: Optional[Constant] = None
+    moment_of_inertia: Optional[Constant] = None
+    J2: Optional[Constant] = None
+    number_of_satellites: Optional[Constant] = None
+    has_ring_system: Optional[Constant] = None  # numeric bool: 1.0 / 0.0
+
+    # Orbital
+    semimajor_axis: Optional[Constant] = None
+    sidereal_orbit_period: Optional[Constant] = None
+    tropical_orbit_period: Optional[Constant] = None
+    perihelion: Optional[Constant] = None
+    aphelion: Optional[Constant] = None
+    synodic_period: Optional[Constant] = None
+    mean_orbital_velocity: Optional[Constant] = None
+    max_orbital_velocity: Optional[Constant] = None
+    min_orbital_velocity: Optional[Constant] = None
+    orbit_inclination: Optional[Constant] = None
+    orbit_eccentricity: Optional[Constant] = None
+    sidereal_rotation_period: Optional[Constant] = None
+    length_of_day: Optional[Constant] = None
+    obliquity_to_orbit: Optional[Constant] = None
+    inclination_of_equator: Optional[Constant] = None
+
+    # Atmospheric
+    surface_pressure: Optional[Constant] = None
+    surface_density: Optional[Constant] = None
+    scale_height: Optional[Constant] = None
+    average_temperature: Optional[Constant] = None
+    mean_molecular_weight: Optional[Constant] = None
+
+    # Bulk (overlap-with-PCK; populated from NSSDC only when PCK doesn't
+    # provide the same — used by the regenerator's merge step).
+    volume: Optional[Constant] = None
+
     # ── Derived (computed lazily, depend on astropy.constants.G) ────────
 
     @property
@@ -172,6 +256,91 @@ class Body:
         a, b, c = self.radii
         volume = (4.0 / 3.0) * np.pi * a * b * c
         return (self.mass / volume).to(u.kg / u.m ** 3).value * u.kg / u.m ** 3
+
+    def at_time(self, date) -> "Body":
+        """Return a snapshot Body with fields resolved as of ``date``.
+
+        Resolution rules:
+
+        - **PCK fields** (radii, GM, pole_*, rotation_rate, ...): pulled
+          from whichever IAU PCK edition was current on ``date``. IAU
+          2009 PCK published 2010-10-21; IAU 2015 PCK published
+          2018-09-20. Before 2010-10-21 no PCK existed → NSSDC fills in.
+        - **NSSDC-only fields** (bond_albedo, surface_pressure, ...):
+          overlaid from NSSDC at the given date.
+
+        ``date`` accepts ``"2001"`` / ``"2001-06"`` / ``"2001-06-15"`` —
+        year/year-month resolve to end-of-period.
+
+        Returns a fresh frozen Body; ``self`` is unmodified.
+        """
+        from planetarypy.constants.nssdc import _loader
+
+        archive_body = self.name.lower()
+        nssdc_has_body = archive_body in _loader.known_bodies()
+
+        iso = _loader.normalize_date(str(date))
+
+        # Determine which IAU edition's PCK fields apply on this date.
+        # ``edition_year`` is None when no PCK had been published yet
+        # (NSSDC will need to fill the overlap fields).
+        edition_year: Optional[int] = None
+        for pub_date, year in _PCK_EDITION_DATES:
+            if iso >= pub_date:
+                edition_year = year
+        pck_is_valid = edition_year is not None
+
+        new_kwargs: dict = {}
+
+        # Step 1 — if the edition for the date differs from this body's
+        # default edition, pull PCK fields from that edition's Body.
+        # The default (latest) is IAU 2015 = the body the user imports
+        # bare; only pre-2018 dates need to swap in IAU 2009 values.
+        if pck_is_valid and edition_year != _PCK_EDITION_DATES[-1][1]:
+            from importlib import import_module
+            edition_mod = import_module(
+                f"planetarypy.constants.iau{edition_year}")
+            edition_body = edition_mod.bodies.find(self.naif_id)
+            if edition_body is not None:
+                for field_name in _PCK_DERIVED_FIELDS:
+                    if field_name not in self.__dataclass_fields__:
+                        continue
+                    val = getattr(edition_body, field_name, None)
+                    if val is not None:
+                        new_kwargs[field_name] = val
+
+        # Step 2 — overlay NSSDC for everything NSSDC has, skipping PCK
+        # fields we already sourced above.
+        if nssdc_has_body:
+            for field_name in _loader.known_fields(archive_body):
+                if field_name not in self.__dataclass_fields__:
+                    continue
+                # Skip PCK overlap fields if PCK is valid AND we have one.
+                if field_name in _PCK_DERIVED_FIELDS and pck_is_valid:
+                    continue
+                rec = _loader.at_date(archive_body, field_name, iso)
+                if rec is None:
+                    continue
+                qty = _loader.coerce_value(rec.value, rec.unit)
+                if qty is None:
+                    continue
+                new_kwargs[field_name] = Constant(
+                    qty,
+                    name=rec.field, body=self.name.title(),
+                    description=f"NSSDC field '{rec.field}' (raw='{rec.value}', unit='{rec.unit}')",
+                    reference=(
+                        "NASA NSSDC Planetary Fact Sheets, Williams D.R. (NSSDC, GSFC), "
+                        "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"
+                    ),
+                    iau_year=0,
+                    source=rec.source_string(),
+                )
+
+        if not new_kwargs:
+            return self
+
+        from dataclasses import replace
+        return replace(self, **new_kwargs)
 
     def __repr__(self) -> str:
         return (

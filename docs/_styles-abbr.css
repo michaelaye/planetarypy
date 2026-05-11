@@ -1,0 +1,35 @@
+/* Custom abbreviation tooltip — replaces the tiny native browser tooltip
+   with a CSS-styled one. The native `title` attribute is preserved for
+   accessibility (screen readers, keyboard users); the custom tooltip
+   appears immediately on hover/focus, before the native delay.
+*/
+
+abbr.acro {
+  position: relative;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: help;
+}
+
+abbr.acro:hover::after,
+abbr.acro:focus::after {
+  content: attr(aria-label);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  padding: 6px 10px;
+  max-width: 320px;
+  width: max-content;
+  background: rgba(35, 41, 51, 0.97);
+  color: #f5f5f5;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.4;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  z-index: 1000;
+  pointer-events: none;
+  white-space: normal;
+}

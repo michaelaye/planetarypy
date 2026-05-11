@@ -37,7 +37,7 @@ def _make_gm(body="Mars", year=2015):
         description="Gravitational parameter",
         reference=f"IAU {year}",
         iau_year=year,
-        pck_source="pck00011.tpc",
+        source="pck00011.tpc",
     )
 
 
@@ -49,7 +49,7 @@ def _make_radii(body="Mars"):
         description="Triaxial body radii (a, b, c)",
         reference="IAU 2015",
         iau_year=2015,
-        pck_source="pck00011.tpc",
+        source="pck00011.tpc",
     )
 
 
@@ -62,7 +62,7 @@ class TestConstantConstruction:
     def test_from_value_unit_pair(self):
         c = Constant(3396.19, u.km, name="r", body="Mars",
                      reference="IAU 2015", iau_year=2015,
-                     pck_source="pck00011.tpc")
+                     source="pck00011.tpc")
         assert c.value == pytest.approx(3396.19)
         assert c.unit == u.km
 
@@ -78,7 +78,7 @@ class TestConstantConstruction:
         assert c.description == "Gravitational parameter"
         assert c.reference == "IAU 2015"
         assert c.iau_year == 2015
-        assert c.pck_source == "pck00011.tpc"
+        assert c.source == "pck00011.tpc"
 
     def test_metadata_defaults_when_omitted(self):
         c = Constant(1.0, u.km)
@@ -106,24 +106,24 @@ class TestConstantQuantityAPI:
 
     def test_addition_in_consistent_units(self):
         a = Constant(1.0 * u.km, name="a", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         b = Constant(500.0 * u.m, name="b", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         result = a + b
         assert result.to(u.km).value == pytest.approx(1.5)
 
     def test_multiplication_by_scalar(self):
         c = Constant(10.0 * u.km, name="r", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         doubled = c * 2
         assert doubled.value == pytest.approx(20.0)
         assert doubled.unit == u.km
 
     def test_division_yields_dimensionless(self):
         a = Constant(10.0 * u.km, name="a", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         b = Constant(2.0 * u.km, name="b", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         ratio = a / b
         assert float(ratio) == pytest.approx(5.0)
         # Dimensionless after kilometers cancel
@@ -171,16 +171,16 @@ class TestConstantNumeric:
 
     def test_comparison_operators(self):
         a = Constant(1.0 * u.km, name="a", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         b = Constant(2.0 * u.km, name="b", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         assert a < b
         assert b > a
         assert a != b
 
     def test_power(self):
         c = Constant(2.0 * u.km, name="r", body="X", reference="r",
-                     iau_year=1, pck_source="p")
+                     iau_year=1, source="p")
         squared = c ** 2
         assert squared.value == pytest.approx(4.0)
         assert squared.unit == u.km ** 2
