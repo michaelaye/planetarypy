@@ -1368,39 +1368,52 @@ def meta(
 # ── constants ────────────────────────────────────────────────────────
 
 
+def _body_name_set() -> list[str]:
+    """All known body names in Title case, sorted. Used for completion
+    and for difflib suggestions on misspelt bodies."""
+    from planetarypy.constants import bodies
+    return sorted({b.name.title() for b in bodies.values()})
+
+
 def _complete_constants_query(
     ctx: click.Context, args: list[str], incomplete: str
 ) -> list[str]:
     """Tab completion for the constants subcommand.
 
     Matches both ``Body`` (return body names) and ``Body.field`` (after a
-    dot, return that body's available scalar-Constant attributes).
+    dot, return that body's Constant-bearing attributes).
     """
-    try:
-        from planetarypy.constants import bodies
-        from planetarypy.constants.base import Body
-    except Exception:
-        return []
+    from planetarypy.constants import bodies
 
     if "." not in incomplete:
-        # Suggest body Python-attribute names (Title case, matches imports)
         prefix = incomplete.lower()
-        names = sorted({b.name.title() for b in bodies.values()
-                        if isinstance(b, Body) and b.name})
-        return [n for n in names if n.lower().startswith(prefix)]
+        return [n for n in _body_name_set() if n.lower().startswith(prefix)]
 
     body_part, _, field_part = incomplete.partition(".")
     body = bodies.find(body_part)
     if body is None:
         return []
-    # Body.iter_constants yields only fields that resolve to a Constant;
-    # metadata like body_class / naif_id / dwarf_planet are already
-    # excluded, so no CLI-side filtering needed.
     return sorted(
         f"{body_part}.{name}"
         for name, _ in body.iter_constants()
         if name.startswith(field_part)
     )
+
+
+def _suggest_and_exit(target: str, choices: list[str], label: str) -> None:
+    """Emit ``"<label> 'target'  did you mean: ..."`` on stderr and exit 1.
+
+    Shared between the body-not-found and field-not-found paths of
+    `plp constants` so the suggestion UX stays consistent.
+    """
+    import difflib
+
+    suggestions = difflib.get_close_matches(target, choices, n=3)
+    msg = f"{label} {target!r}"
+    if suggestions:
+        msg += f"  did you mean: {', '.join(suggestions)}?"
+    typer.echo(msg, err=True)
+    raise typer.Exit(1)
 
 
 @app.command("constants")
@@ -1437,9 +1450,7 @@ def constants_cmd(
     ``MARS``). Unknown bodies print the closest matches as a suggestion.
     """
     import sys
-    import difflib
     from planetarypy.constants import bodies
-    from planetarypy.constants.base import Body
 
     # Bare invocation: typer would normally error on the missing
     # positional. Print help instead — friendlier discovery surface.
@@ -1450,14 +1461,8 @@ def constants_cmd(
     body_part, dot, field_part = query.partition(".")
     body = bodies.find(body_part)
     if body is None:
-        known = sorted({b.name.title() for b in bodies.values()
-                        if isinstance(b, Body) and b.name})
-        suggestions = difflib.get_close_matches(body_part.title(), known, n=3)
-        msg = f"Unknown body: {body_part!r}"
-        if suggestions:
-            msg += f"  did you mean: {', '.join(suggestions)}?"
-        typer.echo(msg, err=True)
-        raise typer.Exit(1)
+        _suggest_and_exit(body_part.title(), _body_name_set(),
+                          "Unknown body:")
 
     if at is not None:
         body = body.at_time(at)
@@ -1465,13 +1470,11 @@ def constants_cmd(
     # ── Field form: stdout=value, stderr=source ────────────────────────
     if dot:
         if not hasattr(body, field_part):
-            available = sorted(n for n, _ in body.iter_constants())
-            suggestions = difflib.get_close_matches(field_part, available, n=3)
-            msg = f"{body.name.title()} has no field {field_part!r}"
-            if suggestions:
-                msg += f"  did you mean: {', '.join(suggestions)}?"
-            typer.echo(msg, err=True)
-            raise typer.Exit(1)
+            _suggest_and_exit(
+                field_part,
+                sorted(n for n, _ in body.iter_constants()),
+                f"{body.name.title()} has no field",
+            )
         value = getattr(body, field_part)
         if value is None:
             typer.echo(
@@ -1481,11 +1484,11 @@ def constants_cmd(
             raise typer.Exit(1)
         # stdout: bare value (pipe-safe). stderr: provenance.
         typer.echo(str(value))
-        source = getattr(value, "source", None) or "<no source>"
-        reference = getattr(value, "reference", None) or ""
-        print(f"# source: {source}", file=sys.stderr)
-        if reference:
-            print(f"# reference: {reference}", file=sys.stderr)
+        # `source` / `reference` may be empty strings (e.g. on
+        # non-Constant fields like Mars.naif_id); only emit when set.
+        for label, attr in (("source", "source"), ("reference", "reference")):
+            if val := getattr(value, attr, ""):
+                print(f"# {label}: {val}", file=sys.stderr)
         return
 
     # ── Body form: Rich table of every scalar Constant ─────────────────
@@ -1507,11 +1510,7 @@ def constants_cmd(
     table.add_column("source", overflow="fold", style="dim")
 
     for field_name, val in body.iter_constants():
-        table.add_row(
-            field_name,
-            str(val),
-            getattr(val, "source", "") or "",
-        )
+        table.add_row(field_name, str(val), val.source)
 
     Console().print(table)
 

@@ -46,16 +46,11 @@ local function wrap(token, defn)
 end
 
 function Str(el)
-  local text = el.text
   for token, defn in pairs(abbr) do
-    -- Match the token surrounded only by word-boundary-safe chars
-    local prefix, suffix = text:match("^(.-)(" .. token .. ")(.*)$")
-    if prefix and suffix ~= nil then
-      local before = prefix
-      local after  = text:sub(#prefix + #token + 1)
-      -- Boundary check: char before/after token should be non-alphanumeric
-      local lc = before:sub(-1)
-      local rc = after:sub(1, 1)
+    local before, _, after = el.text:match("^(.-)(" .. token .. ")(.*)$")
+    if before then
+      -- Word-boundary check: char on either side must be non-alphanumeric
+      local lc, rc = before:sub(-1), after:sub(1, 1)
       if (lc == "" or not lc:match("[%w]"))
          and (rc == "" or not rc:match("[%w]")) then
         local parts = {}
@@ -66,5 +61,4 @@ function Str(el)
       end
     end
   end
-  return nil
 end
