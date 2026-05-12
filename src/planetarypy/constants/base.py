@@ -257,6 +257,30 @@ class Body:
         volume = (4.0 / 3.0) * np.pi * a * b * c
         return (self.mass / volume).to(u.kg / u.m ** 3).value * u.kg / u.m ** 3
 
+    def iter_constants(self):
+        """Yield ``(field_name, Constant)`` for every Constant-bearing field.
+
+        Skips fields that are ``None`` (unset for this body) and fields
+        whose value isn't a :class:`Constant` — metadata like
+        ``body_class`` / ``naif_id`` / ``dwarf_planet`` and structural
+        tuples like ``pole_ra_coeffs`` or scalar floats like
+        ``flattening`` are filtered out. The result is the set of
+        per-body *quantities* with provenance.
+
+        Useful for tabular display, completions, and introspection
+        without the caller needing to know the dataclass schema.
+
+        Example::
+
+            >>> from planetarypy.constants import Mars
+            >>> dict(Mars.iter_constants())["GM"]
+            <Constant Mars.GM = 42828.4 km3 / s2  (IAU 2015)>
+        """
+        for name in self.__dataclass_fields__:
+            val = getattr(self, name, None)
+            if isinstance(val, Constant):
+                yield name, val
+
     def at_time(self, date) -> "Body":
         """Return a snapshot Body with fields resolved as of ``date``.
 

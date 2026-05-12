@@ -1389,24 +1389,18 @@ def _complete_constants_query(
                         if isinstance(b, Body) and b.name})
         return [n for n in names if n.lower().startswith(prefix)]
 
-    from planetarypy.constants.base import Constant
-
     body_part, _, field_part = incomplete.partition(".")
     body = bodies.find(body_part)
     if body is None:
         return []
-    candidates = []
-    for field_name in body.__dataclass_fields__:
-        if not field_name.startswith(field_part):
-            continue
-        # Only offer fields that resolve to a Constant — metadata like
-        # body_class / naif_id / dwarf_planet aren't valid arguments to
-        # `plp constants`.
-        val = getattr(body, field_name, None)
-        if not isinstance(val, Constant):
-            continue
-        candidates.append(f"{body_part}.{field_name}")
-    return sorted(candidates)
+    # Body.iter_constants yields only fields that resolve to a Constant;
+    # metadata like body_class / naif_id / dwarf_planet are already
+    # excluded, so no CLI-side filtering needed.
+    return sorted(
+        f"{body_part}.{name}"
+        for name, _ in body.iter_constants()
+        if name.startswith(field_part)
+    )
 
 
 @app.command("constants")
@@ -1445,7 +1439,7 @@ def constants_cmd(
     import sys
     import difflib
     from planetarypy.constants import bodies
-    from planetarypy.constants.base import Body, Constant
+    from planetarypy.constants.base import Body
 
     # Bare invocation: typer would normally error on the missing
     # positional. Print help instead — friendlier discovery surface.
@@ -1471,11 +1465,7 @@ def constants_cmd(
     # ── Field form: stdout=value, stderr=source ────────────────────────
     if dot:
         if not hasattr(body, field_part):
-            available = sorted(
-                n for n in body.__dataclass_fields__
-                if getattr(body, n, None) is not None
-                and isinstance(getattr(body, n), Constant)
-            )
+            available = sorted(n for n, _ in body.iter_constants())
             suggestions = difflib.get_close_matches(field_part, available, n=3)
             msg = f"{body.name.title()} has no field {field_part!r}"
             if suggestions:
@@ -1516,10 +1506,7 @@ def constants_cmd(
     table.add_column("value", overflow="fold")
     table.add_column("source", overflow="fold", style="dim")
 
-    for field_name in body.__dataclass_fields__:
-        val = getattr(body, field_name, None)
-        if not isinstance(val, Constant):
-            continue
+    for field_name, val in body.iter_constants():
         table.add_row(
             field_name,
             str(val),

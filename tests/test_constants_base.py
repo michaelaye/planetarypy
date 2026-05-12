@@ -224,6 +224,50 @@ class TestBodyConstruction:
         assert "MARS" in s and "499" in s and "planet" in s
 
 
+class TestBodyIterConstants:
+    """``Body.iter_constants()`` yields (name, Constant) for every
+    Constant-bearing field — used by both the table-rendering and
+    tab-completion paths in the CLI, and useful for introspection."""
+
+    def test_yields_only_constants_skips_none(self):
+        # GM set, radii absent → only GM should appear
+        gm = Constant(42828.37 * u.km ** 3 / u.s ** 2,
+                      name="GM", body="Mars", iau_year=2015,
+                      source="pck00011.tpc")
+        b = Body(name="MARS", naif_id=499, body_class="planet", GM=gm)
+        result = dict(b.iter_constants())
+        assert result == {"GM": gm}
+
+    def test_skips_non_constant_fields(self):
+        """Metadata (body_class, naif_id, dwarf_planet), polynomial-coeff
+        tuples, and bare floats (flattening) must not appear."""
+        gm = Constant(42828.37 * u.km ** 3 / u.s ** 2,
+                      name="GM", body="Mars", iau_year=2015,
+                      source="pck00011.tpc")
+        b = Body(
+            name="MARS", naif_id=499, body_class="planet",
+            dwarf_planet=False, mission_visited=False,
+            GM=gm,
+            flattening=0.00589,
+            pole_ra_coeffs=(317.0 * u.deg, 0.0 * u.deg, 0.0 * u.deg),
+        )
+        names = [name for name, _ in b.iter_constants()]
+        assert names == ["GM"]
+        for excluded in ("flattening", "pole_ra_coeffs", "body_class",
+                         "naif_id", "dwarf_planet"):
+            assert excluded not in names
+
+    def test_works_on_real_body_with_pck_and_nssdc_fields(self):
+        from planetarypy.constants import Mars
+        result = dict(Mars.iter_constants())
+        # PCK-sourced
+        assert "GM" in result
+        assert result["GM"].source.endswith(".tpc")
+        # NSSDC-sourced
+        assert "bond_albedo" in result
+        assert "NSSDC" in result["bond_albedo"].source
+
+
 class TestBodyDerivedProperties:
     """mass / density use astropy.constants.G at call time."""
 

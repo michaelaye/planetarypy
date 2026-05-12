@@ -5,9 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.61.1] - 2026-05-13
+## [0.62.0] - 2026-05-13
+
+> Note: a 0.61.1 release was published to PyPI between 0.61.0 and 0.62.0
+> with this same content. It was bumped as a patch by mistake; the new-
+> CLI-subcommand addition is backwards-compatible-additive, which is
+> textbook minor-version territory. 0.61.1 stays on PyPI for posterity;
+> 0.62.0 is the version to install. Bytes are identical apart from the
+> version string.
 
 ### Added
+- **`Body.iter_constants()`** — generator yielding `(field_name,
+  Constant)` for every Constant-bearing field on a body. Skips `None`
+  fields and non-`Constant` values (metadata like `body_class` /
+  `naif_id` / `dwarf_planet`, polynomial-coefficient tuples, scalar
+  floats like `flattening`). Useful for tabular display, introspection,
+  and CLI completions without callers needing to know the dataclass
+  schema. Both the `plp constants` table-rendering and tab-completion
+  paths now route through this method instead of duplicating the
+  filter-by-isinstance loop — keeps the CLI a thin wrapper.
 - **`plp constants` CLI subcommand.** Two forms:
   - `plp constants Mars` — Rich-rendered table of every scalar `Constant`
     attached to the body, with a *source* column (PCK kernel filename or
