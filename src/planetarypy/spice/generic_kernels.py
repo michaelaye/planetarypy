@@ -7,9 +7,11 @@ that are required for basic operations and calculations.
 __all__ = [
     "GENERIC_STORAGE",
     "GENERIC_URL",
+    "GENERIC_KERNEL_ALIASES",
     "generic_kernel_names",
     "generic_kernel_paths",
     "download_generic_kernels",
+    "download_generic_kernel",
     "load_generic_kernels",
     "show_loaded_kernels",
 ]
@@ -34,6 +36,18 @@ generic_kernel_names = [
     "spk/satellites/mar099s.bsp",
 ]
 generic_kernel_paths = [GENERIC_STORAGE.joinpath(i) for i in generic_kernel_names]
+
+# Short aliases for the per-kernel fetcher.  The keys are what
+# `download_generic_kernel(name)` accepts; values are the path-relative-
+# to-GENERIC_URL filenames.  Add satellite ephemerides via load_system()
+# instead — those need furnsh to be useful.
+GENERIC_KERNEL_ALIASES: dict[str, str] = {
+    "lsk":     "lsk/naif0012.tls",
+    "pck":     "pck/pck00010.tpc",
+    "masses":  "pck/de-403-masses.tpc",
+    "de430":   "spk/planets/de430.bsp",
+    "mar099s": "spk/satellites/mar099s.bsp",
+}
 
 # Satellite ephemeris kernels per planetary system.
 # Downloaded on demand via load_system(). These are large files because
@@ -87,6 +101,54 @@ def download_generic_kernels(overwrite=False):
             continue
         savepath.parent.mkdir(exist_ok=True, parents=True)
         url_retrieve(dl_url, savepath)
+
+
+def download_generic_kernel(name: str, overwrite: bool = False) -> Path:
+    """Download a single generic kernel by short alias.
+
+    Aliases (see ``GENERIC_KERNEL_ALIASES``):
+      - ``"lsk"``      — leapseconds (naif0012.tls)
+      - ``"pck"``      — planetary constants (pck00010.tpc)
+      - ``"masses"``   — DE-403 mass values (de-403-masses.tpc)
+      - ``"de430"``    — JPL DE430 planetary ephemeris (large, ~120 MB)
+      - ``"mar099s"``  — Mars satellite ephemeris
+
+    Full kernel paths (relative to NAIF's ``generic_kernels/`` URL) are
+    also accepted for advanced cases — e.g. passing
+    ``"lsk/naif0011.tls"`` to fetch an older LSK.
+
+    Parameters
+    ----------
+    name : str
+        Alias from ``GENERIC_KERNEL_ALIASES`` or a path-fragment relative
+        to ``GENERIC_URL``.
+    overwrite : bool, default False
+        Re-download even if the local cache already has the file.
+
+    Returns
+    -------
+    pathlib.Path
+        Local cache path of the downloaded kernel.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is neither a known alias nor a recognized
+        path-fragment shape.
+    """
+    relpath = GENERIC_KERNEL_ALIASES.get(name, name)
+    if "/" not in relpath:
+        raise ValueError(
+            f"Unknown generic-kernel alias {name!r}. "
+            f"Known aliases: {', '.join(sorted(GENERIC_KERNEL_ALIASES))}; "
+            f"or pass a full path like 'lsk/naif0012.tls'."
+        )
+    savepath = GENERIC_STORAGE / relpath
+    if savepath.exists() and not overwrite:
+        return savepath
+    savepath.parent.mkdir(exist_ok=True, parents=True)
+    url_retrieve(GENERIC_URL / relpath, savepath)
+    return savepath
 
 
 def load_generic_kernels():

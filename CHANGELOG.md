@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.63.0] - 2026-05-13
+
+### Added
+- **`plp spice` CLI sub-app — five verbs covering kernel discovery + fetch.** Mirrors the existing `plp catalog` / `plp indexes` shape so SPICE work no longer requires breaking out to Python for the easy parts:
+  - `plp spice missions` — Rich table of all 39 NAIF mission archives (shorthand, full mission name, date range, cumulative bundle size). Reads from `archived_kernels.datasets`.
+  - `plp spice info <mission>` — date range + archive metadata + URLs (PDS readme, archive root, NAIF subsetter URL) for one mission. Misspellings get difflib suggestions ("cassiny" → "did you mean: cassini?"); tab completion on the mission shorthand.
+  - `plp spice fetch <mission> --start --stop [--save-location]` — date-scoped kernel subset download. Wraps `archived_kernels.get_metakernel_and_files()`; metakernel path goes to **stdout** so shell composition Just Works (`spiceinit mkpre=$(plp spice fetch cassini --start … --stop …)`).
+  - `plp spice cached [--total]` — Rich table of every kernel currently cached under `{storage_root}/spice_kernels/`, grouped by mission with file count, on-disk size, and a sample of filenames per group. New backing helper `archived_kernels.list_cached_kernels() -> dict[str, list[Path]]` (public in `__all__`).
+  - `plp spice generic <name> [--force]` — fetch one generic kernel by short alias. New backing helper `generic_kernels.download_generic_kernel(name, overwrite=False) -> Path` (public). Aliases: `lsk`, `pck`, `masses`, `de430`, `mar099s`. Full path-fragments accepted for non-default kernels (e.g. `lsk/naif0011.tls`). Cached-aware: returns the local Path immediately if already on disk. Tab completion across the alias set; new `GENERIC_KERNEL_ALIASES` dict exposed alongside.
+
+  Per the thin-wrapper rule, both new helpers live as proper Python APIs in `planetarypy.spice.*` and are tested independently of the CLI; the CLI commands are short adapters over them.
+
+### Changed
+- **`plp --help` output is now grouped into 6 panels** instead of one flat 13-verb list. Categories: *Discovery & browsing* (catalog, indexes, spice, constants), *Fetch & download* (fetch, hibrowse, hiedr, himos), *Inspect a product* (meta, example_pid), *Visualize* (ctxqv), *Science computations* (spicer), *Maintenance* (ctx-migrate). Implementation: `rich_help_panel="..."` on each `@app.command()` decorator and on each `app.add_typer(...)` registration. Panel rendering order is determined internally by typer/rich-click (not by source order or alphabetical) — the grouping itself is the readability win; tweaking the order requires a rich-click config override that isn't worth the complexity here.
+
+### Refactor / internal
+- **Body.iter_constants()** extracted from `cli.py` into `planetarypy.constants.base.Body` so the `plp constants` table-render and tab-completion paths stop duplicating the "iterate dataclass fields, filter to Constants" loop. Yields `(field_name, Constant)` for every Constant-bearing field; skips `None` fields and non-Constant values (metadata like `body_class` / `naif_id`, polynomial-coefficient tuples, scalar floats). Useful for introspection beyond the CLI; 3 unit tests in `tests/test_constants_base.py` pin the contract.
+- Misc simplifications in `cli.py`: dropped over-defensive `try/except` around stable internal imports in `_complete_constants_query`; dropped `isinstance(b, Body)` filters (BodyRegistry only contains Bodies by construction); extracted `_body_name_set()` and `_suggest_and_exit()` helpers shared between completion paths and error suggestions; direct `.source` attribute access on Constants instead of `getattr(...) or ""` defensive chains. Plus a Lua-filter cleanup in `docs/_abbreviations.lua` (removed unused `suffix` capture, redundant rename, recomputed `after`, etc.).
+
 ## [0.62.0] - 2026-05-13
 
 > Note: a 0.61.1 release was published to PyPI between 0.61.0 and 0.62.0

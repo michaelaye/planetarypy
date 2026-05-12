@@ -17,6 +17,18 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
+# Help-panel labels used by every command's `rich_help_panel` arg so
+# the `plp --help` output groups verbs by intent. typer/rich-click
+# decides the panel rendering order internally (not by source order or
+# alphabetical) — the grouping itself is what matters; the order isn't
+# worth fighting.
+_PANEL_DISCOVERY  = "Discovery & browsing"
+_PANEL_INSPECT    = "Inspect a product"
+_PANEL_FETCH      = "Fetch & download"
+_PANEL_VISUALIZE  = "Visualize"
+_PANEL_SCIENCE    = "Science computations"
+_PANEL_MAINTAIN   = "Maintenance"
+
 
 # ── fetch ────────────────────────────────────────────────────────────
 
@@ -50,7 +62,7 @@ def _complete_product_id(ctx: click.Context, args: list[str], incomplete: str) -
     return []
 
 
-@app.command()
+@app.command(rich_help_panel=_PANEL_FETCH)
 def fetch(
     ctx: typer.Context,
     key: str = typer.Argument(None, help="Dotted product key, e.g. mro.ctx.edr"),
@@ -117,7 +129,7 @@ def _complete_hirise_obsid_edr(incomplete: str) -> list[str]:
     return complete_pid(incomplete, "mro.hirise.edr")
 
 
-@app.command()
+@app.command(rich_help_panel=_PANEL_FETCH)
 def hibrowse(
     ctx: typer.Context,
     product_id: str = typer.Argument(
@@ -166,7 +178,7 @@ def hibrowse(
         subprocess.Popen(["open", str(outpath)])
 
 
-@app.command()
+@app.command(rich_help_panel=_PANEL_FETCH)
 def hiedr(
     ctx: typer.Context,
     obsid: str = typer.Argument(None, help="HiRISE observation ID, e.g. PSP_003092_0985",
@@ -224,7 +236,7 @@ def hiedr(
     typer.echo(f"Stored in: {products[0].local_path.parent}")
 
 
-@app.command()
+@app.command(rich_help_panel=_PANEL_FETCH)
 def himos(
     ctx: typer.Context,
     obsid: str = typer.Argument(
@@ -294,7 +306,7 @@ def _complete_ctx_pid(incomplete: str) -> list[str]:
     return complete_pid(incomplete, "mro.ctx.edr")
 
 
-@app.command()
+@app.command(rich_help_panel=_PANEL_VISUALIZE)
 def ctxqv(
     ctx: typer.Context,
     imgid: str = typer.Argument(
@@ -402,7 +414,7 @@ def ctxqv(
 # ── catalog ──────────────────────────────────────────────────────────
 
 catalog_app = typer.Typer(help="PDS catalog management.", no_args_is_help=True)
-app.add_typer(catalog_app, name="catalog")
+app.add_typer(catalog_app, name="catalog", rich_help_panel=_PANEL_DISCOVERY)
 
 
 @catalog_app.command("build")
@@ -806,7 +818,7 @@ def catalog_ambiguous():
 indexes_app = typer.Typer(
     help="Browse and manage registered PDS indexes.", no_args_is_help=True,
 )
-app.add_typer(indexes_app, name="indexes")
+app.add_typer(indexes_app, name="indexes", rich_help_panel=_PANEL_DISCOVERY)
 
 
 @indexes_app.command("list")
@@ -1118,7 +1130,7 @@ def indexes_refresh(
 # ── CTX housekeeping ────────────────────────────────────────────────
 
 
-@app.command("ctx-migrate")
+@app.command("ctx-migrate", rich_help_panel=_PANEL_MAINTAIN)
 def ctx_migrate(
     dry_run: bool = typer.Option(
         False, "--dry-run", "-n",
@@ -1186,7 +1198,7 @@ def ctx_migrate(
 # ── spicer ───────────────────────────────────────────────────────────
 
 
-@app.command()
+@app.command(rich_help_panel=_PANEL_SCIENCE)
 def spicer(
     ctx: typer.Context,
     body: str = typer.Argument(None, help="NAIF body name, e.g. Mars, Moon, Enceladus"),
@@ -1256,10 +1268,333 @@ def spicer(
     typer.echo()
 
 
+# ── spice: kernel discovery + fetch ──────────────────────────────────
+
+spice_app = typer.Typer(
+    help="SPICE kernel discovery and date-scoped fetching across NAIF "
+         "mission archives.",
+    no_args_is_help=True,
+)
+app.add_typer(spice_app, name="spice", rich_help_panel=_PANEL_DISCOVERY)
+
+
+def _complete_spice_mission(incomplete: str) -> list[str]:
+    """Tab completion for the NAIF mission shorthand argument."""
+    from planetarypy.spice.archived_kernels import datasets
+    return sorted(m for m in datasets.index
+                  if m.lower().startswith(incomplete.lower()))
+
+
+@spice_app.command("missions")
+def spice_missions():
+    """List every mission archive NAIF publishes (~39 entries).
+
+    Each row shows the shorthand to use as the mission argument to
+    `plp spice info` / `plp spice fetch`, the full mission name, the
+    date range covered by the archive, and the cumulative kernel-bundle
+    size on the NAIF subsetter.
+
+    \b
+    Examples:
+        plp spice missions
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.spice.archived_kernels import datasets
+
+    table = Table(
+        title=f"NAIF mission kernel archives ({len(datasets)})",
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    table.add_column("shorthand", style="cyan", no_wrap=True)
+    table.add_column("mission")
+    table.add_column("start", no_wrap=True)
+    table.add_column("stop", no_wrap=True)
+    table.add_column("size (GB)", justify="right", style="dim")
+
+    for shorthand, row in datasets.iterrows():
+        table.add_row(
+            shorthand,
+            str(row["Mission Name"]),
+            str(row["Start Time"]),
+            str(row["Stop Time"]),
+            f"{row['Data Size (GB)']:g}",
+        )
+    Console().print(table)
+
+
+@spice_app.command("info")
+def spice_info(
+    ctx: typer.Context,
+    mission: str = typer.Argument(
+        None,
+        help="NAIF mission shorthand, e.g. cassini, mro, dawn.",
+        autocompletion=_complete_spice_mission,
+    ),
+):
+    """Show date range + archive metadata for one mission.
+
+    Use this before `plp spice fetch` to discover the date window the
+    archive covers, the cumulative bundle size, and the upstream
+    archive/readme URLs.
+
+    \b
+    Examples:
+        plp spice info cassini
+        plp spice info mro
+    """
+    if mission is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    from planetarypy.spice.archived_kernels import datasets
+
+    if mission not in datasets.index:
+        _suggest_and_exit(
+            mission, sorted(datasets.index), "Unknown mission:",
+        )
+
+    row = datasets.loc[mission]
+
+    from rich.console import Console
+    from rich.table import Table
+
+    table = Table(
+        title=f"{row['Mission Name']} ({mission})",
+        title_style="bold",
+        header_style="bold magenta",
+        show_header=False,
+        pad_edge=False,
+    )
+    table.add_column("field", style="cyan", no_wrap=True)
+    table.add_column("value", overflow="fold")
+    for label, key in (
+        ("date range", None),         # synthesized
+        ("data size", "Data Size (GB)"),
+        ("PDS version", "PDS3 or PDS4"),
+        ("archive readme", "Archive Readme"),
+        ("archive link", "Archive Link"),
+        ("subsetter URL", "Subset Link"),
+    ):
+        if key is None:
+            value = f"{row['Start Time']}  →  {row['Stop Time']}"
+        else:
+            value = str(row[key])
+            if label == "data size":
+                value = f"{row[key]:g} GB"
+            elif label == "PDS version":
+                value = f"PDS{row[key]}"
+        table.add_row(label, value)
+    Console().print(table)
+
+
+@spice_app.command("fetch")
+def spice_fetch(
+    ctx: typer.Context,
+    mission: str = typer.Argument(
+        None,
+        help="NAIF mission shorthand, e.g. cassini, mro, dawn.",
+        autocompletion=_complete_spice_mission,
+    ),
+    start: str = typer.Option(
+        None, "--start", "-s",
+        help="UTC start date (inclusive), e.g. 2006-06-01",
+    ),
+    stop: str = typer.Option(
+        None, "--stop", "-e",
+        help="UTC stop date (inclusive), e.g. 2006-06-30",
+    ),
+    save_location: str = typer.Option(
+        None, "--save-location", "-d",
+        help="Directory for downloaded kernels + metakernel (default: "
+             "planetarypy storage_root)",
+    ),
+):
+    """Download a date-scoped subset of a mission's SPICE kernels.
+
+    Thin wrapper around `planetarypy.spice.archived_kernels.
+    get_metakernel_and_files()`. Generates a metakernel referencing the
+    subsetted kernels; prints the metakernel path to stdout so shell
+    composition Just Works:
+
+    \b
+        ISIS_PRE='spiceinit from=input.cub mkpre=$(plp spice fetch \\
+            cassini --start 2006-06-01 --stop 2006-06-30)'
+
+    \b
+    Examples:
+        plp spice fetch cassini --start 2006-06-01 --stop 2006-06-30
+        plp spice fetch mro -s 2014-01-01 -e 2014-01-31
+    """
+    if mission is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    if start is None or stop is None:
+        typer.echo("Error: --start and --stop are both required.", err=True)
+        raise typer.Exit(2)
+
+    from planetarypy.spice.archived_kernels import datasets, get_metakernel_and_files
+
+    if mission not in datasets.index:
+        _suggest_and_exit(
+            mission, sorted(datasets.index), "Unknown mission:",
+        )
+
+    try:
+        metakernel = get_metakernel_and_files(
+            mission, start, stop, save_location=save_location,
+        )
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    # stdout: the metakernel path (pipe-safe for shell composition).
+    typer.echo(metakernel)
+
+
+@spice_app.command("cached")
+def spice_cached(
+    bytes_total: bool = typer.Option(
+        False, "--total", "-T",
+        help="Also print cumulative on-disk size at the bottom.",
+    ),
+):
+    """Show every SPICE kernel currently cached under storage_root.
+
+    Walks ``{storage_root}/spice_kernels/`` and groups by top-level
+    directory: ``generic`` (LSK/PCK/DE-series/satellites) and per-mission
+    subsets (cassini, mro, …). Useful before kicking off a `plp spice
+    fetch` to check whether kernels are already on disk.
+
+    \b
+    Examples:
+        plp spice cached
+        plp spice cached --total
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.spice.archived_kernels import list_cached_kernels
+    from planetarypy.spice.config import KERNEL_STORAGE
+
+    cached = list_cached_kernels()
+    if not cached:
+        typer.echo(
+            f"No SPICE kernels cached under {KERNEL_STORAGE}.", err=True,
+        )
+        typer.echo(
+            "Use `plp spice fetch` or `plp spice generic <type>` to "
+            "populate it.", err=True,
+        )
+        raise typer.Exit()
+
+    table = Table(
+        title=f"Cached SPICE kernels under {KERNEL_STORAGE}",
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    table.add_column("group", style="cyan", no_wrap=True)
+    table.add_column("files", justify="right")
+    table.add_column("size", justify="right", style="dim")
+    table.add_column("sample", overflow="fold")
+
+    grand_total = 0
+    for group, files in cached.items():
+        size = sum(p.stat().st_size for p in files)
+        grand_total += size
+        sample = ", ".join(p.name for p in files[:3])
+        if len(files) > 3:
+            sample += f", … (+{len(files) - 3} more)"
+        table.add_row(group, str(len(files)),
+                      _humanize_bytes(size), sample)
+    Console().print(table)
+    if bytes_total:
+        typer.echo(f"\ntotal: {_humanize_bytes(grand_total)}", err=True)
+
+
+def _humanize_bytes(n: int) -> str:
+    """Convert a raw byte count to a human-readable string."""
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+        n /= 1024
+
+
+def _complete_generic_alias(incomplete: str) -> list[str]:
+    """Tab completion for the generic-kernel alias argument."""
+    from planetarypy.spice.generic_kernels import GENERIC_KERNEL_ALIASES
+    return sorted(a for a in GENERIC_KERNEL_ALIASES
+                  if a.startswith(incomplete.lower()))
+
+
+@spice_app.command("generic")
+def spice_generic(
+    ctx: typer.Context,
+    name: str = typer.Argument(
+        None,
+        help="Short alias (lsk/pck/masses/de430/mar099s) or a full "
+             "path-fragment relative to NAIF's generic_kernels/ URL.",
+        autocompletion=_complete_generic_alias,
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f",
+        help="Re-download even if the local cache already has the file.",
+    ),
+):
+    """Fetch one generic SPICE kernel by short alias.
+
+    Generic kernels are the ones needed for *any* SPICE work — leapseconds,
+    planetary constants, DE-series planetary ephemerides — and they get
+    cached once under ``{storage_root}/spice_kernels/generic/``.
+
+    The aliases the command knows about:
+
+    \b
+        lsk      naif0012.tls          (leapseconds)
+        pck      pck00010.tpc          (planetary constants)
+        masses   de-403-masses.tpc     (DE-403 body masses)
+        de430    de430.bsp             (JPL DE430 planetary ephemeris)
+        mar099s  mar099s.bsp           (Mars satellite ephemeris)
+
+    Pass a full path-fragment for unlisted kernels (e.g.
+    ``lsk/naif0011.tls`` for an older LSK).
+
+    \b
+    Examples:
+        plp spice generic lsk
+        plp spice generic de430
+        plp spice generic lsk/naif0011.tls    # full path for non-default
+    """
+    if name is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    from planetarypy.spice.generic_kernels import (
+        GENERIC_KERNEL_ALIASES, download_generic_kernel,
+    )
+
+    try:
+        path = download_generic_kernel(name, overwrite=force)
+    except ValueError:
+        _suggest_and_exit(
+            name, sorted(GENERIC_KERNEL_ALIASES),
+            "Unknown generic-kernel alias:",
+        )
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+    # stdout: the local path (pipe-safe for shell composition).
+    typer.echo(path)
+
+
 # ── example_pid ──────────────────────────────────────────────────────
 
 
-@app.command("example_pid")
+@app.command("example_pid", rich_help_panel=_PANEL_INSPECT)
 def example_pid(
     ctx: typer.Context,
     key: str = typer.Argument(
@@ -1294,7 +1629,7 @@ def example_pid(
 # ── meta ─────────────────────────────────────────────────────────────
 
 
-@app.command("meta")
+@app.command("meta", rich_help_panel=_PANEL_INSPECT)
 def meta(
     ctx: typer.Context,
     key: str = typer.Argument(
@@ -1416,7 +1751,7 @@ def _suggest_and_exit(target: str, choices: list[str], label: str) -> None:
     raise typer.Exit(1)
 
 
-@app.command("constants")
+@app.command("constants", rich_help_panel=_PANEL_DISCOVERY)
 def constants_cmd(
     ctx: typer.Context,
     query: str = typer.Argument(

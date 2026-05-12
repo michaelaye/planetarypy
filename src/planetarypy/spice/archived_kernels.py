@@ -17,6 +17,7 @@ __all__ = [
     "Subsetter",
     "get_metakernel_and_files",
     "list_kernels_for_day",
+    "list_cached_kernels",
 ]
 
 import zipfile
@@ -552,3 +553,39 @@ def list_kernels_for_day(mission: str, start: str, stop: str = "") -> list:
     """
     subset = Subsetter(mission, start, stop)
     return subset.kernel_names
+
+
+def list_cached_kernels() -> dict[str, list[Path]]:
+    """Enumerate SPICE kernel files cached locally under ``KERNEL_STORAGE``.
+
+    Walks ``{storage_root}/spice_kernels/`` and groups what it finds by
+    top-level subdirectory:
+
+      - ``"generic"``  — leapseconds, planetary constants, DE-series and
+        satellite ephemerides under ``spice_kernels/generic/``.
+      - ``"<mission>"`` — per-mission archive subsets (one entry per
+        mission shorthand seen on disk).
+
+    Returns an empty dict if no kernels have been cached yet. The Path
+    list for each group is sorted by filename; metakernels (``*.tm``,
+    ``*.mk``) appear alongside the binary kernels.
+
+    Example::
+
+        >>> from planetarypy.spice.archived_kernels import list_cached_kernels
+        >>> cached = list_cached_kernels()
+        >>> sorted(cached.keys())
+        ['cassini', 'generic', 'mro']
+        >>> [p.name for p in cached['generic']]
+        ['de430.bsp', 'naif0012.tls', 'pck00010.tpc', ...]
+    """
+    if not KERNEL_STORAGE.is_dir():
+        return {}
+    out: dict[str, list[Path]] = {}
+    for group_dir in sorted(KERNEL_STORAGE.iterdir()):
+        if not group_dir.is_dir():
+            continue
+        files = sorted(p for p in group_dir.rglob("*") if p.is_file())
+        if files:
+            out[group_dir.name] = files
+    return out
