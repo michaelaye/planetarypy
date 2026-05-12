@@ -52,8 +52,9 @@ def _complete_product_id(ctx: click.Context, args: list[str], incomplete: str) -
 
 @app.command()
 def fetch(
-    key: str = typer.Argument(help="Dotted product key, e.g. mro.ctx.edr"),
-    product_id: str = typer.Argument(help="Product identifier",
+    ctx: typer.Context,
+    key: str = typer.Argument(None, help="Dotted product key, e.g. mro.ctx.edr"),
+    product_id: str = typer.Argument(None, help="Product identifier",
                                      autocompletion=_complete_product_id),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
     label_only: bool = typer.Option(False, "--label-only", "-l", help="Download only the label file"),
@@ -67,6 +68,13 @@ def fetch(
         plp fetch --here mro.ctx.edr P02_001916_2221_XI_42N027W
         cd (plp fetch --folder mro.ctx.edr P02_001916_2221_XI_42N027W)
     """
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    if product_id is None:
+        typer.echo("Error: missing PRODUCT_ID argument.", err=True)
+        raise typer.Exit(2)
+
     from pathlib import Path
 
     from planetarypy.catalog import fetch_product, get_product_urls
@@ -111,7 +119,9 @@ def _complete_hirise_obsid_edr(incomplete: str) -> list[str]:
 
 @app.command()
 def hibrowse(
+    ctx: typer.Context,
     product_id: str = typer.Argument(
+        None,
         help="HiRISE product ID, e.g. PSP_003092_0985_RED or PSP_004238_1135_RED1_1",
         autocompletion=_complete_hirise_obsid_rdr,
     ),
@@ -130,6 +140,10 @@ def hibrowse(
         plp hibrowse PSP_004238_1135_RED1_1       (EDR CCD)
         plp hibrowse PSP_003092_0985              (defaults to RDR RED)
     """
+    if product_id is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from pathlib import Path
     from planetarypy.instruments.mro.hirise import browse_url, get_browse
 
@@ -154,7 +168,8 @@ def hibrowse(
 
 @app.command()
 def hiedr(
-    obsid: str = typer.Argument(help="HiRISE observation ID, e.g. PSP_003092_0985",
+    ctx: typer.Context,
+    obsid: str = typer.Argument(None, help="HiRISE observation ID, e.g. PSP_003092_0985",
                                 autocompletion=_complete_hirise_obsid_edr),
     red: bool = typer.Option(False, "--red", help="Download RED CCDs (RED0–RED9, 20 files)"),
     ir: bool = typer.Option(False, "--ir", help="Download IR CCDs (IR10–IR11, 4 files)"),
@@ -175,6 +190,10 @@ def hiedr(
         plp hiedr PSP_003092_0985 --bg             (BG12+BG13, 4 files)
         plp hiedr PSP_003092_0985 --here --ccds 4,5 (download to current dir)
     """
+    if obsid is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from pathlib import Path
     from planetarypy.instruments.mro.hirise import download_edr, edr_products
 
@@ -207,7 +226,9 @@ def hiedr(
 
 @app.command()
 def himos(
+    ctx: typer.Context,
     obsid: str = typer.Argument(
+        None,
         help="HiRISE observation ID, e.g. PSP_003092_0985",
         autocompletion=_complete_hirise_obsid_edr,
     ),
@@ -232,6 +253,10 @@ def himos(
         plp himos PSP_003092_0985 --red --ir --bg    (all three colors)
         plp himos PSP_003092_0985 --map mymap.map    (custom projection)
     """
+    if obsid is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from planetarypy.instruments.mro.hirise import create_mosaics
 
     if not red and not ir and not bg:
@@ -271,7 +296,9 @@ def _complete_ctx_pid(incomplete: str) -> list[str]:
 
 @app.command()
 def ctxqv(
+    ctx: typer.Context,
     imgid: str = typer.Argument(
+        None,
         help="CTX product ID (short or full), e.g. J05_046771_1950",
         autocompletion=_complete_ctx_pid,
     ),
@@ -288,6 +315,10 @@ def ctxqv(
 
     Use --center-box to also show a full-resolution crop from the image center.
     """
+    if imgid is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -1157,7 +1188,8 @@ def ctx_migrate(
 
 @app.command()
 def spicer(
-    body: str = typer.Argument(help="NAIF body name, e.g. Mars, Moon, Enceladus"),
+    ctx: typer.Context,
+    body: str = typer.Argument(None, help="NAIF body name, e.g. Mars, Moon, Enceladus"),
     time: str = typer.Option(None, "--time", "-t", help="UTC time (default: now)"),
     lon: float = typer.Option(None, "--lon", help="Longitude [deg] for surface illumination"),
     lat: float = typer.Option(None, "--lat", help="Latitude [deg] for surface illumination"),
@@ -1172,6 +1204,10 @@ def spicer(
         plp spicer Moon --time 2024-06-15T12:00:00
         plp spicer Mars --lon 137.4 --lat -4.6
     """
+    if body is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from planetarypy.spice.spicer import Spicer
 
     try:
@@ -1225,7 +1261,9 @@ def spicer(
 
 @app.command("example_pid")
 def example_pid(
+    ctx: typer.Context,
     key: str = typer.Argument(
+        None,
         help="Dotted index key, e.g. mro.ctx.edr",
         autocompletion=_complete_index_key,
     ),
@@ -1238,6 +1276,10 @@ def example_pid(
         plp example_pid mro.ctx.edr
         plp example_pid cassini.iss.index
     """
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from planetarypy.pds import get_example_pid
 
     try:
@@ -1254,11 +1296,14 @@ def example_pid(
 
 @app.command("meta")
 def meta(
+    ctx: typer.Context,
     key: str = typer.Argument(
+        None,
         help="Dotted index key, e.g. mro.ctx.edr",
         autocompletion=_complete_index_key,
     ),
     product_id: str = typer.Argument(
+        None,
         help="Product identifier",
         autocompletion=_complete_product_id,
     ),
@@ -1281,6 +1326,13 @@ def meta(
         plp meta mro.ctx.edr P02_001916_2221_XI_42N027W
         plp meta cassini.iss.index 1_N1454725799
     """
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    if product_id is None:
+        typer.echo("Error: missing PRODUCT_ID argument.", err=True)
+        raise typer.Exit(2)
+
     from rich.console import Console
     from rich.table import Table
 
@@ -1309,6 +1361,170 @@ def meta(
     table.add_column("Value", overflow="fold")
     for col, val in row.items():
         table.add_row(str(col), "" if val is None else str(val))
+
+    Console().print(table)
+
+
+# ── constants ────────────────────────────────────────────────────────
+
+
+def _complete_constants_query(
+    ctx: click.Context, args: list[str], incomplete: str
+) -> list[str]:
+    """Tab completion for the constants subcommand.
+
+    Matches both ``Body`` (return body names) and ``Body.field`` (after a
+    dot, return that body's available scalar-Constant attributes).
+    """
+    try:
+        from planetarypy.constants import bodies
+        from planetarypy.constants.base import Body
+    except Exception:
+        return []
+
+    if "." not in incomplete:
+        # Suggest body Python-attribute names (Title case, matches imports)
+        prefix = incomplete.lower()
+        names = sorted({b.name.title() for b in bodies.values()
+                        if isinstance(b, Body) and b.name})
+        return [n for n in names if n.lower().startswith(prefix)]
+
+    from planetarypy.constants.base import Constant
+
+    body_part, _, field_part = incomplete.partition(".")
+    body = bodies.find(body_part)
+    if body is None:
+        return []
+    candidates = []
+    for field_name in body.__dataclass_fields__:
+        if not field_name.startswith(field_part):
+            continue
+        # Only offer fields that resolve to a Constant — metadata like
+        # body_class / naif_id / dwarf_planet aren't valid arguments to
+        # `plp constants`.
+        val = getattr(body, field_name, None)
+        if not isinstance(val, Constant):
+            continue
+        candidates.append(f"{body_part}.{field_name}")
+    return sorted(candidates)
+
+
+@app.command("constants")
+def constants_cmd(
+    ctx: typer.Context,
+    query: str = typer.Argument(
+        None,
+        help="Body name (case-insensitive) for the full quantity table, "
+             "or 'Body.field' for one value. "
+             "Examples: 'Mars', 'mars.GM', 'jupiter.bond_albedo'.",
+        autocompletion=_complete_constants_query,
+    ),
+    at: str = typer.Option(
+        None, "--at", "-t",
+        help="Time-travel: show the value as of this date (YYYY, YYYY-MM, "
+             "or YYYY-MM-DD). Walks PCK editions + NSSDC capture history.",
+    ),
+):
+    """Print per-body planetary constants from PCK + NSSDC sources.
+
+    Two forms:
+
+    \b
+        plp constants Mars         # Rich table of every known constant
+        plp constants Mars.GM      # Just the value (stdout) + source (stderr)
+
+    For the single-field form, the quantity is printed to stdout and the
+    source/reference goes to stderr, so output stays pipe-safe::
+
+    \b
+        plp constants Mars.GM | awk '{print $1}'
+
+    Body name matching is case-insensitive (``mars`` == ``Mars`` ==
+    ``MARS``). Unknown bodies print the closest matches as a suggestion.
+    """
+    import sys
+    import difflib
+    from planetarypy.constants import bodies
+    from planetarypy.constants.base import Body, Constant
+
+    # Bare invocation: typer would normally error on the missing
+    # positional. Print help instead — friendlier discovery surface.
+    if query is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    body_part, dot, field_part = query.partition(".")
+    body = bodies.find(body_part)
+    if body is None:
+        known = sorted({b.name.title() for b in bodies.values()
+                        if isinstance(b, Body) and b.name})
+        suggestions = difflib.get_close_matches(body_part.title(), known, n=3)
+        msg = f"Unknown body: {body_part!r}"
+        if suggestions:
+            msg += f"  did you mean: {', '.join(suggestions)}?"
+        typer.echo(msg, err=True)
+        raise typer.Exit(1)
+
+    if at is not None:
+        body = body.at_time(at)
+
+    # ── Field form: stdout=value, stderr=source ────────────────────────
+    if dot:
+        if not hasattr(body, field_part):
+            available = sorted(
+                n for n in body.__dataclass_fields__
+                if getattr(body, n, None) is not None
+                and isinstance(getattr(body, n), Constant)
+            )
+            suggestions = difflib.get_close_matches(field_part, available, n=3)
+            msg = f"{body.name.title()} has no field {field_part!r}"
+            if suggestions:
+                msg += f"  did you mean: {', '.join(suggestions)}?"
+            typer.echo(msg, err=True)
+            raise typer.Exit(1)
+        value = getattr(body, field_part)
+        if value is None:
+            typer.echo(
+                f"{body.name.title()}.{field_part} is unset (None)",
+                err=True,
+            )
+            raise typer.Exit(1)
+        # stdout: bare value (pipe-safe). stderr: provenance.
+        typer.echo(str(value))
+        source = getattr(value, "source", None) or "<no source>"
+        reference = getattr(value, "reference", None) or ""
+        print(f"# source: {source}", file=sys.stderr)
+        if reference:
+            print(f"# reference: {reference}", file=sys.stderr)
+        return
+
+    # ── Body form: Rich table of every scalar Constant ─────────────────
+    from rich.console import Console
+    from rich.table import Table
+
+    title = f"{body.name.title()} (NAIF {body.naif_id}, {body.body_class})"
+    if at is not None:
+        title += f"  — as of {at}"
+    table = Table(
+        title=title,
+        title_style="bold",
+        header_style="bold magenta",
+        show_lines=False,
+        pad_edge=False,
+    )
+    table.add_column("field", style="cyan", no_wrap=True)
+    table.add_column("value", overflow="fold")
+    table.add_column("source", overflow="fold", style="dim")
+
+    for field_name in body.__dataclass_fields__:
+        val = getattr(body, field_name, None)
+        if not isinstance(val, Constant):
+            continue
+        table.add_row(
+            field_name,
+            str(val),
+            getattr(val, "source", "") or "",
+        )
 
     Console().print(table)
 

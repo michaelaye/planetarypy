@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.1] - 2026-05-13
+
+### Added
+- **`plp constants` CLI subcommand.** Two forms:
+  - `plp constants Mars` — Rich-rendered table of every scalar `Constant`
+    attached to the body, with a *source* column (PCK kernel filename or
+    NSSDC capture stamp per field). Filters out non-Constant metadata
+    like `body_class` / `dwarf_planet` / `naif_id` so the table only
+    contains actual quantities.
+  - `plp constants Mars.GM` — value on **stdout**, provenance lines
+    (`# source: pck00011.tpc`, `# reference: IAU 2015 — Archinal et
+    al.…`) on **stderr**, so `plp constants Mars.GM | awk '{print $1}'`
+    Just Works.
+  Body matching is case-insensitive (`mars` == `Mars` == `MARS`). Misspelt
+  bodies and unknown fields each exit non-zero with `difflib`-driven
+  close-match suggestions on stderr (e.g. `'jupier'` → "did you mean:
+  Jupiter, Juliet?"; `Mars.gravity` → "did you mean: surface_gravity?").
+  Carries the time-travel facility through to the CLI via `--at`/`-t`:
+  `plp constants Mars.pole_dec --at 2012` returns 52.886° (sourced from
+  `pck00010.tpc`/IAU 2009), demonstrating the PCK-edition swap from a
+  shell. Tab completion offers body names before the dot and
+  Constant-bearing field names after it (gas-giant `Jupiter.surface_<TAB>`
+  correctly returns nothing since those fields are unset). 13 new tests
+  in `tests/test_cli_constants.py` pin the contract.
+
+### Changed
+- **Bare invocation now prints `--help` for every top-level CLI command.**
+  Previously, `plp catalog` / `plp indexes` (sub-app groups) showed full
+  help on bare invocation (typer's free `no_args_is_help=True` for
+  groups), but the eight individual commands with required positionals
+  — `fetch`, `hibrowse`, `hiedr`, `himos`, `ctxqv`, `spicer`,
+  `example_pid`, `meta` — instead emitted typer's terse `Missing
+  argument 'KEY'.` error (exit 2). Now every top-level command exits 0
+  with the full help block when invoked without arguments. Two-positional
+  commands (`fetch`, `meta`) still error on partial invocation with a
+  clear `Error: missing PRODUCT_ID argument.` message and exit 2, so the
+  "give me a hint, I have the first arg" flow is preserved. Pattern:
+  added `ctx: typer.Context` parameter, defaulted the first positional
+  to `None`, and inserted an `if x is None: typer.echo(ctx.get_help());
+  raise typer.Exit()` block at the top of each function body. Cheap and
+  consistent.
+
 ## [0.61.0] - 2026-05-12
 
 ### Added
