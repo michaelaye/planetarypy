@@ -1268,6 +1268,13 @@ def spicer(
     typer.echo()
 
 
+# TODO: plp geo sub-app over planetarypy.geo is the next planned CLI
+#       surface (Discovery panel). Verbs: crs / bodies / project /
+#       unproject / pixel2lonlat / lonlat2pixel. Per the thin-wrapper
+#       rule, audit planetarypy.geo for Python-API gaps first — a
+#       `bodies()` or `crs_for(body)` lookup likely needs adding.
+
+
 # ── spice: kernel discovery + fetch ──────────────────────────────────
 
 spice_app = typer.Typer(
