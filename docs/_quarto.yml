@@ -27,6 +27,8 @@ website:
         href: explanation/index.qmd
       - text: API Reference
         href: reference/index.qmd
+      - text: Fact Sheets
+        href: factsheets.qmd
       - text: Contributing
         href: contributing.qmd
     right:

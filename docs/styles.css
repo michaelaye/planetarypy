@@ -43,3 +43,31 @@
 .quarto-dark .source-link:hover {
   color: #aecbfa;  /* Lighter blue on hover */
 }
+
+/* Panel-tabset: make the active tab clearly distinguishable in both
+   themes. Default Bootstrap styling renders the active tab with the
+   same-coloured text as inactive tabs and only a thin border, which is
+   too subtle on both Flatly (teal text on white) and Superhero (teal
+   text on dark). Fill with the theme's primary colour instead. */
+.panel-tabset .nav-tabs .nav-link.active,
+.panel-tabset .nav-tabs .nav-item.show .nav-link {
+  background-color: var(--bs-primary);
+  color: #fff !important;
+  border-color: var(--bs-primary) var(--bs-primary) var(--bs-primary);
+  font-weight: 600;
+}
+
+.panel-tabset .nav-tabs .nav-link:hover:not(.active) {
+  background-color: rgba(var(--bs-primary-rgb), 0.12);
+  border-color: transparent;
+}
+
+/* Dark mode: same primary fill works since Superhero's --bs-primary is
+   a distinct orange against the dark body background. Keep the white
+   text explicit for AA contrast. */
+.quarto-dark .panel-tabset .nav-tabs .nav-link.active,
+.quarto-dark .panel-tabset .nav-tabs .nav-item.show .nav-link {
+  background-color: var(--bs-primary);
+  color: #fff !important;
+  border-color: var(--bs-primary);
+}

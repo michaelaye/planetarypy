@@ -1,0 +1,427 @@
+---
+title: "Planetary Fact Sheets"
+subtitle: "Latest archived NSSDC values for the Sun and the planets"
+date: today
+toc: true
+toc-depth: 2
+---
+
+::: {.panel-tabset}
+
+## Sun
+
+*Latest archived revision: **(undated)*** · [original Wayback snapshot ↗](https://web.archive.org/web/20160911214455id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 1,988,500 | 10²⁴ kg |
+| Gm | 132,712 | x 10⁶ km³/s² |
+| Volume | 1,412,000 | 10¹² km³ |
+| Volumetric mean radius | 695,700 | km |
+| Mean density | 1,408 | kg/m³ |
+| Surface gravity | 274 | m/s² |
+| Escape velocity | 617.6 | km/s |
+| Ellipticity | 5e-05 |  |
+
+## Mercury
+
+*Latest archived revision: **2024-01-11*** · [original Wayback snapshot ↗](https://web.archive.org/web/20250821200511id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/mercuryfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 0.3301 | 10²⁴ kg |
+| Volume | 6.083 | 10¹⁰ km³ |
+| Equatorial radius | 2440.5 | km |
+| Polar radius | 2438.3 | km |
+| Volumetric mean radius | 2439.7 | km |
+| Ellipticity | 0.0009 |  |
+| Mean density | 5,429 | kg/m³ |
+| Surface gravity | 3.7 | m/s² |
+| Surface acceleration | 3.7 | m/s² |
+| Surface acceleration pole | 3.71 | m/s² |
+| Escape velocity | 4.3 | km/s |
+| Gm | 0.022032 | x 10⁶ km³/s² |
+| Bond albedo | 0.068 |  |
+| Geometric albedo | 0.142 |  |
+| Solar irradiance | 9082.7 | W/m² |
+| Black body temperature | 439.6 | K |
+| Topographic range | 7 | km |
+| Number of satellites | 0 |  |
+| Has ring system | No |  |
+| Semimajor axis | 57.909 | 10⁶ km |
+| Sidereal orbit period | 87.969 | days |
+| Tropical orbit period | 87.968 | days |
+| Perihelion | 46 | 10⁶ km |
+| Aphelion | 69.818 | 10⁶ km |
+| Synodic period | 115.88 | days |
+| Mean orbital velocity | 47.36 | km/s |
+| Max orbital velocity | 58.97 | km/s |
+| Min orbital velocity | 38.86 | km/s |
+| Orbit inclination | 7.004 | deg |
+| Orbit eccentricity | 0.2056 |  |
+| Sidereal rotation period | 1407.6 | hrs |
+| Length of day | 4222.6 | hrs |
+| Obliquity to orbit | 0.034 | deg |
+| Inclination of equator | 0.034 | deg |
+| Average temperature | 440 | K |
+
+## Venus
+
+*Latest archived revision: **2024-01-11*** · [original Wayback snapshot ↗](https://web.archive.org/web/20250820171848id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/venusfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 4.8673 | 10²⁴ kg |
+| Volume | 92.843 | 10¹⁰ km³ |
+| Equatorial radius | 6051.8 | km |
+| Polar radius | 6051.8 | km |
+| Volumetric mean radius | 6051.8 | km |
+| Ellipticity | 0 |  |
+| Mean density | 5,243 | kg/m³ |
+| Surface gravity | 8.87 | m/s² |
+| Surface acceleration | 8.87 | m/s² |
+| Surface acceleration pole | 8.87 | m/s² |
+| Escape velocity | 10.36 | km/s |
+| Gm | 0.32486 | x 10⁶ km³/s² |
+| Bond albedo | 0.77 |  |
+| Geometric albedo | 0.689 |  |
+| Solar irradiance | 2601.3 | W/m² |
+| Black body temperature | 226.6 | K |
+| Topographic range | 13 | km |
+| Number of satellites | 0 |  |
+| Has ring system | No |  |
+| Semimajor axis | 108.21 | 10⁶ km |
+| Sidereal orbit period | 224.701 | days |
+| Tropical orbit period | 224.695 | days |
+| Perihelion | 107.48 | 10⁶ km |
+| Aphelion | 108.941 | 10⁶ km |
+| Synodic period | 583.92 | days |
+| Mean orbital velocity | 35.02 | km/s |
+| Max orbital velocity | 35.26 | km/s |
+| Min orbital velocity | 34.78 | km/s |
+| Orbit inclination | 3.395 | deg |
+| Orbit eccentricity | 0.0068 |  |
+| Sidereal rotation period | -5832.6 | hrs |
+| Length of day | 2,802 | hrs |
+| Obliquity to orbit | 177.36 | deg |
+| Inclination of equator | 2.64 | deg |
+| Surface pressure | 92 | bars |
+| Surface density | 65 | kg/m |
+| Scale height | 15.9 | km |
+| Average temperature | 737 | K |
+| Mean molecular weight | 43.45 |  |
+
+## Earth
+
+*Latest archived revision: **2024-11-15*** · [original Wayback snapshot ↗](https://web.archive.org/web/20250819180903id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 5.9722 | 10²⁴ kg |
+| Volume | 108.321 | 10¹⁰ km³ |
+| Equatorial radius | 6378.14 | km |
+| Polar radius | 6356.75 | km |
+| Volumetric mean radius | 6,371 | km |
+| Core radius | 3,485 | km |
+| Ellipticity | 0.003353 |  |
+| Mean density | 5,513 | kg/m³ |
+| Surface gravity | 9.82 | m/s² |
+| Surface acceleration eq | 9.78 | m/s² |
+| Surface acceleration pole | 9.832 | m/s² |
+| Escape velocity | 11.186 | km/s |
+| Gm | 0.3986 | x 10⁶ km³/s² |
+| Bond albedo | 0.294 |  |
+| Geometric albedo | 0.434 |  |
+| Solar irradiance | 1,361 | W/m² |
+| Black body temperature | 254 | K |
+| Topographic range | 20.4 | km |
+| Number of satellites | 1 |  |
+| Has ring system | No |  |
+| Semimajor axis | 149.598 | 10⁶ km |
+| Sidereal orbit period | 365.256 | days |
+| Tropical orbit period | 365.242 | days |
+| Perihelion | 147.095 | 10⁶ km |
+| Aphelion | 152.1 | 10⁶ km |
+| Mean orbital velocity | 29.78 | km/s |
+| Max orbital velocity | 30.29 | km/s |
+| Min orbital velocity | 29.29 | km/s |
+| Orbit inclination | 0 | deg |
+| Orbit eccentricity | 0.0167 |  |
+| Sidereal rotation period | 23.9345 | hrs |
+| Length of day | 24 | hrs |
+| Obliquity to orbit | 23.44 | deg |
+| Inclination of equator | 23.44 | deg |
+| Surface pressure | 1,014 | mb |
+| Surface density | 1.217 | kg/m³ |
+| Scale height | 8.5 | km |
+| Average temperature | 288 | K |
+| Mean molecular weight | 28.97 |  |
+
+## Mars
+
+*Latest archived revision: **2025-05-19*** · [original Wayback snapshot ↗](https://web.archive.org/web/20250820142225id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 0.64169 | 10²⁴ kg |
+| Volume | 16.312 | 10¹⁰ km³ |
+| Equatorial radius | 3396.2 | km |
+| Polar radius | 3376.2 | km |
+| Volumetric mean radius | 3389.5 | km |
+| Core radius | 1,830 | km |
+| Ellipticity | 0.00589 |  |
+| Mean density | 3,934 | kg/m³ |
+| Surface gravity | 3.73 | m/s² |
+| Surface acceleration eq | 3.69 | m/s² |
+| Surface acceleration pole | 3.73 | m/s² |
+| Escape velocity | 5.03 | km/s |
+| Gm | 0.042828 | x 10⁶ km³/s² |
+| Bond albedo | 0.25 |  |
+| Geometric albedo | 0.17 |  |
+| Solar irradiance | 586.2 | W/m² |
+| Black body temperature | 209.8 | K |
+| Topographic range | 30 | km |
+| Number of satellites | 2 |  |
+| Has ring system | No |  |
+| Semimajor axis | 227.956 | 10⁶ km |
+| Sidereal orbit period | 686.98 | days |
+| Perihelion | 206.65 | 10⁶ km |
+| Aphelion | 249.261 | 10⁶ km |
+| Synodic period | 779.94 | days |
+| Mean orbital velocity | 24.08 | km/s |
+| Max orbital velocity | 26.5 | km/s |
+| Min orbital velocity | 21.97 | km/s |
+| Orbit inclination | 1.848 | deg |
+| Orbit eccentricity | 0.0935 |  |
+| Sidereal rotation period | 24.6229 | hrs |
+| Length of day | 24.6597 | hrs |
+| Obliquity to orbit | 25.19 | deg |
+| Inclination of equator | 25.19 | deg |
+| Surface pressure | 6.36 | mb |
+| Surface density | 0.016 |  |
+| Scale height | 11 | km |
+| Average temperature | 214 | K |
+| Mean molecular weight | 43.49 |  |
+
+## Jupiter
+
+*Latest archived revision: **2024-10-02*** · [original Wayback snapshot ↗](https://web.archive.org/web/20241004225740id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/jupiterfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 1898.13 | 10²⁴ kg |
+| Volume | 143,128 | 10¹⁰ km³ |
+| Equatorial radius | 71,492 | km |
+| Polar radius | 66,854 | km |
+| Volumetric mean radius | 69,911 | km |
+| Ellipticity | 0.06487 |  |
+| Mean density | 1,326 | kg/m³ |
+| Escape velocity | 59.5 | km/s |
+| Gm | 126.687 | x 10⁶ km³/s² |
+| Bond albedo | 0.343 |  |
+| Geometric albedo | 0.538 |  |
+| Solar irradiance | 50.26 | W/m² |
+| Black body temperature | 109.9 | K |
+| Number of satellites | 95 |  |
+| Has ring system | Yes |  |
+| Semimajor axis | 778.479 | 10⁶ km |
+| Sidereal orbit period | 4332.59 | days |
+| Tropical orbit period | 4330.6 | days |
+| Perihelion | 740.595 | 10⁶ km |
+| Aphelion | 816.363 | 10⁶ km |
+| Synodic period | 398.88 | days |
+| Mean orbital velocity | 13.06 | km/s |
+| Max orbital velocity | 13.72 | km/s |
+| Min orbital velocity | 12.44 | km/s |
+| Orbit inclination | 1.304 | deg |
+| Orbit eccentricity | 0.0487 |  |
+| Sidereal rotation period | 9.925 | hrs |
+| Length of day | 9.9259 | hrs |
+| Obliquity to orbit | 3.13 | deg |
+| Inclination of equator | 3.13 | deg |
+| Scale height | 27 | km |
+| Mean molecular weight | 2.22 |  |
+
+## Saturn
+
+*Latest archived revision: **2025-03-18*** · [original Wayback snapshot ↗](https://web.archive.org/web/20250821165423id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturnfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 568.32 | 10²⁴ kg |
+| Volume | 82,713 | 10¹⁰ km³ |
+| Equatorial radius | 60,268 | km |
+| Polar radius | 54,364 | km |
+| Volumetric mean radius | 58,232 | km |
+| Ellipticity | 0.09796 |  |
+| Mean density | 687 | kg/m³ |
+| Escape velocity | 35.5 | km/s |
+| Gm | 37.931 | x 10⁶ km³/s² |
+| Bond albedo | 0.342 |  |
+| Geometric albedo | 0.499 |  |
+| Solar irradiance | 14.82 | W/m² |
+| Black body temperature | 81 | K |
+| Number of satellites | 274 |  |
+| Has ring system | Yes |  |
+| Semimajor axis | 1432.04 | 10⁶ km |
+| Sidereal orbit period | 10755.7 | days |
+| Tropical orbit period | 10746.9 | days |
+| Perihelion | 1357.55 | 10⁶ km |
+| Aphelion | 1506.53 | 10⁶ km |
+| Synodic period | 378.09 | days |
+| Mean orbital velocity | 9.67 | km/s |
+| Max orbital velocity | 10.14 | km/s |
+| Min orbital velocity | 9.14 | km/s |
+| Orbit inclination | 2.486 | deg |
+| Orbit eccentricity | 0.052 |  |
+| Sidereal rotation period | 10.656 | hrs |
+| Length of day | 10.656 | hrs |
+| Obliquity to orbit | 26.73 | deg |
+| Scale height | 59.5 | km |
+| Mean molecular weight | 2.07 |  |
+
+## Uranus
+
+*Latest archived revision: **2024-10-02*** · [original Wayback snapshot ↗](https://web.archive.org/web/20241007091728id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/uranusfact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 86.811 | 10²⁴ kg |
+| Volume | 6,833 | 10¹⁰ km³ |
+| Equatorial radius | 25,559 | km |
+| Polar radius | 24,973 | km |
+| Volumetric mean radius | 25,362 | km |
+| Ellipticity | 0.02293 |  |
+| Mean density | 1,270 | kg/m³ |
+| Escape velocity | 21.3 | km/s |
+| Gm | 5.794 | x 10⁶ km³/s² |
+| Bond albedo | 0.3 |  |
+| Geometric albedo | 0.488 |  |
+| Solar irradiance | 3.69 | W/m² |
+| Black body temperature | 58.1 | K |
+| Number of satellites | 28 |  |
+| Has ring system | Yes |  |
+| Semimajor axis | 2867.04 | 10⁶ km |
+| Sidereal orbit period | 30685.4 | days |
+| Tropical orbit period | 30588.7 | days |
+| Perihelion | 2732.7 | 10⁶ km |
+| Aphelion | 3001.39 | 10⁶ km |
+| Synodic period | 369.66 | days |
+| Mean orbital velocity | 6.79 | km/s |
+| Max orbital velocity | 7.13 | km/s |
+| Min orbital velocity | 6.49 | km/s |
+| Orbit inclination | 0.77 | deg |
+| Orbit eccentricity | 0.0469 |  |
+| Sidereal rotation period | -17.24 | hrs |
+| Length of day | 17.24 | hrs |
+| Obliquity to orbit | 97.77 | deg |
+| Inclination of equator | 82.23 | deg |
+| Scale height | 27.7 | km |
+| Mean molecular weight | 2.64 |  |
+
+## Neptune
+
+*Latest archived revision: **2024-10-03*** · [original Wayback snapshot ↗](https://web.archive.org/web/20241006132807id_/https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptunefact.html)
+
+| Field | Value | Unit |
+|-------|------:|:-----|
+| Mass | 102.409 | 10²⁴ kg |
+| Volume | 6,254 | 10¹⁰ km³ |
+| Equatorial radius | 24,764 | km |
+| Polar radius | 24,341 | km |
+| Volumetric mean radius | 24,622 | km |
+| Ellipticity | 0.01708 |  |
+| Mean density | 1,638 | kg/m³ |
+| Escape velocity | 23.5 | km/s |
+| Gm | 6.8351 | x 10⁶ km³/s² |
+| Bond albedo | 0.29 |  |
+| Geometric albedo | 0.442 |  |
+| Solar irradiance | 1.508 | W/m² |
+| Black body temperature | 46.6 | K |
+| Number of satellites | 16 |  |
+| Has ring system | Yes |  |
+| Semimajor axis | 4514.95 | 10⁶ km |
+| Sidereal orbit period | 60189 | days |
+| Tropical orbit period | 59799.9 | days |
+| Perihelion | 4471.05 | 10⁶ km |
+| Aphelion | 4558.86 | 10⁶ km |
+| Synodic period | 367.49 | days |
+| Mean orbital velocity | 5.45 | km/s |
+| Max orbital velocity | 5.47 | km/s |
+| Min orbital velocity | 5.37 | km/s |
+| Orbit inclination | 1.77 | deg |
+| Orbit eccentricity | 0.0097 |  |
+| Sidereal rotation period | 16.11 | hrs |
+| Length of day | 16.11 | hrs |
+| Obliquity to orbit | 28.32 | deg |
+| Inclination of equator | 28.32 | deg |
+| Scale height | 19.1 | - |
+| Mean molecular weight | 2.53 | - |
+
+:::
+
+## About this page
+
+::: {.callout-note}
+NASA's live [NSSDC planetary fact sheets](https://nssdc.gsfc.nasa.gov/planetary/factsheet/)
+have been intermittently offline for months. The tables above are the
+**most recent archived revisions** of each fact sheet, parsed from the
+longitudinal archive that ships with `planetarypy.constants` and
+deposited at Zenodo
+([10.5281/zenodo.20122987](https://doi.org/10.5281/zenodo.20122987)).
+Each tab shows the latest capture's date and links to the underlying
+Wayback Machine snapshot so the original page is one click away.
+:::
+
+The values above are auto-extracted from `parsed_archive_v1.json.gz`
+--- the same dataset that `planetarypy.constants` loads at runtime.
+The archive currently contains 913 distinct content versions of 13
+NSSDC fact sheets, spanning December 1996 to May 2025. This page is a
+static snapshot of the most recent capture per body; it does not
+auto-refresh and will be regenerated whenever NSSDC publishes new
+revisions (or comes back online and we re-scrape).
+
+The Moon, Pluto, and the asteroid / comet summary sheets are also in
+the archive but not shown here, since this page focuses on the Sun and
+the eight planets. Access them through the
+[`planetarypy.constants`](reference/constants.qmd) API the same way.
+
+## How to consume these in code
+
+Every value shown above is also available as an
+[`astropy.units.Quantity`](https://docs.astropy.org/en/stable/units/)
+through `planetarypy.constants`:
+
+``` python
+from planetarypy.constants import Mars
+Mars.bond_albedo          # 0.25
+Mars.bond_albedo.unit     # dimensionless
+Mars.bond_albedo.source   # the originating NSSDC capture
+```
+
+For the full revision trail of any field --- not just the latest value
+shown here --- use the explicit `nssdc` namespace:
+
+``` python
+from planetarypy.constants import nssdc
+nssdc.history("saturn", "number_of_satellites")
+```
+
+For the dataset itself, methodology, and citation BibTeX, see the
+[Zenodo deposit](https://doi.org/10.5281/zenodo.20122987).
+
+## Source & copyright
+
+- **Source data:** NASA / Goddard Space Flight Center / National Space
+  Science Data Center (NSSDC), Planetary Fact Sheets at
+  <https://nssdc.gsfc.nasa.gov/planetary/factsheet/>, long-time curator
+  Dr. David R. Williams. As works of the U.S. federal government these
+  data are in the public domain in the United States
+  ([17 U.S.C. § 105](https://www.copyright.gov/title17/92chap1.html#105));
+  please credit **NASA / NSSDC** when you reuse them.
+- **Archive parsing & redistribution:** Aye, K. M. (2025).
+  *A longitudinal archive of the NSSDC planetary fact sheets
+  (1996--2025)* \[Data set\]. Zenodo. <https://doi.org/10.5281/zenodo.20122987>
+  (MIT licensed).
+- **Disclaimer:** `planetarypy` is a community project. It is not
+  affiliated with, endorsed by, or sponsored by NASA, GSFC, or NSSDC.
