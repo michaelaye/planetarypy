@@ -75,6 +75,10 @@ format:
     toc-title: Contents
     toc-location: right
     code-link: true
+    include-in-header:
+      - text: |
+          <script data-goatcounter="https://planetarypy.goatcounter.com/count"
+                  async src="//gc.zgo.at/count.js"></script>
     css:
       - styles.css
       - reference/_styles-quartodoc.css
