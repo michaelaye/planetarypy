@@ -120,6 +120,7 @@ _NSSDC_UNIT_EMIT: dict[Optional[str], tuple[str, float]] = {
     None: ("u.dimensionless_unscaled", 1.0),
     "": ("u.dimensionless_unscaled", 1.0),
     "ppm": ("u.dimensionless_unscaled", 1e-6),
+    "10^-6": ("u.dimensionless_unscaled", 1e-6),  # NSSDC's "x 10^-6" — used for J2
 }
 
 

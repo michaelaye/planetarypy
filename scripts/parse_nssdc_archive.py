@@ -105,6 +105,10 @@ FIELD_MAP: dict[str, str] = {
     "Moment of inertia (I/MR2)": "moment_of_inertia",
     "Moment of inertia (I/MR^2)": "moment_of_inertia",
     "J2": "J2",
+    # `<sub>2</sub>` survives _strip_html as the marker form `_2`, so the
+    # page label "J<sub>2</sub>" arrives here as "J_2". Map it to the same
+    # attribute. (Strip-as-marker is intentional — see _strip_html docstring.)
+    "J_2": "J2",
     "Number of natural satellites": "number_of_satellites",
     "Planetary ring system": "has_ring_system",  # Yes/No textual
     # Orbital parameters
