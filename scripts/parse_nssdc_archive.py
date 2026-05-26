@@ -242,6 +242,26 @@ class ParsedRow:
     value: Optional[float]  # coerced to float; None for non-numeric ('Yes', 'No', etc.)
 
 
+@dataclass
+class SkippedReport:
+    """Anti-hallucination coverage probe.
+
+    Populated by :func:`parse_capture` (and its helpers) when a non-None
+    instance is passed via the ``_report`` keyword. Records every place
+    where the parser saw data and silently dropped it — the test suite
+    asserts this stays within a committed allowlist so a newly-published
+    NSSDC field can't disappear into the void unnoticed.
+    """
+    unknown_labels: set = None      # row labels with no FIELD_MAP entry
+    unknown_sections: set = None    # <h3> section names we never entered
+
+    def __post_init__(self) -> None:
+        if self.unknown_labels is None:
+            self.unknown_labels = set()
+        if self.unknown_sections is None:
+            self.unknown_sections = set()
+
+
 def _match_field(label: str) -> Optional[str]:
     """FIELD_MAP lookup tolerant of trailing qualifier parens.
 
@@ -256,13 +276,18 @@ def _match_field(label: str) -> Optional[str]:
     return FIELD_MAP.get(stripped)
 
 
-def _parse_pre_block(text: str) -> list[ParsedRow]:
+def _parse_pre_block(text: str,
+                     _report: Optional["SkippedReport"] = None) -> list[ParsedRow]:
     """Parse rows from the plain-text body of a single section.
 
     Each line should have shape ``LABEL [whitespace] VALUE [other columns]``.
     We take the first non-empty numeric-or-textual token after the label
     as the target-body value (matches the column ordering used since
     1996: target column comes first after the label).
+
+    When ``_report`` is supplied, every label whose ``_match_field`` lookup
+    fails is recorded into ``_report.unknown_labels`` for downstream
+    coverage assertions.
     """
     rows: list[ParsedRow] = []
     for line in text.splitlines():
@@ -276,6 +301,8 @@ def _parse_pre_block(text: str) -> list[ParsedRow]:
         label, unit = _split_label_unit(label_text)
         attr = _match_field(label)
         if attr is None:
+            if _report is not None:
+                _report.unknown_labels.add(label)
             continue
 
         # Pull the first whitespace-separated token from `rest` as the
@@ -291,7 +318,8 @@ def _parse_pre_block(text: str) -> list[ParsedRow]:
     return rows
 
 
-def _parse_table(table_html: str) -> list[ParsedRow]:
+def _parse_table(table_html: str,
+                 _report: Optional["SkippedReport"] = None) -> list[ParsedRow]:
     """Parse rows from an HTML <table>.
 
     Modern (2017+) NSSDC layout: each data row is a <tr> with the label
@@ -320,6 +348,8 @@ def _parse_table(table_html: str) -> list[ParsedRow]:
         label, unit = _split_label_unit(label_text)
         attr = _match_field(label)
         if attr is None:
+            if _report is not None:
+                _report.unknown_labels.add(label)
             continue
         value_text = _strip_thousand_commas(_strip_html(cells[1]).strip())
         first_token = value_text.split()[0] if value_text.split() else ""
@@ -330,13 +360,20 @@ def _parse_table(table_html: str) -> list[ParsedRow]:
     return rows
 
 
-def parse_capture(raw_html: str) -> dict:
+def parse_capture(raw_html: str,
+                  _report: Optional["SkippedReport"] = None) -> dict:
     """Parse one capture's HTML into a {field_name: {value, raw, unit}} dict
     plus the page_date.
 
     Strategy: split HTML into sections by <h3>...</h3> markers. For each
     section, detect whether it's a <pre>-style or <table>-style block, and
     parse accordingly.
+
+    When ``_report`` is supplied (a :class:`SkippedReport`), every <h3>
+    section header we don't enter and every row label that has no
+    FIELD_MAP entry is recorded. Used by the
+    ``test_constants_vs_sources`` slow-test to prove no NSSDC content
+    slips past the parser unnoticed.
     """
     page_date = parse_page_date(raw_html)
     fields: dict[str, dict] = {}
@@ -354,12 +391,14 @@ def parse_capture(raw_html: str) -> dict:
         if "Bulk parameters" not in section_name \
                 and "Orbital parameters" not in section_name \
                 and "Atmosphere" not in section_name:
+            if _report is not None and section_name:
+                _report.unknown_sections.add(section_name)
             continue
         section_body = raw_html[header.end():boundaries[i + 1]]
 
         # Prefer table parsing if a <table> appears in this section.
         if re.search(r"<table[^>]*>", section_body, re.IGNORECASE):
-            for row in _parse_table(section_body):
+            for row in _parse_table(section_body, _report=_report):
                 # Only insert first occurrence (some sections list the
                 # same label in moon sub-tables we want to skip).
                 if row.attr not in fields:
@@ -369,7 +408,7 @@ def parse_capture(raw_html: str) -> dict:
         else:
             # Pre-block style. Strip HTML to get text, parse rows.
             section_text = _strip_html(section_body)
-            for row in _parse_pre_block(section_text):
+            for row in _parse_pre_block(section_text, _report=_report):
                 if row.attr not in fields:
                     fields[row.attr] = {
                         "value": row.value, "raw": row.raw, "unit": row.unit,
