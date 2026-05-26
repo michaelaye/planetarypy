@@ -30,8 +30,15 @@ class TestFieldForm:
         # `# reference:`); stdout must stay clean of them so consumers can
         # pipe the value into awk/jq/etc.
         assert "# source:" in result.stderr
-        assert "pck00011.tpc" in result.stderr
+        # GM is sourced from the JPL DE440 ephemeris, not the PCK.
+        assert "gm_de440.tpc" in result.stderr
         assert "# source:" not in result.stdout
+
+    def test_pck_field_source_is_the_pck(self):
+        # Sibling check: a PCK-sourced field reports the PCK kernel.
+        result = runner.invoke(app, ["constants", "Mars.radii"])
+        assert result.exit_code == 0
+        assert "pck00011.tpc" in result.stderr
 
     def test_case_insensitive_body_name(self):
         upper = runner.invoke(app, ["constants", "MARS.GM"]).stdout

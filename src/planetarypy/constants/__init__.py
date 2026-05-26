@@ -67,22 +67,103 @@ from astropy.constants import (
     au, pc, kpc,
 )
 
+from dataclasses import replace as _dc_replace
+
 from planetarypy.constants.base import (
     Body,
     BodyRegistry,
     Constant,
     century,
 )
-from planetarypy.constants import iau2009, iau2015, nssdc
-
-# The current default edition. Importing ``planetarypy.constants.X``
-# resolves to ``planetarypy.constants.iau2015.X`` (Mars, Saturn, ...).
-# Earlier editions are still reachable explicitly via their submodule.
-from planetarypy.constants.iau2015 import *  # noqa: F401, F403  (body aliases)
-from planetarypy.constants.iau2015 import bodies  # explicit so type checkers see it
+from planetarypy.constants import iau2009, iau2015, nssdc, _gm_jpl
 
 DEFAULT_IAU_YEAR = 2015
 AVAILABLE_IAU_YEARS = (2009, 2015)
+
+# Fields that, when present in PCK, take precedence over NSSDC.
+# Mirrors ``base._PCK_DERIVED_FIELDS`` — duplicated here to keep this
+# module import-free of base internals.
+_PCK_DERIVED_FIELDS: frozenset[str] = frozenset({
+    "radii", "GM", "long_axis",
+    "pole_ra", "pole_dec", "pm", "rotation_rate",
+    "pole_ra_coeffs", "pole_dec_coeffs", "pm_coeffs",
+    "mean_radius", "volume_radius", "flattening",
+})
+
+
+def _compose_body(pck_body: Body) -> Body:
+    """Compose one user-facing Body from PCK + JPL GM + latest NSSDC.
+
+    Inputs (per body):
+      - ``pck_body``     : IAU-PCK-sourced Body from iau{year}.bodies
+      - JPL GM           : from ``_gm_jpl.gms`` indexed by NAIF id
+      - NSSDC overlay    : from ``nssdc.bodies`` (latest capture)
+
+    PCK wins for cartographic / orientation fields; JPL DE440 wins for
+    GM; NSSDC fills everything else. Result is a frozen Body with one
+    field per source, each Constant carrying its own provenance metadata.
+    """
+    overlays: dict = {}
+
+    # GM from JPL DE440 (not IAU-versioned). Re-stamp the body name so
+    # the Constant's repr reads sensibly — _gm_jpl ships them with
+    # body='' by design.
+    gm = _gm_jpl.gms.get(pck_body.naif_id)
+    if gm is not None:
+        overlays["GM"] = Constant(
+            gm.value * gm.unit,
+            name="GM", body=pck_body.name.title(),
+            description=gm.description,
+            reference=gm.reference,
+            iau_year=gm.iau_year,
+            source=gm.source,
+        )
+
+    # NSSDC overlay — only for fields PCK doesn't already supply.
+    nssdc_body = nssdc.bodies.find(pck_body.naif_id)
+    if nssdc_body is not None:
+        for field_name, constant in nssdc_body.iter_constants():
+            if field_name in _PCK_DERIVED_FIELDS:
+                continue
+            overlays[field_name] = constant
+
+    return _dc_replace(pck_body, **overlays) if overlays else pck_body
+
+
+def _compose_default_registry() -> BodyRegistry:
+    """Build the user-facing BodyRegistry: PCK + GM + NSSDC composed.
+
+    Starts from the default IAU edition (latest), overlays each
+    body, and tacks on bodies that only exist in NSSDC (none today;
+    placeholder for future expansion).
+    """
+    out: dict[int, Body] = {}
+    for naif_id, pck_body in iau2015.bodies.items():
+        out[naif_id] = _compose_body(pck_body)
+    # NSSDC-only bodies (none today since every NSSDC body is also in
+    # PCK) would land here.
+    for naif_id, nssdc_body in nssdc.bodies.items():
+        if naif_id not in out:
+            out[naif_id] = nssdc_body
+    return BodyRegistry(out)
+
+
+bodies: BodyRegistry = _compose_default_registry()
+
+
+# Hoist body aliases (Mars, Earth, Saturn, …) into module globals so
+# ``from planetarypy.constants import Mars`` works the same as before
+# the refactor. Names come from the PCK module's globals to preserve
+# the existing alias map (Saturn vs SATURN_BARYCENTER, etc.).
+def _hoist_aliases() -> None:
+    for py_name, obj in vars(iau2015).items():
+        if isinstance(obj, Body):
+            composed = bodies.find(obj.naif_id)
+            if composed is not None:
+                globals()[py_name] = composed
+
+
+_hoist_aliases()
 
 
 # ── Discovery helpers ──────────────────────────────────────────────────

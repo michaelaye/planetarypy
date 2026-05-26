@@ -25,8 +25,11 @@ from planetarypy.constants.base import Body, Constant
 class TestTopLevelAccess:
     def test_default_edition_is_iau2015(self):
         assert c.DEFAULT_IAU_YEAR == 2015
-        # Direct comparison: the default Mars IS the iau2015 Mars
-        assert c.Mars is iau2015.Mars
+        # PCK fields on the composed top-level Mars come from IAU 2015.
+        # (c.Mars is NOT iau2015.Mars itself — c.Mars composes PCK + JPL
+        # GM + NSSDC, whereas iau2015.Mars is PCK-only.)
+        assert c.Mars.radii is iau2015.Mars.radii
+        assert c.Mars.pole_ra is iau2015.Mars.pole_ra
 
     def test_available_editions(self):
         assert c.AVAILABLE_IAU_YEARS == (2009, 2015)
@@ -147,8 +150,13 @@ class TestTimeTravel:
         assert hasattr(iau2015, "Mars")
 
     def test_iau2015_is_the_default(self):
-        assert c.Mars is iau2015.Mars
-        assert c.Mars is not iau2009.Mars
+        # PCK fields on the default Mars match the IAU 2015 edition,
+        # not IAU 2009. c.Mars itself is a composed Body (PCK + GM +
+        # NSSDC), but its cartographic fields are shared by-reference
+        # from iau2015.
+        assert c.Mars.radii is iau2015.Mars.radii
+        assert c.Mars.pole_ra is iau2015.Mars.pole_ra
+        assert c.Mars.pole_ra is not iau2009.Mars.pole_ra
 
     def test_orientation_differs_between_editions(self):
         # The IAU report editions differ on rotational elements (the
@@ -163,8 +171,10 @@ class TestTimeTravel:
         )
 
     def test_both_editions_carry_their_own_iau_year(self):
-        assert iau2009.Mars.GM.iau_year == 2009
-        assert iau2015.Mars.GM.iau_year == 2015
+        # GM lives in _gm_jpl (JPL DE440, not IAU-versioned), so check
+        # an actually-IAU-versioned field on each edition module.
+        assert iau2009.Mars.pole_ra.iau_year == 2009
+        assert iau2015.Mars.pole_ra.iau_year == 2015
 
 
 # ── Integration: numerical sanity checks against literature ─────────────
@@ -224,13 +234,25 @@ class TestNumericalSanity:
         # Titan radius ≈ 2575 km
         assert titan.radii[0].value == pytest.approx(2575, rel=1e-2)
 
-    def test_constant_carries_iau_provenance(self):
+    def test_constant_carries_jpl_provenance(self):
+        # GM comes from JPL DE440 (gm_de440.tpc), NOT from the IAU PCK.
+        # iau_year=0 marks "not IAU-edition-versioned".
         gm = c.Mars.GM
         assert isinstance(gm, Constant)
-        assert gm.iau_year == 2015
+        assert gm.iau_year == 0
         assert gm.body == "Mars"
         assert gm.name == "GM"
-        assert "IAU 2015" in gm.reference
+        assert "DE440" in gm.reference
+        assert gm.source == "gm_de440.tpc"
+
+    def test_pck_field_carries_iau_provenance(self):
+        # PCK-sourced fields (radii, pole_*, pm, …) DO carry IAU year.
+        radii = c.Mars.radii
+        assert isinstance(radii, Constant)
+        assert radii.iau_year == 2015
+        assert radii.body == "Mars"
+        assert "IAU 2015" in radii.reference
+        assert radii.source == "pck00011.tpc"
 
 
 # ── Repr / introspection ────────────────────────────────────────────────
@@ -238,8 +260,16 @@ class TestNumericalSanity:
 
 class TestRepr:
     def test_constant_repr_shows_provenance(self):
+        # GM repr shows its JPL source (not an IAU year, because GM
+        # isn't IAU-versioned).
         s = repr(c.Mars.GM)
         assert "Mars.GM" in s
+        assert "gm_de440.tpc" in s
+
+    def test_pck_constant_repr_shows_iau_year(self):
+        # PCK-sourced fields still tag with their IAU edition.
+        s = repr(c.Mars.radii)
+        assert "Mars.radii" in s
         assert "IAU 2015" in s
 
     def test_body_repr(self):
