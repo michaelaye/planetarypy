@@ -275,3 +275,47 @@ class TestRepr:
     def test_body_repr(self):
         s = repr(c.Mars)
         assert "MARS" in s and "499" in s and "planet" in s
+
+
+class TestUncertaintyAndRange:
+    """The two error-info fields on Constant are orthogonal and
+    semantically distinct: uncertainty = symmetric measurement ± error,
+    range = bounds for a naturally-varying quantity."""
+
+    def test_default_uncertainty_is_zero_range_is_none(self):
+        # Existing PCK-sourced constants set neither field.
+        assert c.Mars.radii.uncertainty == 0.0
+        assert c.Mars.radii.range is None
+
+    def test_uncertainty_round_trips_through_constant(self):
+        import astropy.units as u
+        from planetarypy.constants.base import Constant
+        k = Constant(
+            0.016 * u.kg / u.m ** 3, uncertainty=0.006,
+            name="surface_density", body="Mars",
+            source="NSSDC fact-sheet",
+        )
+        assert k.uncertainty == 0.006
+        assert "± 0.006" in repr(k)
+
+    def test_range_round_trips_through_constant(self):
+        import astropy.units as u
+        from planetarypy.constants.base import Constant, Range
+        r = Range(min=19.1, max=20.3)
+        # Midpoint is the representative single value for arithmetic.
+        k = Constant(
+            r.midpoint * u.km, range=r,
+            name="scale_height", body="Neptune",
+            source="NSSDC fact-sheet",
+        )
+        assert k.range.min == 19.1
+        assert k.range.max == 20.3
+        assert k.range.midpoint == pytest.approx(19.7)
+        assert k.range.half_width == pytest.approx(0.6)
+        assert "range 19.1" in repr(k) and "20.3" in repr(k)
+
+    def test_range_dataclass_is_immutable(self):
+        from planetarypy.constants.base import Range
+        r = Range(1.0, 2.0)
+        with pytest.raises((AttributeError, Exception)):
+            r.min = 5.0  # frozen dataclass

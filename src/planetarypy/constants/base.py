@@ -59,11 +59,38 @@ _PCK_DERIVED_FIELDS: frozenset[str] = frozenset({
 })
 
 
+# ── Range ───────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Range:
+    """Inclusive bounds for a quantity that legitimately varies.
+
+    Distinct from measurement uncertainty: a range expresses that the
+    quantity takes different values under different conditions
+    (seasonal, diurnal, latitudinal, …), not that one measurement is
+    bracketed by an error bar. Mars surface pressure varying between
+    4.0 mb and 8.7 mb across the year is a range; Mars surface density
+    of 0.020 ± 0.006 kg/m³ is an uncertainty.
+    """
+
+    min: float
+    max: float
+
+    @property
+    def midpoint(self) -> float:
+        return (self.min + self.max) / 2
+
+    @property
+    def half_width(self) -> float:
+        return (self.max - self.min) / 2
+
+
 # ── Constant ────────────────────────────────────────────────────────────
 
 
 class Constant(u.Quantity):
-    """A ``Quantity`` with attached PCK provenance metadata.
+    """A ``Quantity`` with attached provenance and (optional) error info.
 
     Behaves like any other :class:`astropy.units.Quantity` for math
     and unit operations — composes in formulas, supports ``.to()``,
@@ -71,9 +98,15 @@ class Constant(u.Quantity):
     metadata; explicitly demote to plain ``Quantity`` if you want a
     metadata-free value.
 
-    Metadata fields (all defaulting to empty/zero):
+    Metadata fields (all defaulting to empty/zero/None):
     ``name``, ``body``, ``description``, ``reference``, ``iau_year``,
-    ``source``.
+    ``source``, ``uncertainty``, ``range``.
+
+    The two error-info fields are orthogonal and semantically distinct
+    (see :class:`Range`). ``uncertainty`` is a symmetric ± value in the
+    same unit as ``value``; ``range`` is a :class:`Range` of bounds for
+    a naturally-varying quantity, with ``value`` set to the midpoint as
+    the representative single number for arithmetic.
     """
 
     # Field name → default. Drives both __new__ propagation and
@@ -81,11 +114,13 @@ class Constant(u.Quantity):
     _META: dict[str, object] = {
         "name": "", "body": "", "description": "",
         "reference": "", "iau_year": 0, "source": "",
+        "uncertainty": 0.0, "range": None,
     }
 
     def __new__(cls, value, unit=None, *,
                 name="", body="", description="",
-                reference="", iau_year=0, source=""):
+                reference="", iau_year=0, source="",
+                uncertainty=0.0, range=None):  # noqa: A002  (mirrors public attr)
         if isinstance(value, u.Quantity):
             inst = u.Quantity.__new__(cls, value.value, value.unit)
         else:
@@ -96,6 +131,8 @@ class Constant(u.Quantity):
         inst.reference = reference
         inst.iau_year = int(iau_year)
         inst.source = source
+        inst.uncertainty = float(uncertainty)
+        inst.range = range
         return inst
 
     def __array_finalize__(self, obj):
@@ -114,9 +151,15 @@ class Constant(u.Quantity):
             arr = np.asarray(self)
             v = (f"{float(arr):.6g}" if arr.shape == ()
                  else np.array2string(arr, precision=6, separator=", "))
+            extras = ""
+            if self.uncertainty:
+                extras += f" ± {self.uncertainty:.6g}"
+            if self.range is not None:
+                extras += (f" (range {self.range.min:.6g}"
+                           f"–{self.range.max:.6g})")
             tag = f"IAU {self.iau_year}" if self.iau_year else self.source
-            return (f"<Constant {self.body}.{self.name} = {v} {self.unit}  "
-                    f"({tag})>")
+            return (f"<Constant {self.body}.{self.name} = {v}{extras} "
+                    f"{self.unit}  ({tag})>")
         return repr(u.Quantity(self))
 
 
