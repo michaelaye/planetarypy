@@ -75,7 +75,7 @@ REFERENCE = (
 
 
 def _make_constant(rec: _loader.NSSDCRecord, body_label: str) -> Optional[Constant]:
-    qty = _loader.coerce_value(rec.value, rec.unit)
+    qty = _loader.coerce_value(rec.value, rec.unit, field_name=rec.field)
     if qty is None:
         return None
     return Constant(

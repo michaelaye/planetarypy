@@ -160,8 +160,32 @@ def _normalize_unit(raw_unit: Optional[str]) -> Optional[str]:
     return s
 
 
-def coerce_value(raw_value: float, raw_unit: Optional[str]) -> Optional[u.Quantity]:
+# Conventional unit for fields NSSDC sometimes publishes without one.
+# Applied only when the raw unit is ``None`` or empty AND the field name
+# appears here — explicit units on the source always win. Documented
+# per-entry so the assumption is auditable.
+_FIELD_DEFAULT_UNITS: dict[str, u.UnitBase] = {
+    # Earth captures publish "Mean molecular weight: 28.97" with no
+    # unit; other bodies write "g/mole" explicitly. Atmospheric-chemistry
+    # convention is g/mol (≡ Da, ≡ atomic mass units). Without this
+    # default, ~338 captures load as dimensionless while ~171 load as
+    # g/mol, producing an inconsistent type across bodies.
+    "mean_molecular_weight": u.g / u.mol,
+}
+
+
+def coerce_value(
+    raw_value: float,
+    raw_unit: Optional[str],
+    field_name: Optional[str] = None,
+) -> Optional[u.Quantity]:
     """Turn ``(raw_value, raw_unit_str)`` into an astropy Quantity.
+
+    When ``raw_unit`` is absent (``None`` or empty) AND ``field_name`` is
+    a key in :data:`_FIELD_DEFAULT_UNITS`, the field's conventional unit
+    is applied. Explicit units on the source always take precedence;
+    fields without a default entry fall back to ``dimensionless_unscaled``
+    via ``_UNIT_MAP[None]``.
 
     Returns ``None`` for non-numeric values (e.g. "Yes", "No") or unit
     strings we don't recognize — caller decides how to handle missing.
@@ -169,6 +193,8 @@ def coerce_value(raw_value: float, raw_unit: Optional[str]) -> Optional[u.Quanti
     if raw_value is None:
         return None
     key = _normalize_unit(raw_unit)
+    if (key is None or key == "") and field_name in _FIELD_DEFAULT_UNITS:
+        return raw_value * _FIELD_DEFAULT_UNITS[field_name]
     if key in _UNIT_MAP:
         unit, scale = _UNIT_MAP[key]
         return (raw_value * scale) * unit
