@@ -269,7 +269,9 @@ class Constant(astropy.units.Quantity):
     description    # e.g. "Gravitational parameter"
     reference      # e.g. "IAU 2015 — Archinal et al. ..."
     iau_year       # e.g. 2015
-    source     # e.g. "pck00011.tpc"
+    source         # e.g. "pck00011.tpc"
+    uncertainty    # symmetric ± value (NSSDC fields only); 0.0 if absent
+    range          # Range(min, max) for varying quantities; None if absent
 ```
 
 Math operations correctly demote to plain `Quantity` (so
@@ -326,6 +328,48 @@ was published or computed:
 | `Quantity`     | Computed from one or more PCKs / astropy values |
 
 That's a meaningful signal, not noise.
+
+### NSSDC error-info: uncertainty vs range
+
+NSSDC publishes two kinds of error information that the parser captures
+and the `Constant` class plumbs through:
+
+| NSSDC source form | Captured as |
+|---|---|
+| `0.016 +/- 0.006 kg/m³`  | `value=0.016, uncertainty=0.006, unit=kg/m³` |
+| `2.53 - 2.69` (range)    | `value=NaN, range=Range(2.53, 2.69), unit=...` |
+
+The two concepts are **kept distinct on purpose**. A symmetric ± value
+expresses *measurement uncertainty around a known central estimate*. A
+range expresses *the quantity legitimately varies* (seasonally,
+diurnally, with latitude). Flattening both into one field would lose
+the scientifically-meaningful distinction.
+
+For ranges, `value` is `NaN` by default — the parser is faithful to the
+source (NSSDC published bounds, not a number). Arithmetic propagates
+`NaN`, which is a visible signal that the caller is silently choosing
+a representative number. To opt into midpoint substitution:
+
+``` toml
+# ~/.planetarypy_config.toml
+[constants]
+range_strategy = "midpoint"   # value becomes (min + max) / 2
+warn_on_range_midpoint = true # one-time RangeWarning per process
+```
+
+When the strategy is `"midpoint"`, a `planetarypy.constants.RangeWarning`
+fires once per process explaining that a range has been flattened to its
+midpoint and how to reach the underlying bounds (`.range.min` /
+`.range.max`). Suppress permanently via the config switch or per-script:
+
+``` python
+import warnings
+from planetarypy.constants import RangeWarning
+warnings.filterwarnings("ignore", category=RangeWarning)
+```
+
+The archive on disk is interpretation-free in either case — same JSON
+data, runtime preference decides presentation.
 
 ## Natural / fundamental constants — defer to astropy
 
