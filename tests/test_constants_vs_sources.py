@@ -404,8 +404,6 @@ _EXPECTED_UNKNOWN_LABELS: frozenset[str] = frozenset({
     # Unicode / formatting glitches
     "", "*",
     # (c) PARSER BUGS — see _LIKELY_PARSER_BUGS for the triage list.
-    "V-band magnitude V",   # FIELD_MAP key has "(1,0)" stripped by unit-paren detector
-    "Visual magnitude V",   # same issue
     "Inclination to equator",   # FIELD_MAP has "Inclination of equator"
     "Orbital eccentricity",     # FIELD_MAP has "Orbit eccentricity"
     "Orbital inclination",      # FIELD_MAP has "Orbit inclination"
@@ -421,8 +419,6 @@ _EXPECTED_UNKNOWN_LABELS: frozenset[str] = frozenset({
 # Fixing these is a follow-up that requires editing
 # scripts/parse_nssdc_archive.py and re-running the parser + regenerator.
 _LIKELY_PARSER_BUGS: frozenset[str] = frozenset({
-    "V-band magnitude V",
-    "Visual magnitude V",
     "Inclination to equator",
     "Orbital eccentricity",
     "Orbital inclination",

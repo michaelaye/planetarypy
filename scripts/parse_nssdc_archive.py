@@ -222,6 +222,15 @@ def _split_label_unit(label_text: str) -> tuple[str, Optional[str]]:
     Returns (label, unit) where unit is None if no parenthesized suffix.
     """
     s = label_text.strip()
+    # Short-circuit when the full string is a known FIELD_MAP key. NSSDC
+    # uses parenthesized non-units in some labels — `(1,0)` is photometric
+    # notation in "Visual magnitude V(1,0)", and `(Flattening)` is the
+    # synonym qualifier in "Ellipticity (Flattening)". Both look like
+    # units to the naive splitter and used to silently shadow ~1400
+    # readings combined. Trusting FIELD_MAP first lets us keep the
+    # generic split-off rule for genuine unit suffixes like "(10^24 kg)".
+    if s in FIELD_MAP:
+        return s, None
     if not s.endswith(")"):
         return s, None
     # Walk backward counting parens; find the matching '(' for the final ')'.
