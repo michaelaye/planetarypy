@@ -89,6 +89,9 @@ FIELD_MAP: dict[str, str] = {
     "Mean density": "mean_density",
     "Surface gravity": "surface_gravity",
     "Surface gravity (mean)": "surface_gravity",
+    # Some captures use Title Case for the noun; alias both forms.
+    "Surface Gravity": "surface_gravity",
+    "Surface Gravity (mean)": "surface_gravity",
     "Surface acceleration": "surface_acceleration",
     "Surface acceleration (eq)": "surface_acceleration_eq",
     "Surface acceleration (pole)": "surface_acceleration_pole",

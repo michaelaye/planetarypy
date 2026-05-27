@@ -333,16 +333,12 @@ finally:
 # before) trigger a deliberate decision: extend FIELD_MAP to capture
 # the field, or expand this allowlist with a reason.
 #
-# Most entries fall into one of three buckets — comments above each
+# Most entries fall into one of two buckets — comments above each
 # block say which:
 #   (a) cross-column labels (planet/moon names appearing as column
 #       headers in comparison tables — not data),
 #   (b) sub-sections we don't expose (Sun internals, magnetosphere,
-#       mean orbital elements, satellite tables, free-text atmosphere),
-#   (c) PARSER BUGS we know about and choose not to fix in this round:
-#       see ``_LIKELY_PARSER_BUGS`` below for the suspect list — they
-#       look like genuine fields the parser misses due to label-form
-#       quirks. Logged in test output as a warning.
+#       mean orbital elements, satellite tables, free-text atmosphere).
 _EXPECTED_UNKNOWN_LABELS: frozenset[str] = frozenset({
     # (a) column headers from inter-body comparison tables
     "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn",
@@ -403,21 +399,6 @@ _EXPECTED_UNKNOWN_LABELS: frozenset[str] = frozenset({
     "Note:", "Up to",
     # Unicode / formatting glitches
     "", "*",
-    # (c) PARSER BUGS — see _LIKELY_PARSER_BUGS for the triage list.
-    "Surface Gravity",          # FIELD_MAP has lowercase "Surface gravity"
-    "Surface Gravity (mean)",   # FIELD_MAP has lowercase
-})
-
-
-# Labels in the allowlist that LOOK like genuine parser misses — the
-# field would map to a real Body attribute if FIELD_MAP recognized the
-# spelling/casing actually used on the page. Logged as a warning in
-# the test output so a future maintainer can prioritise the fix.
-# Fixing these is a follow-up that requires editing
-# scripts/parse_nssdc_archive.py and re-running the parser + regenerator.
-_LIKELY_PARSER_BUGS: frozenset[str] = frozenset({
-    "Surface Gravity",
-    "Surface Gravity (mean)",
 })
 
 
@@ -504,17 +485,6 @@ class TestNSSDCParserCoverage:
               f"({sum(unknown_labels.values())} total occurrences)")
         print(f"  unknown sections : {len(unknown_sections)} distinct "
               f"({sum(unknown_sections.values())} total occurrences)")
-
-        # Warning band: allowlisted labels that look like real misses
-        # the parser ought to be catching. Not a failure (the user
-        # acknowledges these), but surfaced so they don't fall off
-        # someone's plate forever.
-        active_bugs = sorted(set(unknown_labels) & _LIKELY_PARSER_BUGS)
-        if active_bugs:
-            print("\n  PARSER BUGS still active (fix in "
-                  "scripts/parse_nssdc_archive.py FIELD_MAP):")
-            for label in active_bugs:
-                print(f"    {label!r}  ×{unknown_labels[label]}")
 
         if new_labels:
             print("\n  NEW unknown labels (extend FIELD_MAP or allowlist):")
