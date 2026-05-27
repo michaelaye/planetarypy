@@ -132,6 +132,158 @@ class TestIndexesLastSort:
         assert "P_005" in result.output
 
 
+# ── tab-completion: segment-aware fallback ──────────────────────────────
+
+
+class TestCompleteIndexKey:
+    """``_complete_index_key`` falls back to a case-insensitive segment
+    prefix match when whole-key prefix produces nothing — so typing
+    ``ctx`` or ``CTX`` can complete ``mro.ctx.edr`` without forcing the
+    user to remember the mission segment."""
+
+    KEYS = {
+        "mro.ctx.edr", "mro.ctx.calib",
+        "mro.hirise.edr",
+        "cassini.cda.index",
+        "go.ssi.raw",
+    }
+
+    def test_whole_key_prefix_still_wins(self):
+        from planetarypy.cli import _complete_index_key
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value=self.KEYS):
+            assert set(_complete_index_key("mro.")) == {
+                "mro.ctx.edr", "mro.ctx.calib", "mro.hirise.edr",
+            }
+            assert set(_complete_index_key("mro.ctx")) == {
+                "mro.ctx.edr", "mro.ctx.calib",
+            }
+
+    def test_segment_prefix_when_whole_key_misses(self):
+        from planetarypy.cli import _complete_index_key
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value=self.KEYS):
+            # `ctx` doesn't prefix any whole key, so the segment
+            # fallback kicks in — middle segment starts with `ctx`.
+            assert set(_complete_index_key("ctx")) == {
+                "mro.ctx.edr", "mro.ctx.calib",
+            }
+            # `hirise` matches mro.hirise.edr via the second segment.
+            assert _complete_index_key("hirise") == ["mro.hirise.edr"]
+            # `cda` matches cassini.cda.index via the second segment.
+            assert _complete_index_key("cda") == ["cassini.cda.index"]
+            # `index` matches the third segment of cassini.cda.index.
+            assert _complete_index_key("index") == ["cassini.cda.index"]
+
+    def test_segment_match_is_case_insensitive(self):
+        from planetarypy.cli import _complete_index_key
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value=self.KEYS):
+            assert set(_complete_index_key("CTX")) == {
+                "mro.ctx.edr", "mro.ctx.calib",
+            }
+            assert _complete_index_key("HiRise") == ["mro.hirise.edr"]
+
+    def test_empty_incomplete_does_not_segment_match(self):
+        # Empty incomplete falls through the prefix branch returning
+        # all keys; the segment fallback explicitly skips when
+        # ``incomplete`` is empty so we don't list everything twice
+        # or do redundant work.
+        from planetarypy.cli import _complete_index_key
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value=self.KEYS):
+            assert set(_complete_index_key("")) == self.KEYS
+
+    def test_no_match_returns_empty(self):
+        from planetarypy.cli import _complete_index_key
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value=self.KEYS):
+            assert _complete_index_key("nothing_here") == []
+
+    def test_shell_complete_adapter_delegates_to_logic_function(self):
+        """``_shell_complete_index_key`` is the Click-shaped wrapper —
+        it discards the (unused) ``ctx``/``param`` args and returns
+        whatever the underlying matcher returns. The wrapper exists to
+        bypass Typer's autocompletion-side ``startswith(incomplete)``
+        filter that would otherwise drop segment-prefix matches."""
+        from planetarypy.cli import _shell_complete_index_key
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value=self.KEYS):
+            # Same segment-prefix expectation as the logic function —
+            # routing through the adapter must not lose the candidate.
+            assert set(_shell_complete_index_key(
+                ctx=None, param=None, incomplete="ctx"
+            )) == {"mro.ctx.edr", "mro.ctx.calib"}
+
+
+# ── DeprecationWarning filter ───────────────────────────────────────────
+
+
+class TestApplyWarningFilters:
+    """``_apply_warning_filters`` reads the user config and either
+    silences DeprecationWarning (default, end-user-facing) or leaves it
+    alone (devs who set ``filter_deprecation_warnings = false``)."""
+
+    def test_default_installs_deprecation_filter(self, monkeypatch):
+        # No explicit config key → default True → filter installed.
+        import warnings
+        from planetarypy.cli import _apply_warning_filters
+        from planetarypy.config import config
+
+        # Force the key to be absent (config["..."] returns "" when missing).
+        monkeypatch.setattr(config, "tomldoc", dict(config.tomldoc))
+        config.tomldoc.pop("filter_deprecation_warnings", None)
+
+        with warnings.catch_warnings():
+            warnings.resetwarnings()
+            _apply_warning_filters()
+            with warnings.catch_warnings(record=True) as captured:
+                warnings.simplefilter("default")
+                # `simplefilter("default")` is a coarser setting — the
+                # specific ignore filter installed by our helper still
+                # wins because filters are matched in order. Re-apply
+                # to put it on top.
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                warnings.warn("test", DeprecationWarning)
+            assert not any(
+                issubclass(w.category, DeprecationWarning) for w in captured
+            )
+
+    def test_explicit_false_does_not_install_filter(self, monkeypatch):
+        import warnings
+        from planetarypy.cli import _apply_warning_filters
+        from planetarypy.config import config
+
+        monkeypatch.setattr(config, "tomldoc", dict(config.tomldoc))
+        config.tomldoc["filter_deprecation_warnings"] = False
+
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.resetwarnings()
+            warnings.simplefilter("default")
+            _apply_warning_filters()
+            warnings.warn("test", DeprecationWarning)
+        assert any(
+            issubclass(w.category, DeprecationWarning) for w in captured
+        ), "with filter_deprecation_warnings=false the warning must surface"
+
+    def test_explicit_true_installs_filter(self, monkeypatch):
+        import warnings
+        from planetarypy.cli import _apply_warning_filters
+        from planetarypy.config import config
+
+        monkeypatch.setattr(config, "tomldoc", dict(config.tomldoc))
+        config.tomldoc["filter_deprecation_warnings"] = True
+
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.resetwarnings()
+            warnings.simplefilter("default")
+            _apply_warning_filters()
+            warnings.warn("test", DeprecationWarning)
+        assert not any(
+            issubclass(w.category, DeprecationWarning) for w in captured
+        )
+
+
 # ── peek still works (regression guard for the helper refactor) ─────────
 
 

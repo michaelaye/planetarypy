@@ -35,29 +35,67 @@ class Config:
         self._read_config()
 
     def _create_default_config(self):
-        """Create a minimal default config file with just storage_root."""
+        """Create a minimal default config file with documented defaults."""
         doc = tomlkit.document()
         doc.add(tomlkit.comment("PlanetaryPy Configuration"))
         doc.add(tomlkit.nl())
         doc.add(tomlkit.comment("Root directory for storing all planetarypy data"))
         doc.add(tomlkit.nl())
         doc["storage_root"] = ""  # Empty string will be updated during _read_config
+        doc.add(tomlkit.nl())
+        doc.add(tomlkit.comment(
+            "Suppress upstream DeprecationWarning during CLI execution"
+        ))
+        doc.add(tomlkit.comment(
+            "(e.g. Typer's shell_complete= deprecation notice)."
+        ))
+        doc.add(tomlkit.comment(
+            "Devs developing planetarypy can set this to false to see"
+        ))
+        doc.add(tomlkit.comment(
+            "deprecation notices as reminders to track upstream."
+        ))
+        doc["filter_deprecation_warnings"] = True
         self.path.write_text(tomlkit.dumps(doc))
 
     def _read_config(self):
         """Read the configfile and store config dict.
 
-        `storage_root` will be stored as attribute.
+        `storage_root` will be stored as attribute. Backfills new
+        default-bearing keys that aren't present in older config files
+        so users see the available knobs next time they open the file.
         """
         self.tomldoc = tomlkit.loads(self.path.read_text())
+        dirty = False
         if not self.tomldoc.get("storage_root"):
             path = Path.home() / "planetarypy_data"
             path.mkdir(exist_ok=True)
             self.tomldoc["storage_root"] = str(path)
             self.storage_root = path
-            self.save()
+            dirty = True
         else:
             self.storage_root = Path(self.tomldoc["storage_root"])
+        # Backfill for older configs created before the key existed.
+        # Use ``in`` rather than ``get()`` so an explicit ``false`` is
+        # preserved — falsy-but-present is a user choice we honor.
+        if "filter_deprecation_warnings" not in self.tomldoc:
+            self.tomldoc.add(tomlkit.nl())
+            self.tomldoc.add(tomlkit.comment(
+                "Suppress upstream DeprecationWarning during CLI execution"
+            ))
+            self.tomldoc.add(tomlkit.comment(
+                "(e.g. Typer's shell_complete= deprecation notice)."
+            ))
+            self.tomldoc.add(tomlkit.comment(
+                "Devs developing planetarypy can set this to false to see"
+            ))
+            self.tomldoc.add(tomlkit.comment(
+                "deprecation notices as reminders to track upstream."
+            ))
+            self.tomldoc["filter_deprecation_warnings"] = True
+            dirty = True
+        if dirty:
+            self.save()
 
     @property
     def d(self):

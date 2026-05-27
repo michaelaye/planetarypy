@@ -59,3 +59,49 @@ def test_config_custom_path():
         custom_config = Config(custom_path)
         assert custom_config.path == custom_path
         assert custom_path.exists()
+
+
+def test_default_config_includes_filter_deprecation_warnings():
+    """Fresh configs ship with ``filter_deprecation_warnings = true`` so
+    end users see the knob exists when they open the file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fresh = Config(Path(tmpdir) / "fresh.toml")
+        assert fresh.get_value("filter_deprecation_warnings") is True
+        # Comment block must accompany the key — discoverability matters.
+        text = fresh.path.read_text()
+        assert "filter_deprecation_warnings = true" in text
+        assert "DeprecationWarning" in text  # explanatory comment
+
+
+def test_existing_config_gets_key_backfilled():
+    """Configs written before the key existed get it backfilled on read,
+    so users opening the file later see the new knob."""
+    import tomlkit
+    with tempfile.TemporaryDirectory() as tmpdir:
+        legacy_path = Path(tmpdir) / "legacy.toml"
+        # Pre-existing config with only storage_root (the old shape).
+        doc = tomlkit.document()
+        doc["storage_root"] = str(Path(tmpdir) / "data")
+        legacy_path.write_text(tomlkit.dumps(doc))
+        # Reading via Config should backfill the new key.
+        cfg = Config(legacy_path)
+        assert cfg.get_value("filter_deprecation_warnings") is True
+        # …and persist that backfill to disk.
+        text = legacy_path.read_text()
+        assert "filter_deprecation_warnings = true" in text
+
+
+def test_existing_explicit_false_is_preserved():
+    """A user who set ``filter_deprecation_warnings = false`` must not
+    have their choice silently flipped to true on the next read."""
+    import tomlkit
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "dev.toml"
+        doc = tomlkit.document()
+        doc["storage_root"] = str(Path(tmpdir) / "data")
+        doc["filter_deprecation_warnings"] = False
+        path.write_text(tomlkit.dumps(doc))
+        cfg = Config(path)
+        # Backfill must use ``in`` not ``get()`` so falsy-but-present
+        # values aren't overwritten.
+        assert cfg.get_value("filter_deprecation_warnings") is False

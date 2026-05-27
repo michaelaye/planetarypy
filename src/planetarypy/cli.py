@@ -10,6 +10,39 @@ Usage:
 import click
 import typer
 
+
+def _apply_warning_filters() -> None:
+    """Apply DeprecationWarning suppression per the user's config.
+
+    Default ``filter_deprecation_warnings = true`` silences
+    DeprecationWarning during CLI execution so end users aren't shown
+    upstream noise (e.g. Typer's ``shell_complete=``-is-deprecated
+    notice, which is a known signal we accept — see
+    :func:`_shell_complete_index_key`).
+
+    Devs working on planetarypy can opt in to seeing the warnings as
+    reminders by setting ``filter_deprecation_warnings = false`` in
+    ``~/.planetarypy_config.toml``. Standard Python ``-W`` flags and
+    ``PYTHONWARNINGS`` env var still work — they're not overridden,
+    they just stack with ours.
+
+    Called at module top so the filter is installed before Typer
+    compiles commands (which is when the wrapped warnings actually fire).
+    """
+    try:
+        from planetarypy.config import config
+        val = config["filter_deprecation_warnings"]
+    except Exception:
+        val = ""
+    should_filter = True if val in ("", None) else bool(val)
+    if should_filter:
+        import warnings
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+
+_apply_warning_filters()
+
+
 app = typer.Typer(
     name="plp",
     help="PlanetaryPy — Python tools for planetary science data access.",
@@ -448,12 +481,51 @@ def catalog_build(
 
 
 def _complete_index_key(incomplete: str) -> list[str]:
-    """Tab completion: registered dotted index keys."""
+    """Segment-aware matcher for registered dotted PDS index keys.
+
+    Prefix match on the whole key wins (so ``mro.<TAB>`` keeps working
+    the obvious way). When that produces nothing, falls back to a
+    case-insensitive *segment* prefix match — typing ``ctx<TAB>`` or
+    ``CTX<TAB>`` then yields ``mro.ctx.edr`` / ``mro.ctx.calib`` because
+    the middle dot-segment starts with the incomplete text. Either
+    mission, instrument, or indexname alone is enough to drive the
+    completion without having to remember the full path.
+
+    This is the testable logic. Wire it into a typer.Argument via
+    :func:`_shell_complete_index_key` (the Click-compatible adapter).
+    """
     try:
         from planetarypy.pds.utils import _all_dotted_index_keys
-        return [k for k in _all_dotted_index_keys() if k.startswith(incomplete)]
+        keys = _all_dotted_index_keys()
+        matched = [k for k in keys if k.startswith(incomplete)]
+        if not matched and incomplete:
+            inc = incomplete.lower()
+            matched = [
+                k for k in keys
+                if any(seg.lower().startswith(inc) for seg in k.split("."))
+            ]
+        return matched
     except Exception:
         return []
+
+
+def _shell_complete_index_key(ctx, param, incomplete: str) -> list[str]:
+    """Click ``shell_complete=`` adapter for :func:`_complete_index_key`.
+
+    Wired via Click's native ``shell_complete=`` kwarg rather than
+    Typer's ``autocompletion=`` because Typer's wrapper filters
+    candidates via ``value.startswith(incomplete)`` (see
+    ``typer/core.py``'s ``_typer_param_setup_autocompletion_compat``),
+    which silently drops every segment-prefix candidate — the whole
+    point of this completer. Click's ``shell_complete=`` bypasses that
+    filter so ``ctx<TAB>`` can actually return ``mro.ctx.edr``.
+
+    Typer emits a ``DeprecationWarning`` about ``shell_complete=`` going
+    away in a future version. If/when that lands, the fix is either
+    (a) revert to prefix-only completion under Typer's ``autocompletion=``,
+    or (b) file an upstream issue asking for a filter opt-out flag.
+    """
+    return _complete_index_key(incomplete)
 
 
 def _fetchable_sets():
@@ -974,7 +1046,7 @@ def indexes_list(
 def indexes_peek(
     key: str = typer.Argument(
         ..., help="Dotted index key, e.g. cassini.cda.index",
-        autocompletion=_complete_index_key,
+        shell_complete=_shell_complete_index_key,
     ),
     rows: int = typer.Option(
         3, "--rows", "-n",
@@ -1069,7 +1141,7 @@ def _render_index_rows(key: str, subset, *, total_rows: int,
 def indexes_last(
     key: str = typer.Argument(
         ..., help="Dotted index key, e.g. mro.ctx.edr",
-        autocompletion=_complete_index_key,
+        shell_complete=_shell_complete_index_key,
     ),
     rows: int = typer.Option(
         3, "--rows", "-n",
@@ -1124,7 +1196,7 @@ def indexes_last(
 @indexes_app.command("info")
 def indexes_info(
     key: str = typer.Argument(..., help="Dotted index key, e.g. cassini.iss.index",
-                              autocompletion=_complete_index_key),
+                              shell_complete=_shell_complete_index_key),
 ):
     """Show config + cache status for a registered PDS index."""
     from rich.console import Console
@@ -1194,7 +1266,7 @@ def indexes_refresh(
     ),
     cache: str = typer.Option(None, "--cache",
                               help="Re-download a specific index's cumulative parquet.",
-                              autocompletion=_complete_index_key),
+                              shell_complete=_shell_complete_index_key),
 ):
     """Refresh upstream index config or re-download a single index."""
     if not config and not cache:
@@ -1695,7 +1767,7 @@ def example_pid(
     key: str = typer.Argument(
         None,
         help="Dotted index key, e.g. mro.ctx.edr",
-        autocompletion=_complete_index_key,
+        shell_complete=_shell_complete_index_key,
     ),
 ):
     """Print an example product ID from a registered PDS index.
@@ -1730,7 +1802,7 @@ def meta(
     key: str = typer.Argument(
         None,
         help="Dotted index key, e.g. mro.ctx.edr",
-        autocompletion=_complete_index_key,
+        shell_complete=_shell_complete_index_key,
     ),
     product_id: str = typer.Argument(
         None,
