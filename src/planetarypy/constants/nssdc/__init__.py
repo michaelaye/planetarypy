@@ -36,12 +36,15 @@ in ``_loader.ZENODO_RECORD_ID``).
 
 from __future__ import annotations
 
+import warnings
 from typing import Optional
 
 from planetarypy.constants.base import (
     Body,
     BodyRegistry,
     Constant,
+    Range,
+    RangeWarning,
 )
 from planetarypy.constants.nssdc import _loader
 
@@ -74,8 +77,67 @@ REFERENCE = (
 )
 
 
+# Module-level once-per-process gate for the RangeWarning emission. Reset
+# in tests via ``monkeypatch.setattr(nssdc, "_range_warning_emitted", False)``.
+_range_warning_emitted = False
+
+
+def _range_strategy() -> str:
+    """Read ``[constants] range_strategy`` from the user config, default ``"nan"``.
+
+    Valid values: ``"nan"`` (interpretation-free, value is NaN), ``"midpoint"``
+    (substitute the range midpoint; emits :class:`RangeWarning` once per process).
+    """
+    from planetarypy.config import config
+    val = config["constants.range_strategy"]
+    return val if val in ("midpoint", "nan") else "nan"
+
+
+def _warn_on_range_midpoint() -> bool:
+    """Read ``[constants] warn_on_range_midpoint`` from the user config,
+    default ``True``."""
+    from planetarypy.config import config
+    val = config["constants.warn_on_range_midpoint"]
+    if val == "" or val is None:
+        return True
+    return bool(val)
+
+
+def _maybe_emit_range_warning() -> None:
+    """Emit the once-per-process RangeWarning if not yet emitted and the
+    user hasn't suppressed it via config."""
+    global _range_warning_emitted
+    if _range_warning_emitted or not _warn_on_range_midpoint():
+        return
+    warnings.warn(
+        "One or more NSSDC constants are published as ranges; surfacing "
+        "the midpoint as scalar value per [constants] range_strategy "
+        '= "midpoint". The midpoint is an interpretation, not raw data — '
+        "access exact bounds via <constant>.range.min / .range.max. "
+        "Suppress this notice via [constants] warn_on_range_midpoint = "
+        "false in ~/.planetarypy_config.toml, or "
+        'warnings.filterwarnings("ignore", category=RangeWarning).',
+        RangeWarning,
+        stacklevel=3,
+    )
+    _range_warning_emitted = True
+
+
 def _make_constant(rec: _loader.NSSDCRecord, body_label: str) -> Optional[Constant]:
-    qty = _loader.coerce_value(rec.value, rec.unit, field_name=rec.field)
+    # Range case: NSSDC published bounds, not a single value. The runtime
+    # strategy decides whether ``value`` is NaN (faithful) or the
+    # midpoint (ergonomic). Both branches carry the Range object so users
+    # can always reach exact bounds via ``.range``.
+    rng = None
+    central: Optional[float] = rec.value
+    if rec.range_min is not None and rec.range_max is not None:
+        rng = Range(min=rec.range_min, max=rec.range_max)
+        if _range_strategy() == "midpoint":
+            central = rng.midpoint
+            _maybe_emit_range_warning()
+        else:
+            central = float("nan")
+    qty = _loader.coerce_value(central, rec.unit, field_name=rec.field)
     if qty is None:
         return None
     return Constant(
@@ -86,6 +148,8 @@ def _make_constant(rec: _loader.NSSDCRecord, body_label: str) -> Optional[Consta
         reference=REFERENCE,
         iau_year=0,           # NSSDC values aren't IAU-edition-versioned
         source=rec.source_string(),
+        uncertainty=rec.uncertainty or 0.0,
+        range=rng,
     )
 
 
@@ -99,17 +163,23 @@ def _build_body_from_capture(body: str, capture: dict) -> Body:
 
     body_kwargs: dict = {}
     for field_name, field_data in capture["fields"].items():
-        if field_data.get("value") is None:
+        rng = field_data.get("range") or {}
+        has_value = field_data.get("value") is not None
+        has_range = rng.get("min") is not None and rng.get("max") is not None
+        if not has_value and not has_range:
             continue
         # Synthesize a transient NSSDCRecord for the source string.
         rec = _loader.NSSDCRecord(
             body=body,
             field=field_name,
-            value=field_data["value"],
+            value=field_data.get("value"),
             unit=field_data.get("unit"),
             page_date=capture.get("page_date"),
             wayback_timestamp=capture["wayback_timestamp"],
             wayback_url=capture["wayback_url"],
+            uncertainty=field_data.get("uncertainty"),
+            range_min=rng.get("min"),
+            range_max=rng.get("max"),
         )
         constant = _make_constant(rec, canonical_name.capitalize())
         if constant is None:

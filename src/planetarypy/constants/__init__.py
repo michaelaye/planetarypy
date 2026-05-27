@@ -73,6 +73,8 @@ from planetarypy.constants.base import (
     Body,
     BodyRegistry,
     Constant,
+    Range,
+    RangeWarning,
     century,
 )
 from planetarypy.constants import iau2009, iau2015, nssdc, _gm_jpl

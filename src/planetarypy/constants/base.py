@@ -86,6 +86,26 @@ class Range:
         return (self.max - self.min) / 2
 
 
+class RangeWarning(UserWarning):
+    """Issued when a Constant with a populated ``.range`` returns the
+    range midpoint as its scalar value.
+
+    The midpoint is an *interpretation* of NSSDC's published bounds, not
+    raw data — surfaced because the user opted into the ``"midpoint"``
+    strategy via ``[constants] range_strategy`` in
+    ``~/.planetarypy_config.toml``. Default strategy is ``"nan"``, which
+    leaves the underlying value as NaN and never triggers this warning.
+
+    Suppress permanently via config (``[constants]
+    warn_on_range_midpoint = false``) or per-script via the standard
+    ``warnings`` module::
+
+        import warnings
+        from planetarypy.constants import RangeWarning
+        warnings.filterwarnings("ignore", category=RangeWarning)
+    """
+
+
 # ── Constant ────────────────────────────────────────────────────────────
 
 
@@ -149,14 +169,26 @@ class Constant(u.Quantity):
         # NSSDC-sourced constants where iau_year is intentionally 0.
         if self.body and self.name and (self.iau_year or self.source):
             arr = np.asarray(self)
-            v = (f"{float(arr):.6g}" if arr.shape == ()
-                 else np.array2string(arr, precision=6, separator=", "))
-            extras = ""
-            if self.uncertainty:
-                extras += f" ± {self.uncertainty:.6g}"
-            if self.range is not None:
-                extras += (f" (range {self.range.min:.6g}"
-                           f"–{self.range.max:.6g})")
+            # Range + NaN value (the "interpretation-free" default
+            # strategy) — replace the meaningless `nan` with the bounds.
+            range_is_value = (
+                self.range is not None
+                and arr.shape == ()
+                and np.isnan(float(arr))
+            )
+            if range_is_value:
+                v = (f"[range {self.range.min:.6g}"
+                     f"–{self.range.max:.6g}]")
+                extras = ""
+            else:
+                v = (f"{float(arr):.6g}" if arr.shape == ()
+                     else np.array2string(arr, precision=6, separator=", "))
+                extras = ""
+                if self.uncertainty:
+                    extras += f" ± {self.uncertainty:.6g}"
+                if self.range is not None:
+                    extras += (f" (range {self.range.min:.6g}"
+                               f"–{self.range.max:.6g})")
             tag = f"IAU {self.iau_year}" if self.iau_year else self.source
             return (f"<Constant {self.body}.{self.name} = {v}{extras} "
                     f"{self.unit}  ({tag})>")

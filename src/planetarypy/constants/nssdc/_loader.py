@@ -211,14 +211,24 @@ def coerce_value(
 
 @dataclass(frozen=True)
 class NSSDCRecord:
-    """One field-value reading from a single NSSDC capture."""
+    """One field-value reading from a single NSSDC capture.
+
+    ``value`` is ``None`` for range-typed entries (NSSDC published bounds
+    rather than a central estimate). ``uncertainty`` is the ± value for
+    rows like ``X +/- Y unit``. ``range_min/range_max`` are populated for
+    rows like ``X - Y unit``. The error-info fields are mutually exclusive
+    in practice though the schema doesn't enforce it.
+    """
     body: str
     field: str
-    value: float
+    value: Optional[float]
     unit: Optional[str]
     page_date: Optional[str]    # ISO YYYY-MM-DD
     wayback_timestamp: str      # YYYYMMDDhhmmss
     wayback_url: str
+    uncertainty: Optional[float] = None
+    range_min: Optional[float] = None
+    range_max: Optional[float] = None
 
     @property
     def best_date(self) -> str:
@@ -252,16 +262,24 @@ def _per_field_history(body: str, field: str) -> list[NSSDCRecord]:
     out: list[NSSDCRecord] = []
     for cap in sheet["captures"]:
         f = cap["fields"].get(field)
-        if not f or f.get("value") is None:
+        if not f:
+            continue
+        rng = f.get("range") or {}
+        has_value = f.get("value") is not None
+        has_range = rng.get("min") is not None and rng.get("max") is not None
+        if not has_value and not has_range:
             continue
         rec = NSSDCRecord(
             body=body,
             field=field,
-            value=f["value"],
+            value=f.get("value"),
             unit=f.get("unit"),
             page_date=cap.get("page_date"),
             wayback_timestamp=cap["wayback_timestamp"],
             wayback_url=cap["wayback_url"],
+            uncertainty=f.get("uncertainty"),
+            range_min=rng.get("min"),
+            range_max=rng.get("max"),
         )
         out.append(rec)
     out.sort(key=lambda r: r.best_date)
