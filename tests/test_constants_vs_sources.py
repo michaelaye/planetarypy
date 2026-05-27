@@ -404,9 +404,6 @@ _EXPECTED_UNKNOWN_LABELS: frozenset[str] = frozenset({
     # Unicode / formatting glitches
     "", "*",
     # (c) PARSER BUGS — see _LIKELY_PARSER_BUGS for the triage list.
-    "Inclination to equator",   # FIELD_MAP has "Inclination of equator"
-    "Orbital eccentricity",     # FIELD_MAP has "Orbit eccentricity"
-    "Orbital inclination",      # FIELD_MAP has "Orbit inclination"
     "Surface Gravity",          # FIELD_MAP has lowercase "Surface gravity"
     "Surface Gravity (mean)",   # FIELD_MAP has lowercase
 })
@@ -419,9 +416,6 @@ _EXPECTED_UNKNOWN_LABELS: frozenset[str] = frozenset({
 # Fixing these is a follow-up that requires editing
 # scripts/parse_nssdc_archive.py and re-running the parser + regenerator.
 _LIKELY_PARSER_BUGS: frozenset[str] = frozenset({
-    "Inclination to equator",
-    "Orbital eccentricity",
-    "Orbital inclination",
     "Surface Gravity",
     "Surface Gravity (mean)",
 })

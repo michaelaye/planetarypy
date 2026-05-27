@@ -123,10 +123,15 @@ FIELD_MAP: dict[str, str] = {
     "Min. orbital velocity": "min_orbital_velocity",
     "Orbit inclination": "orbit_inclination",
     "Orbit eccentricity": "orbit_eccentricity",
+    # Older NSSDC captures use the longer "Orbital ..." spelling for both.
+    "Orbital inclination": "orbit_inclination",
+    "Orbital eccentricity": "orbit_eccentricity",
     "Sidereal rotation period": "sidereal_rotation_period",
     "Length of day": "length_of_day",
     "Obliquity to orbit": "obliquity_to_orbit",
     "Inclination of equator": "inclination_of_equator",
+    # NSSDC has used both prepositions across the archive's 30 years.
+    "Inclination to equator": "inclination_of_equator",
     # Atmospheric (extracted from free-text section as best-effort)
     "Surface pressure": "surface_pressure",
     "Surface density": "surface_density",
