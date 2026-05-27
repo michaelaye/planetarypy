@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.65.0] - 2026-05-27
+
+Two CLI quality-of-life additions for `plp indexes`, plus a small main-config knob to silence upstream deprecation noise that one of them provokes.
+
+### Added
+- **`plp indexes last KEY [-n N] [--sort]`** — show the trailing rows of a PDS index, transposed in the same layout as `plp indexes peek` (one output column per shown index row, field names down the left). Default 3 rows; `--rows`/`-n` adjusts.
+  - Default order: file order. Most PDS indexes are appended chronologically as new products land, so the last row in the parquet IS the newest entry. Cheapest read — no sort.
+  - `--sort` / `-s`: auto-detect a canonical time column (`START_TIME` / `OBSERVATION_TIME` / `IMAGE_TIME` / `TIME`, in order) and sort ascending before taking the tail. Useful when the parquet isn't actually chronologically ordered. Falls back gracefully with a stderr notice if no canonical time column is present.
+  - Internal: extracted `_render_index_rows()` so `peek` and `last` share the table-rendering code; `peek`'s behavior is unchanged.
+- **New main-config knob `filter_deprecation_warnings`** (default `true`) in `~/.planetarypy_config.toml`. Suppresses `DeprecationWarning` during `plp` execution so end users don't see upstream noise (notably Typer's `shell_complete=`-is-deprecated notice that the segment-aware completion below provokes). Devs working on planetarypy can set this to `false` to see the warnings as reminders. Standard Python `-W` flags and `PYTHONWARNINGS` env var still stack with this filter — it doesn't override an explicit user policy. The key is written into freshly-created configs with an explanatory comment block; legacy configs (existing users who installed before this version) get it backfilled on next read so they too see the knob exists.
+
+### Changed
+- **`plp indexes` tab completion is now segment-aware.** Pressing `<TAB>` after just an instrument or indexname segment — `ctx<TAB>`, `hirise<TAB>`, `CTX<TAB>` — now completes to the full dotted key (`mro.ctx.edr`, `mro.hirise.edr`, …). No more "did I have to remember the mission prefix?" friction. Whole-key prefix still wins (`mro.<TAB>` keeps working the obvious way); the segment-prefix branch only fires when whole-key prefix produces nothing. Case-insensitive. Applies to every command that resolves an index key (`peek`, `last`, `info`, `refresh`, `example_pid`, `meta`).
+
+  Implementation: wired via Click's native `shell_complete=` rather than Typer's `autocompletion=` because Typer's wrapper post-filters returned candidates with `value.startswith(incomplete)` — which would have silently dropped every segment-prefix match. This is the reason for the new `filter_deprecation_warnings` knob; Typer emits a `DeprecationWarning` about `shell_complete=` going away in a future version. If/when that lands, the fix is either to revert to prefix-only completion under `autocompletion=`, or upstream a filter opt-out flag.
+
+### Internal
+- 18 new tests across `tests/test_cli_indexes.py` (15) and `tests/test_config.py` (3): completion paths (whole-key precedence, segment-prefix fallback, case-insensitivity, adapter wiring), `last` command behavior (default 3-row tail, `-n` limit, `--sort` picks time column, `--sort` falls back, peek regression guard), warning-filter behavior (default-on, explicit-true, explicit-false), config backfill (fresh has key, legacy gets backfilled, explicit-false survives backfill). `get_index` is patched so the suite stays offline.
+
 ## [0.64.0] - 2026-05-27
 
 A `planetarypy.constants` cycle focused on (1) restoring the design contract that the `iauNNNN` modules contain *only* IAU data, (2) finding and fixing a cluster of "silently dropped NSSDC values" bugs that had been hiding in plain sight in the 30-year fact-sheet archive, and (3) plumbing through structured error information (measurement uncertainty, naturally-varying ranges) that the parser was previously throwing away.
