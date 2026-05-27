@@ -991,9 +991,6 @@ def indexes_peek(
     Output is transposed (one row of the index per column of the table)
     so it stays readable whether the index has 4 columns or 71.
     """
-    from rich.console import Console
-    from rich.table import Table
-
     from planetarypy.pds import get_index
     from planetarypy.pds.utils import _all_dotted_index_keys
 
@@ -1004,10 +1001,54 @@ def indexes_peek(
     df = get_index(key, allow_refresh=False)
     n = max(0, min(rows, len(df)))
     sample = df.sample(n=n) if n > 0 else df.head(0)
+    _render_index_rows(key, sample, total_rows=len(df),
+                       total_cols=len(df.columns),
+                       label=f"showing {n} random")
 
+
+def pd_isna(v):
+    """Lazy-import-friendly NaN check for index-display commands."""
+    import pandas as pd
+    try:
+        return bool(pd.isna(v))
+    except (TypeError, ValueError):
+        return False
+
+
+# Common time-column names PDS missions use for chronological ordering.
+# Tried in order — first match wins. Per-mission overrides could land
+# here as a registry if a real-world index needs one we don't catch.
+_INDEX_TIME_COLUMNS: tuple[str, ...] = (
+    "START_TIME",
+    "OBSERVATION_TIME",
+    "IMAGE_TIME",
+    "TIME",
+)
+
+
+def _find_time_column(df) -> str | None:
+    """Return the first ``_INDEX_TIME_COLUMNS`` member present in ``df``,
+    or ``None`` if none is."""
+    for col in _INDEX_TIME_COLUMNS:
+        if col in df.columns:
+            return col
+    return None
+
+
+def _render_index_rows(key: str, subset, *, total_rows: int,
+                       total_cols: int, label: str) -> None:
+    """Render a transposed Rich table of an index-row subset.
+
+    Shared between ``plp indexes peek`` and ``plp indexes last`` so both
+    commands present rows the same way (field-name column on the left,
+    one row of the index per output column on the right).
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    n = len(subset)
     table = Table(
-        title=f"{key} — {len(df):,} rows × {len(df.columns)} cols  "
-              f"(showing {n} random)",
+        title=f"{key} — {total_rows:,} rows × {total_cols} cols  ({label})",
         title_style="bold",
         header_style="bold magenta",
         pad_edge=False,
@@ -1015,22 +1056,69 @@ def indexes_peek(
     table.add_column("field", style="cyan", no_wrap=True)
     for i in range(n):
         table.add_column(f"row {i + 1}", overflow="fold")
-    for col in df.columns:
+    for col in subset.columns:
         values = [
-            "" if pd_isna(sample[col].iloc[i]) else str(sample[col].iloc[i])
+            "" if pd_isna(subset[col].iloc[i]) else str(subset[col].iloc[i])
             for i in range(n)
         ]
         table.add_row(str(col), *values)
     Console().print(table)
 
 
-def pd_isna(v):
-    """Lazy-import-friendly NaN check for the peek command."""
-    import pandas as pd
-    try:
-        return bool(pd.isna(v))
-    except (TypeError, ValueError):
-        return False
+@indexes_app.command("last")
+def indexes_last(
+    key: str = typer.Argument(
+        ..., help="Dotted index key, e.g. mro.ctx.edr",
+        autocompletion=_complete_index_key,
+    ),
+    rows: int = typer.Option(
+        3, "--rows", "-n",
+        help="Number of trailing rows to show (default 3).",
+    ),
+    sort: bool = typer.Option(
+        False, "--sort", "-s",
+        help="Sort by a time column before taking the last rows. "
+             "Auto-detects START_TIME / OBSERVATION_TIME / IMAGE_TIME / TIME.",
+    ),
+):
+    """Show the last entries of a registered PDS index, transposed.
+
+    Default order is file order (most PDS indexes are appended
+    chronologically so the last row IS the newest). Pass ``--sort`` to
+    actually sort by a time column when one is present — useful when
+    the index file isn't chronologically ordered.
+
+    The output format matches ``plp indexes peek`` so columns line up
+    the same way; only the row selection differs.
+    """
+    from planetarypy.pds import get_index
+    from planetarypy.pds.utils import _all_dotted_index_keys
+
+    if key not in _all_dotted_index_keys():
+        typer.echo(f"Unknown index key: {key!r}.", err=True)
+        raise typer.Exit(1)
+
+    df = get_index(key, allow_refresh=False)
+    n = max(0, min(rows, len(df)))
+
+    label_parts = [f"last {n}"]
+    if sort:
+        time_col = _find_time_column(df)
+        if time_col is None:
+            typer.echo(
+                f"--sort: no time column found in {key!r}. "
+                f"Tried: {', '.join(_INDEX_TIME_COLUMNS)}. "
+                "Falling back to file order.",
+                err=True,
+            )
+        else:
+            df = df.sort_values(time_col)
+            label_parts.append(f"by {time_col}")
+
+    subset = df.tail(n) if n > 0 else df.head(0)
+    _render_index_rows(key, subset, total_rows=len(df),
+                       total_cols=len(df.columns),
+                       label=", ".join(label_parts))
 
 
 @indexes_app.command("info")
