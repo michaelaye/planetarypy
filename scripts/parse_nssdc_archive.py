@@ -214,6 +214,12 @@ def _strip_html(s: str) -> str:
     s = re.sub(r"<sup[^>]*>([^<]+)</sup>", r"^\1", s, flags=re.IGNORECASE)
     s = re.sub(r"<sub[^>]*>([^<]+)</sub>", r"_\1", s, flags=re.IGNORECASE)
     s = re.sub(r"<[^>]+>", " ", s)
+    # Outer tags (commonly <span>) wrap the <sup>/<sub>, so after tag
+    # stripping we get e.g. `kg/m ^3` instead of `kg/m^3` and `J _2`
+    # instead of `J_2`. Re-attach the exponent/subscript marker to its
+    # preceding word so unit and label lookups see the intended form.
+    s = re.sub(r"(\S)\s+(\^[+-]?\d)", r"\1\2", s)
+    s = re.sub(r"(\S)\s+(_\d)", r"\1\2", s)
     s = html.unescape(s)
     s = s.replace("\xa0", " ")            # NBSP → regular space
     return s
