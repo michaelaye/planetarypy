@@ -442,7 +442,13 @@ def parse_capture(raw_html: str,
                     }
 
     # Atmospheric section is free-text; pull a few canonical labels from it
-    # via simple regex.
+    # via simple regex. The regex tolerates two optional middle terms
+    # NSSDC routinely uses:
+    #   ``X +/- Y`` (or ``X ± Y``)  → symmetric measurement uncertainty
+    #   ``X - Y``                   → range of a naturally varying quantity
+    # The horizontal-whitespace classes ([ \t]) stop the unit capture at
+    # the end of the value's line so the next section header (e.g.
+    # "Atmospheric composition:") cannot bleed in as a fake unit.
     atmo = re.search(
         r"<h3[^>]*>[^<]*Atmosphere[^<]*</h3>(.*?)(?=<h3|<hr)",
         raw_html, re.IGNORECASE | re.DOTALL,
@@ -456,13 +462,42 @@ def parse_capture(raw_html: str,
             if attr in fields:
                 continue
             m = re.search(
-                rf"{re.escape(label)}\s*[:\s]\s*~?\s*({NUMERIC_RE.pattern})\s*([^\n,;]*)",
+                rf"{re.escape(label)}\s*[:\s]\s*~?\s*"
+                rf"({NUMERIC_RE.pattern})"
+                rf"(?:[ \t]*(\+/-|±|-)[ \t]*({NUMERIC_RE.pattern}))?"
+                rf"[ \t]*([^\n,;]*)",
                 atext,
             )
-            if m:
-                value = float(m.group(1))
-                unit = m.group(2).strip().split()[0] if m.group(2).strip() else None
-                fields[attr] = {"value": value, "raw": m.group(1), "unit": unit}
+            if not m:
+                continue
+            v1 = float(m.group(1))
+            sep = m.group(2)
+            v2 = float(m.group(3)) if m.group(3) is not None else None
+            unit = (m.group(4).strip().split()[0]
+                    if m.group(4).strip() else None)
+            if sep is None or v2 is None:
+                entry = {"value": v1, "raw": m.group(1), "unit": unit}
+            elif sep == "-":
+                # Range: NSSDC gave us bounds, not a single value. We
+                # emit those bounds verbatim and OMIT ``value`` — the
+                # archive is interpretation-free. The runtime loader
+                # decides whether to surface the value as NaN (default)
+                # or replace with the range midpoint (config opt-in).
+                entry = {
+                    "raw": f"{m.group(1)}-{m.group(3)}",
+                    "unit": unit,
+                    "range": {"min": v1, "max": v2},
+                }
+            else:  # "+/-" or "±"
+                # Uncertainty: NSSDC gave a real central estimate plus
+                # an error bar. ``value`` is the central estimate.
+                entry = {
+                    "value": v1,
+                    "raw": f"{m.group(1)}{sep}{m.group(3)}",
+                    "unit": unit,
+                    "uncertainty": v2,
+                }
+            fields[attr] = entry
 
     return {"page_date": page_date, "fields": fields}
 
