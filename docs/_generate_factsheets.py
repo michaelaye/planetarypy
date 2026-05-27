@@ -169,9 +169,19 @@ def build(archive_path: Path) -> str:
         out.append("|-------|------:|:-----|")
         for fname, fval in fields.items():
             v = fval.get("value")
+            unc = fval.get("uncertainty")
+            rng = fval.get("range") or {}
             raw = fval.get("raw") or ""
             unit = fmt_unit(fval.get("unit") or "")
-            display = fmt_value(v) if v not in (None, "") else raw
+            # Range entries omit ``value`` in the archive — show bounds
+            # as ``X–Y`` so the user sees both that the quantity varies
+            # and what the bracket is.
+            if rng.get("min") is not None and rng.get("max") is not None:
+                display = f"{fmt_value(rng['min'])}–{fmt_value(rng['max'])}"
+            elif unc is not None and v is not None:
+                display = f"{fmt_value(v)} ± {fmt_value(unc)}"
+            else:
+                display = fmt_value(v) if v not in (None, "") else raw
             display = str(display).replace("|", "\\|")
             unit_d = unit.replace("|", "\\|")
             out.append(f"| {fmt_field_name(fname)} | {display} | {unit_d} |")

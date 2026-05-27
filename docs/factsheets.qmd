@@ -22,6 +22,8 @@ toc-depth: 2
 | Surface gravity | 274 | m/s² |
 | Escape velocity | 617.6 | km/s |
 | Ellipticity | 5e-05 |  |
+| Moment of inertia | 0.059 |  |
+| V band magnitude | -26.74 |  |
 
 ## Mercury
 
@@ -34,7 +36,7 @@ toc-depth: 2
 | Equatorial radius | 2440.5 | km |
 | Polar radius | 2438.3 | km |
 | Volumetric mean radius | 2439.7 | km |
-| Ellipticity | 0.0009 |  |
+| Flattening | 0.0009 |  |
 | Mean density | 5,429 | kg/m³ |
 | Surface gravity | 3.7 | m/s² |
 | Surface acceleration | 3.7 | m/s² |
@@ -43,9 +45,12 @@ toc-depth: 2
 | Gm | 0.022032 | x 10⁶ km³/s² |
 | Bond albedo | 0.068 |  |
 | Geometric albedo | 0.142 |  |
+| V band magnitude | -0.613 |  |
 | Solar irradiance | 9082.7 | W/m² |
 | Black body temperature | 439.6 | K |
 | Topographic range | 7 | km |
+| Moment of inertia | 0.35 |  |
+| J2 | 50.3 | x 10⁻⁶ |
 | Number of satellites | 0 |  |
 | Has ring system | No |  |
 | Semimajor axis | 57.909 | 10⁶ km |
@@ -63,6 +68,7 @@ toc-depth: 2
 | Length of day | 4222.6 | hrs |
 | Obliquity to orbit | 0.034 | deg |
 | Inclination of equator | 0.034 | deg |
+| Surface pressure | 5e-15 | bar |
 | Average temperature | 440 | K |
 
 ## Venus
@@ -76,7 +82,7 @@ toc-depth: 2
 | Equatorial radius | 6051.8 | km |
 | Polar radius | 6051.8 | km |
 | Volumetric mean radius | 6051.8 | km |
-| Ellipticity | 0 |  |
+| Flattening | 0 |  |
 | Mean density | 5,243 | kg/m³ |
 | Surface gravity | 8.87 | m/s² |
 | Surface acceleration | 8.87 | m/s² |
@@ -85,9 +91,11 @@ toc-depth: 2
 | Gm | 0.32486 | x 10⁶ km³/s² |
 | Bond albedo | 0.77 |  |
 | Geometric albedo | 0.689 |  |
+| V band magnitude | -4.38 |  |
 | Solar irradiance | 2601.3 | W/m² |
 | Black body temperature | 226.6 | K |
 | Topographic range | 13 | km |
+| J2 | 4.458 | x 10⁻⁶ |
 | Number of satellites | 0 |  |
 | Has ring system | No |  |
 | Semimajor axis | 108.21 | 10⁶ km |
@@ -106,7 +114,7 @@ toc-depth: 2
 | Obliquity to orbit | 177.36 | deg |
 | Inclination of equator | 2.64 | deg |
 | Surface pressure | 92 | bars |
-| Surface density | 65 | kg/m |
+| Surface density | 65 | kg/m³ |
 | Scale height | 15.9 | km |
 | Average temperature | 737 | K |
 | Mean molecular weight | 43.45 |  |
@@ -123,7 +131,7 @@ toc-depth: 2
 | Polar radius | 6356.75 | km |
 | Volumetric mean radius | 6,371 | km |
 | Core radius | 3,485 | km |
-| Ellipticity | 0.003353 |  |
+| Flattening | 0.003353 |  |
 | Mean density | 5,513 | kg/m³ |
 | Surface gravity | 9.82 | m/s² |
 | Surface acceleration eq | 9.78 | m/s² |
@@ -132,9 +140,12 @@ toc-depth: 2
 | Gm | 0.3986 | x 10⁶ km³/s² |
 | Bond albedo | 0.294 |  |
 | Geometric albedo | 0.434 |  |
+| V band magnitude | -3.99 |  |
 | Solar irradiance | 1,361 | W/m² |
 | Black body temperature | 254 | K |
 | Topographic range | 20.4 | km |
+| Moment of inertia | 0.3308 |  |
+| J2 | 1082.63 | x 10⁻⁶ |
 | Number of satellites | 1 |  |
 | Has ring system | No |  |
 | Semimajor axis | 149.598 | 10⁶ km |
@@ -169,7 +180,7 @@ toc-depth: 2
 | Polar radius | 3376.2 | km |
 | Volumetric mean radius | 3389.5 | km |
 | Core radius | 1,830 | km |
-| Ellipticity | 0.00589 |  |
+| Flattening | 0.00589 |  |
 | Mean density | 3,934 | kg/m³ |
 | Surface gravity | 3.73 | m/s² |
 | Surface acceleration eq | 3.69 | m/s² |
@@ -178,9 +189,11 @@ toc-depth: 2
 | Gm | 0.042828 | x 10⁶ km³/s² |
 | Bond albedo | 0.25 |  |
 | Geometric albedo | 0.17 |  |
+| V band magnitude | -1.6 |  |
 | Solar irradiance | 586.2 | W/m² |
 | Black body temperature | 209.8 | K |
 | Topographic range | 30 | km |
+| J2 | 1960.45 | x 10⁻⁶ |
 | Number of satellites | 2 |  |
 | Has ring system | No |  |
 | Semimajor axis | 227.956 | 10⁶ km |
@@ -198,7 +211,7 @@ toc-depth: 2
 | Obliquity to orbit | 25.19 | deg |
 | Inclination of equator | 25.19 | deg |
 | Surface pressure | 6.36 | mb |
-| Surface density | 0.016 |  |
+| Surface density | 0.016 ± 0.006 | kg/m³ |
 | Scale height | 11 | km |
 | Average temperature | 214 | K |
 | Mean molecular weight | 43.49 |  |
@@ -220,8 +233,10 @@ toc-depth: 2
 | Gm | 126.687 | x 10⁶ km³/s² |
 | Bond albedo | 0.343 |  |
 | Geometric albedo | 0.538 |  |
+| V band magnitude | -9.4 |  |
 | Solar irradiance | 50.26 | W/m² |
 | Black body temperature | 109.9 | K |
+| J2 | 14,736 | x 10⁻⁶ |
 | Number of satellites | 95 |  |
 | Has ring system | Yes |  |
 | Semimajor axis | 778.479 | 10⁶ km |
@@ -253,14 +268,16 @@ toc-depth: 2
 | Equatorial radius | 60,268 | km |
 | Polar radius | 54,364 | km |
 | Volumetric mean radius | 58,232 | km |
-| Ellipticity | 0.09796 |  |
+| Flattening | 0.09796 |  |
 | Mean density | 687 | kg/m³ |
 | Escape velocity | 35.5 | km/s |
 | Gm | 37.931 | x 10⁶ km³/s² |
 | Bond albedo | 0.342 |  |
 | Geometric albedo | 0.499 |  |
+| V band magnitude | -8.91 |  |
 | Solar irradiance | 14.82 | W/m² |
 | Black body temperature | 81 | K |
+| J2 | 16,298 | x 10⁻⁶ |
 | Number of satellites | 274 |  |
 | Has ring system | Yes |  |
 | Semimajor axis | 1432.04 | 10⁶ km |
@@ -291,14 +308,17 @@ toc-depth: 2
 | Equatorial radius | 25,559 | km |
 | Polar radius | 24,973 | km |
 | Volumetric mean radius | 25,362 | km |
-| Ellipticity | 0.02293 |  |
+| Flattening | 0.02293 |  |
 | Mean density | 1,270 | kg/m³ |
 | Escape velocity | 21.3 | km/s |
 | Gm | 5.794 | x 10⁶ km³/s² |
 | Bond albedo | 0.3 |  |
 | Geometric albedo | 0.488 |  |
+| V band magnitude | -7.11 |  |
 | Solar irradiance | 3.69 | W/m² |
 | Black body temperature | 58.1 | K |
+| Moment of inertia | 0.225 |  |
+| J2 | 3343.43 | x 10⁻⁶ |
 | Number of satellites | 28 |  |
 | Has ring system | Yes |  |
 | Semimajor axis | 2867.04 | 10⁶ km |
@@ -330,14 +350,16 @@ toc-depth: 2
 | Equatorial radius | 24,764 | km |
 | Polar radius | 24,341 | km |
 | Volumetric mean radius | 24,622 | km |
-| Ellipticity | 0.01708 |  |
+| Flattening | 0.01708 |  |
 | Mean density | 1,638 | kg/m³ |
 | Escape velocity | 23.5 | km/s |
 | Gm | 6.8351 | x 10⁶ km³/s² |
 | Bond albedo | 0.29 |  |
 | Geometric albedo | 0.442 |  |
+| V band magnitude | -6.94 |  |
 | Solar irradiance | 1.508 | W/m² |
 | Black body temperature | 46.6 | K |
+| J2 | 3,411 | x 10⁻⁶ |
 | Number of satellites | 16 |  |
 | Has ring system | Yes |  |
 | Semimajor axis | 4514.95 | 10⁶ km |
@@ -355,8 +377,8 @@ toc-depth: 2
 | Length of day | 16.11 | hrs |
 | Obliquity to orbit | 28.32 | deg |
 | Inclination of equator | 28.32 | deg |
-| Scale height | 19.1 | - |
-| Mean molecular weight | 2.53 | - |
+| Scale height | 19.1–20.3 | km |
+| Mean molecular weight | 2.53–2.69 |  |
 
 :::
 
