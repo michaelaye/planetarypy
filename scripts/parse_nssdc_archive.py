@@ -442,13 +442,36 @@ def parse_capture(raw_html: str,
                     }
 
     # Atmospheric section is free-text; pull a few canonical labels from it
-    # via simple regex. The regex tolerates two optional middle terms
-    # NSSDC routinely uses:
+    # via simple regex. The regex tolerates several NSSDC conventions:
+    #   ``~``, ``<``, ``>``, ``≈`` qualifier prefixes (zero or more)
     #   ``X +/- Y`` (or ``X ± Y``)  → symmetric measurement uncertainty
     #   ``X - Y``                   → range of a naturally varying quantity
+    #   ``10^N`` (no coefficient)   → 1 × 10^N
+    #   ``X x 10^N`` / ``X × 10^N`` → X × 10^N
     # The horizontal-whitespace classes ([ \t]) stop the unit capture at
     # the end of the value's line so the next section header (e.g.
     # "Atmospheric composition:") cannot bleed in as a fake unit.
+    #
+    # The value matcher has 4 capture groups:
+    #   1. full value text (used for the ``raw`` field downstream)
+    #   2. mantissa (sci-notation only; may be None → implies 1)
+    #   3. "10^N" tail (sci-notation only)
+    #   4. plain number (the non-sci alternative)
+    # ``_eval_value`` below collapses them into a single Python float.
+    value_pattern = (
+        r"("                                      # 1: full value text
+        r"(?:(-?\d+(?:\.\d+)?)[ \t]*[xX×][ \t]*)?(10\^[+-]?\d+)"  # 2,3
+        rf"|({NUMERIC_RE.pattern})"               # 4
+        r")"
+    )
+
+    def _eval_value(mantissa, exp_tail, plain) -> float:
+        if exp_tail is not None:
+            coef = float(mantissa) if mantissa else 1.0
+            exp_n = int(exp_tail[3:])     # strip "10^"
+            return coef * (10 ** exp_n)
+        return float(plain)
+
     atmo = re.search(
         r"<h3[^>]*>[^<]*Atmosphere[^<]*</h3>(.*?)(?=<h3|<hr)",
         raw_html, re.IGNORECASE | re.DOTALL,
@@ -462,21 +485,23 @@ def parse_capture(raw_html: str,
             if attr in fields:
                 continue
             m = re.search(
-                rf"{re.escape(label)}\s*[:\s]\s*~?\s*"
-                rf"({NUMERIC_RE.pattern})"
+                rf"{re.escape(label)}\s*[:\s]\s*[<>~≈]*\s*"
+                rf"{value_pattern}"
                 rf"(?:[ \t]*(\+/-|±|-)[ \t]*({NUMERIC_RE.pattern}))?"
                 rf"[ \t]*([^\n,;]*)",
                 atext,
             )
             if not m:
                 continue
-            v1 = float(m.group(1))
-            sep = m.group(2)
-            v2 = float(m.group(3)) if m.group(3) is not None else None
-            unit = (m.group(4).strip().split()[0]
-                    if m.group(4).strip() else None)
+            v1_raw = m.group(1)
+            v1 = _eval_value(m.group(2), m.group(3), m.group(4))
+            sep = m.group(5)
+            v2_raw = m.group(6)
+            v2 = float(v2_raw) if v2_raw is not None else None
+            unit = (m.group(7).strip().split()[0]
+                    if m.group(7).strip() else None)
             if sep is None or v2 is None:
-                entry = {"value": v1, "raw": m.group(1), "unit": unit}
+                entry = {"value": v1, "raw": v1_raw, "unit": unit}
             elif sep == "-":
                 # Range: NSSDC gave us bounds, not a single value. We
                 # emit those bounds verbatim and OMIT ``value`` — the
@@ -484,7 +509,7 @@ def parse_capture(raw_html: str,
                 # decides whether to surface the value as NaN (default)
                 # or replace with the range midpoint (config opt-in).
                 entry = {
-                    "raw": f"{m.group(1)}-{m.group(3)}",
+                    "raw": f"{v1_raw}-{v2_raw}",
                     "unit": unit,
                     "range": {"min": v1, "max": v2},
                 }
@@ -493,7 +518,7 @@ def parse_capture(raw_html: str,
                 # an error bar. ``value`` is the central estimate.
                 entry = {
                     "value": v1,
-                    "raw": f"{m.group(1)}{sep}{m.group(3)}",
+                    "raw": f"{v1_raw}{sep}{v2_raw}",
                     "unit": unit,
                     "uncertainty": v2,
                 }
