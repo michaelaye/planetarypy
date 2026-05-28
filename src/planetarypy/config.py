@@ -66,7 +66,7 @@ class Config:
         doc.add(tomlkit.comment(
             "Rich table to CSV. Lower it if your terminal is narrow."
         ))
-        doc["max_table_rows"] = 4
+        doc["max_table_rows"] = 3
         self.path.write_text(tomlkit.dumps(doc))
 
     def _read_config(self):
@@ -116,7 +116,7 @@ class Config:
             self.tomldoc.add(tomlkit.comment(
                 "Rich table to CSV. Lower it if your terminal is narrow."
             ))
-            self.tomldoc["max_table_rows"] = 4
+            self.tomldoc["max_table_rows"] = 3
             dirty = True
         if dirty:
             self.save()

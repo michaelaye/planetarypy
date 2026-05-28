@@ -63,7 +63,7 @@ def _resolved_max_table_rows(override: int | None) -> int:
         val = ""
     if isinstance(val, int) and val > 0:
         return val
-    return 4
+    return 3
 
 
 app = typer.Typer(
@@ -1401,9 +1401,9 @@ def indexes_select(
     ),
     max_table_rows: int = typer.Option(
         None, "--max-table-rows",
-        help="Threshold for --format=auto: above this row count, switch "
-             "from the transposed table to CSV. Defaults to the "
-             "`max_table_rows` config key (4 if unset).",
+        help="Max filtered rows that still get the transposed table; "
+             "above this count --format=auto switches to CSV. Defaults "
+             "to the `max_table_rows` config key (3 if unset).",
     ),
     report: str = typer.Option(
         "errors-only", "--report",
@@ -1472,7 +1472,7 @@ def indexes_select(
     # Pick effective format.
     if fmt == "auto":
         threshold = _resolved_max_table_rows(max_table_rows)
-        effective = "table" if len(filtered) < threshold else "csv"
+        effective = "table" if len(filtered) <= threshold else "csv"
     elif fmt in ("table", "csv", "jsonl"):
         effective = fmt
     else:

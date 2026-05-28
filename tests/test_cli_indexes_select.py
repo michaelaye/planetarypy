@@ -92,11 +92,17 @@ class TestIndexesSelectFormats:
         assert "PRODUCT_ID" in result.stdout
         assert "P_002" in result.stdout
 
-    def test_auto_switches_to_csv_above_threshold(self):
+    def test_auto_switches_to_csv_above_threshold(self, monkeypatch):
         df = _fake_df()
+        # Stub the config to the shipped default (3) so the test is
+        # independent of whatever the developer's local config says.
+        class _CfgStub:
+            def __getitem__(self, key):
+                return 3 if key == "max_table_rows" else ""
+        monkeypatch.setattr("planetarypy.config.config", _CfgStub())
         keys_p, idx_p = _patch_index(df)
         with keys_p, idx_p:
-            # 4 PIDs, default --max-table-rows=4 → switch to CSV.
+            # 4 PIDs, default --max-table-rows=3 → switch to CSV (4 > 3).
             result = runner.invoke(
                 app, ["indexes", "select", "mro.ctx.edr",
                       "P_001", "P_002", "P_003", "P_004"]
