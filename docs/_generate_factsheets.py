@@ -1,6 +1,6 @@
 """Regenerate `docs/factsheets.qmd` from the parsed NSSDC archive.
 
-Reads `parsed_archive_v1.json.gz` (the same artifact that
+Reads `parsed_archive.json.gz` (the same artifact that
 `planetarypy.constants` loads at runtime) and writes a Quarto page with
 one tab per body showing the *latest* archived NSSDC capture.
 
@@ -8,7 +8,7 @@ Run from the repo root:
 
     python docs/_generate_factsheets.py
 
-Override the archive path with `--archive /path/to/parsed_archive_v1.json.gz`.
+Override the archive path with `--archive /path/to/parsed_archive.json.gz`.
 The default looks up the cached file used by `planetarypy.constants`.
 """
 
@@ -20,7 +20,10 @@ import json
 import re
 from pathlib import Path
 
-DEFAULT_ARCHIVE = Path.home() / "planetarypy_data" / "constants" / "nssdc" / "parsed_archive_v1.json.gz"
+DEFAULT_ARCHIVE = (
+    Path(__file__).resolve().parent.parent
+    / "src" / "planetarypy" / "constants" / "nssdc" / "parsed_archive.json.gz"
+)
 OUT = Path(__file__).resolve().parent / "factsheets.qmd"
 
 BODIES: list[tuple[str, str]] = [
@@ -88,12 +91,12 @@ have been intermittently offline for months. The tables above are the
 **most recent archived revisions** of each fact sheet, parsed from the
 longitudinal archive that ships with `planetarypy.constants` and
 deposited at Zenodo
-([10.5281/zenodo.20122987](https://doi.org/10.5281/zenodo.20122987)).
+([10.5281/zenodo.20122986](https://doi.org/10.5281/zenodo.20122986)).
 Each tab shows the latest capture's date and links to the underlying
 Wayback Machine snapshot so the original page is one click away.
 :::
 
-The values above are auto-extracted from `parsed_archive_v1.json.gz`
+The values above are auto-extracted from `parsed_archive.json.gz`
 --- the same dataset that `planetarypy.constants` loads at runtime.
 The archive currently contains 913 distinct content versions of 13
 NSSDC fact sheets, spanning December 1996 to May 2025. This page is a
@@ -128,7 +131,7 @@ nssdc.history("saturn", "number_of_satellites")
 ```
 
 For the dataset itself, methodology, and citation BibTeX, see the
-[Zenodo deposit](https://doi.org/10.5281/zenodo.20122987).
+[Zenodo deposit](https://doi.org/10.5281/zenodo.20122986).
 
 ## Source & copyright
 
@@ -141,7 +144,7 @@ For the dataset itself, methodology, and citation BibTeX, see the
   please credit **NASA / NSSDC** when you reuse them.
 - **Archive parsing & redistribution:** Aye, K. M. (2025).
   *A longitudinal archive of the NSSDC planetary fact sheets
-  (1996--2025)* \\[Data set\\]. Zenodo. <https://doi.org/10.5281/zenodo.20122987>
+  (1996--2025)* \\[Data set\\]. Zenodo. <https://doi.org/10.5281/zenodo.20122986>
   (MIT licensed).
 - **Disclaimer:** `planetarypy` is a community project. It is not
   affiliated with, endorsed by, or sponsored by NASA, GSFC, or NSSDC.
@@ -194,7 +197,7 @@ def build(archive_path: Path) -> str:
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--archive", type=Path, default=DEFAULT_ARCHIVE,
-                    help=f"path to parsed_archive_v1.json.gz (default: {DEFAULT_ARCHIVE})")
+                    help=f"path to parsed_archive.json.gz (default: {DEFAULT_ARCHIVE})")
     ap.add_argument("--out", type=Path, default=OUT,
                     help=f"output qmd path (default: {OUT})")
     args = ap.parse_args()
