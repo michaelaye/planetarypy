@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.65.1] - 2026-05-28
+
+A bugfix release that finally delivers the v0.64.0 NSSDC parser improvements to end users on PyPI/conda. The parsed fact-sheet archive isn't bundled in the wheel (it's lazy-downloaded from Zenodo on first use), and the local cache filename in `planetarypy.constants.nssdc._loader` was keyed only on the JSON schema version — which v0.64.0 didn't bump, because the schema didn't break. Result: anyone with a pre-v0.64.0 cache kept reading the old buggy data, and fresh installs pulled the original v1.0.0 Zenodo deposit which was also pre-fix. This release uploads the corrected archive as Zenodo deposit v1.1.0 (concept DOI [10.5281/zenodo.20122986](https://doi.org/10.5281/zenodo.20122986)) and refactors the loader's cache key so future data refreshes propagate automatically to existing users.
+
+### Fixed
+- **NSSDC parser fixes from v0.64.0 now reach end users.** The local cache filename is now `parsed_archive_v{EXPECTED_ARCHIVE_VERSION}_z{ZENODO_RECORD_ID}.json.gz` — keyed on both the JSON schema version and the per-version Zenodo record ID. Bumping `ZENODO_RECORD_ID` in a release invalidates existing caches and triggers a redownload, which is how data-only updates actually propagate. Previously only `EXPECTED_ARCHIVE_VERSION` was in the filename, so pure data refreshes (no schema change) were invisible to the cache layer.
+- **`ZENODO_RECORD_ID` bumped `20122987` → `20426712`.** Points at the new Zenodo deposit v1.1.0, which contains the parsed archive with all v0.64.0 parser fixes baked in (J2 oblateness restored on 9 planets, range/uncertainty plumbed, unit aliases for `hours`/`g/mole`/`degrees`, `±` and `10^N` extraction, Title-Case `Surface Gravity`, NSSDC label-wording drift, unit-paren detector no longer eating non-unit qualifiers).
+
+### Changed
+- **Versioning policy in `_loader.py` documented and split.** Two independent knobs, explicitly commented: `EXPECTED_ARCHIVE_VERSION` (JSON schema — bump only on breaking shape changes; additive optional keys like the v0.64 `uncertainty`/`range` keys don't count) and `ZENODO_RECORD_ID` (data revision — bump every Zenodo upload). The previous single-knob "bump only on breaking schema changes" policy was technically defensible but incompatible with delivering data updates: without a freshness signal, no breaking schema → no cache miss → no propagation. New split makes that contract explicit.
+- **Zenodo bundle script (`scripts/build_nssdc_zenodo_bundle.py`) plumbing.** New `DEPOSIT_VERSION = "1.1.0"` and `CONCEPT_DOI = "10.5281/zenodo.20122986"` constants. The generated `README.md` inside the bundle now cites the deposit version (in title and citation block), surfaces the JSON schema version separately in the schema reference section, and uses the concept DOI in the citation rather than a version-pinned record ID. Bundle output directory becomes `build/nssdc_archive_v{DEPOSIT_VERSION}/` (was schema-version-named).
+
+### Note for downstream consumers
+End-user constant *values* will change after this upgrade — the same data changes documented under v0.64.0's "Fixed" section now actually take effect (J2 populated on 9 planets, range/uncertainty plumbed through, ~1400 readings recovered from the unit-paren-eater fix, etc.). Strict semver permits this under PATCH because the pre-fix values were buggy, but pinned-equality tests against the old constants will see diffs.
+
 ## [0.65.0] - 2026-05-27
 
 Two CLI quality-of-life additions for `plp indexes`, plus a small main-config knob to silence upstream deprecation noise that one of them provokes.

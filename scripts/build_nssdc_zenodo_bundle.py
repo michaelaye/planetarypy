@@ -51,9 +51,24 @@ SCRIPT_NAMES = (
     "regenerate_constants.py",
 )
 
+# Zenodo deposit version (semver applied to the dataset itself; bump per
+# upload — MAJOR=breaking schema, MINOR=additive optional keys, PATCH=
+# data-quality fixes only). Distinct from the JSON schema version
+# embedded in parsed_archive.json.gz, which tracks only breaking shape
+# changes.
+DEPOSIT_VERSION = "1.1.0"
 
-def _archive_version() -> str:
-    """Read the version from the parsed archive's own metadata."""
+# Zenodo concept DOI — always redirects to the latest version of the
+# deposit. Cited in the README for downstream papers. Distinct from the
+# per-version record ID pinned in
+# src/planetarypy/constants/nssdc/_loader.py (ZENODO_RECORD_ID), which
+# is what the runtime loader actually downloads from and uses as the
+# cache invalidation key.
+CONCEPT_DOI = "10.5281/zenodo.20122986"
+
+
+def _archive_schema_version() -> str:
+    """Read the JSON schema version from the parsed archive's own metadata."""
     with gzip.open(PARSED_PATH, "rt", encoding="utf-8") as f:
         return json.load(f)["version"]
 
@@ -106,15 +121,23 @@ def _build_raw_tarball(raw_dir: Path, out_path: Path) -> int:
     return n_files
 
 
-def _write_readme(bundle_dir: Path, version: str, archive_meta: dict,
+def _write_readme(bundle_dir: Path, deposit_version: str, schema_version: str,
+                  concept_doi: str, archive_meta: dict,
                   n_csv_rows: int, n_raw_files: int) -> None:
-    """Generate a citation-friendly README inside the bundle."""
+    """Generate a citation-friendly README inside the bundle.
+
+    ``deposit_version`` is the Zenodo deposit revision (semver applied to
+    the dataset); ``schema_version`` is the JSON shape version inside
+    parsed_archive.json.gz and only bumps on breaking shape changes;
+    ``concept_doi`` is the Zenodo concept DOI (always-latest redirect),
+    used for the README's citation block.
+    """
     body_summary = "\n".join(
         f"- **{body}**: {len(sheet['captures'])} captures"
         for body, sheet in sorted(archive_meta["fact_sheet"].items())
     )
     today = datetime.now(timezone.utc).date().isoformat()
-    readme = f"""# NASA NSSDC Planetary Fact Sheet Archive (v{version})
+    readme = f"""# NASA NSSDC Planetary Fact Sheet Archive (v{deposit_version})
 
 A curated longitudinal archive of NASA's National Space Science Data
 Center (NSSDC) per-body planetary fact sheets at
@@ -160,9 +183,12 @@ archive fills that gap.
 
 ## Schema (parsed_archive.json.gz)
 
+JSON schema version: `{schema_version}` (bumps only on breaking shape
+changes — independent of the deposit version above).
+
 ```json
 {{
-  "version": "{version}",
+  "version": "{schema_version}",
   "generated_at": "ISO timestamp",
   "fact_sheet": {{
     "<body>": {{
@@ -205,8 +231,9 @@ If you use this archive in published work, please cite both:
 2. This longitudinal archive:
    Aye, K.-M. (planetarypy contributors). NSSDC Planetary Fact Sheet
    Time Series (1996–2025): A Longitudinal Archive of Solar-System
-   Reference Parameters, v{version}. Zenodo, {today}.
-   DOI: [10.5281/zenodo.20122987](https://doi.org/10.5281/zenodo.20122987).
+   Reference Parameters, v{deposit_version}. Zenodo, {today}.
+   DOI (concept — always resolves to the latest version):
+   [{concept_doi}](https://doi.org/{concept_doi}).
 
 3. The Internet Archive Wayback Machine, which made every capture in
    this archive accessible:
@@ -264,8 +291,8 @@ def build_bundle() -> Path:
             f"Run scripts/fetch_nssdc_archive.py first."
         )
 
-    version = _archive_version()
-    bundle_name = f"nssdc_archive_v{version}"
+    schema_version = _archive_schema_version()
+    bundle_name = f"nssdc_archive_v{DEPOSIT_VERSION}"
     bundle_dir = OUT_ROOT / bundle_name
     if bundle_dir.exists():
         shutil.rmtree(bundle_dir)
@@ -299,7 +326,10 @@ def build_bundle() -> Path:
     # 6. README with citation + provenance
     with gzip.open(PARSED_PATH, "rt", encoding="utf-8") as f:
         archive_meta = json.load(f)
-    _write_readme(bundle_dir, version, archive_meta, n_csv_rows, n_raw_files)
+    _write_readme(
+        bundle_dir, DEPOSIT_VERSION, schema_version, CONCEPT_DOI,
+        archive_meta, n_csv_rows, n_raw_files,
+    )
 
     return bundle_dir
 

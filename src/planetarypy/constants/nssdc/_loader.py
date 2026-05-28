@@ -22,19 +22,31 @@ from typing import Optional
 import astropy.units as u
 
 # ── Versioning ─────────────────────────────────────────────────────────
+#
+# Two independent knobs control archive identity and freshness:
+#
+#   EXPECTED_ARCHIVE_VERSION — JSON *schema* version. Bump only when the
+#       parsed_archive.json.gz shape changes in a way that breaks existing
+#       consumers (field rename, field removal, type change). Additive
+#       optional keys (e.g. the v0.64 ``uncertainty`` / ``range`` keys)
+#       do not require a bump.
+#
+#   ZENODO_RECORD_ID — Per-version Zenodo record ID of the deposit users
+#       should download. Bump on every new Zenodo upload, including pure
+#       data refreshes. This ID is also baked into the local cache
+#       filename, so bumping it invalidates the cache and forces a
+#       redownload — which is how data-only updates actually reach end
+#       users after a planetarypy release.
+#
+# DOI of the current deposit (per-version DOI — distinct from the
+# concept DOI 10.5281/zenodo.20122986 used in the README citation):
+#   https://doi.org/10.5281/zenodo.20426712 (record 20426712, deposit v1.1.0)
 
-# Schema version of the parsed archive's JSON content. Must match the
-# ``version`` field inside parsed_archive.json.gz. Bump only on
-# breaking schema changes — *not* on data updates.
 EXPECTED_ARCHIVE_VERSION = "1"
+ZENODO_RECORD_ID: Optional[str] = "20426712"
 
-# Numeric tail of the Zenodo DOI; used to build the download URL.
-# DOI: https://doi.org/10.5281/zenodo.20122987 (deposit v1.0.0).
-ZENODO_RECORD_ID: Optional[str] = "20122987"
-
-# Filename inside the Zenodo deposit. The bundle ships the canonical
-# unversioned name; the local cache keeps a versioned copy so multiple
-# archive generations can coexist.
+# Filename inside the Zenodo deposit (unversioned — the cache keeps a
+# versioned copy keyed on both knobs above).
 _ZENODO_FILENAME = "parsed_archive.json.gz"
 
 # In-repo location during development. After Zenodo deposit, the runtime
@@ -43,14 +55,19 @@ _PACKAGED_PATH = Path(__file__).parent / "parsed_archive.json.gz"
 
 
 def _local_archive_path() -> Path:
-    """Return the local cache path under the user's planetarypy storage root."""
+    """Return the local cache path under the user's planetarypy storage root.
+
+    Filename is keyed on both ``EXPECTED_ARCHIVE_VERSION`` (schema) and
+    ``ZENODO_RECORD_ID`` (data revision) so that bumping either constant
+    in a future planetarypy release forces a re-download on next use.
+    """
     from planetarypy.config import config
 
     return (
         Path(config.storage_root)
         / "constants"
         / "nssdc"
-        / f"parsed_archive_v{EXPECTED_ARCHIVE_VERSION}.json.gz"
+        / f"parsed_archive_v{EXPECTED_ARCHIVE_VERSION}_z{ZENODO_RECORD_ID}.json.gz"
     )
 
 
