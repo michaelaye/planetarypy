@@ -1,0 +1,152 @@
+"""Tests for the PID-filter additions to ``planetarypy.pds``.
+
+Covers ``pid_column`` resolution, ``get_index(pids=...)`` filtering, and
+``missing_pids`` reporting. The ``Index`` class is stubbed so the tests
+never touch disk or the network.
+"""
+from __future__ import annotations
+
+import pandas as pd
+import pytest
+
+from planetarypy.pds import get_index, missing_pids, pid_column
+
+
+def _df_with_product_id() -> pd.DataFrame:
+    return pd.DataFrame({
+        "PRODUCT_ID": ["P_001", "P_002", "P_003", "P_004", "P_005"],
+        "FILE_NAME": [f"file_{i}.IMG" for i in range(1, 6)],
+        "START_TIME": [f"2024-{m:02d}-01T00:00:00" for m in range(1, 6)],
+    })
+
+
+def _df_with_file_name_only() -> pd.DataFrame:
+    """Mirrors cassini.uvis.index, which lacks PRODUCT_ID."""
+    return pd.DataFrame({
+        "FILE_NAME": ["EUV1999_007_17_05.LBL", "EUV1999_008_03_22.LBL"],
+        "SCLK_TIME": [1.0, 2.0],
+    })
+
+
+class _StubIndex:
+    """Drop-in replacement for ``Index`` that exposes a canned DataFrame."""
+    def __init__(self, df: pd.DataFrame):
+        self._df = df
+
+    def make(self):
+        # Factory that ignores constructor args from get_index.
+        outer = self
+        class _I:
+            def __init__(self, *a, **kw): pass
+            def ensure_parquet(self, force=False): return False
+            @property
+            def update_available(self): return False
+            @property
+            def dataframe(self): return outer._df
+        return _I
+
+
+# ── pid_column ──────────────────────────────────────────────────────────
+
+
+class TestPidColumn:
+
+    def test_prefers_product_id_when_present(self):
+        df = _df_with_product_id()
+        assert pid_column("mro.ctx.edr", df) == "PRODUCT_ID"
+
+    def test_falls_back_to_file_name_when_product_id_absent(self):
+        df = _df_with_file_name_only()
+        # cassini.uvis.index is registered with product_id_col=FILE_NAME
+        assert pid_column("cassini.uvis.index", df) == "FILE_NAME"
+
+    def test_falls_back_through_default_order_for_unknown_key(self):
+        df = pd.DataFrame({
+            "IMAGE_ID": ["IMG_1", "IMG_2"],
+            "OTHER": [1, 2],
+        })
+        # PRODUCT_ID and FILE_NAME not present; IMAGE_ID wins next.
+        assert pid_column("not.registered.key", df) == "IMAGE_ID"
+
+    def test_raises_keyerror_when_no_candidate_present(self):
+        df = pd.DataFrame({"X": [1], "Y": [2]})
+        with pytest.raises(KeyError, match="No suitable product-id column"):
+            pid_column("not.registered.key", df)
+
+
+# ── get_index(pids=...) ─────────────────────────────────────────────────
+
+
+class TestGetIndexPidsFilter:
+
+    def test_filter_returns_only_matching_rows(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.ctx.edr", pids=["P_002", "P_004"])
+        assert list(out["PRODUCT_ID"]) == ["P_002", "P_004"]
+
+    def test_filter_unknown_pids_silently_dropped(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.ctx.edr", pids=["P_002", "DOES_NOT_EXIST"])
+        assert list(out["PRODUCT_ID"]) == ["P_002"]
+
+    def test_filter_empty_list_returns_empty_dataframe(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.ctx.edr", pids=[])
+        assert len(out) == 0
+        assert list(out.columns) == list(df.columns)
+
+    def test_pids_none_returns_full_index(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.ctx.edr", pids=None)
+        assert len(out) == len(df)
+
+    def test_pids_accepts_any_iterable(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        # Generator, tuple, set — all should work via map(str, ...).
+        out_gen = get_index("mro.ctx.edr", pids=(p for p in ["P_001", "P_003"]))
+        out_tup = get_index("mro.ctx.edr", pids=("P_001", "P_003"))
+        out_set = get_index("mro.ctx.edr", pids={"P_001", "P_003"})
+        assert set(out_gen["PRODUCT_ID"]) == {"P_001", "P_003"}
+        assert set(out_tup["PRODUCT_ID"]) == {"P_001", "P_003"}
+        assert set(out_set["PRODUCT_ID"]) == {"P_001", "P_003"}
+
+
+# ── missing_pids ────────────────────────────────────────────────────────
+
+
+class TestMissingPids:
+
+    def test_returns_pids_absent_from_dataframe(self):
+        df = _df_with_product_id()
+        out = missing_pids(df, "mro.ctx.edr",
+                           ["P_002", "GHOST_A", "P_004", "GHOST_B"])
+        assert out == ["GHOST_A", "GHOST_B"]
+
+    def test_preserves_input_order(self):
+        df = _df_with_product_id()
+        out = missing_pids(df, "mro.ctx.edr", ["Z", "A", "M"])
+        assert out == ["Z", "A", "M"]
+
+    def test_does_not_dedup(self):
+        df = _df_with_product_id()
+        out = missing_pids(df, "mro.ctx.edr", ["X", "X", "Y", "Y"])
+        assert out == ["X", "X", "Y", "Y"]
+
+    def test_empty_pids_returns_empty_list(self):
+        df = _df_with_product_id()
+        assert missing_pids(df, "mro.ctx.edr", []) == []
+
+    def test_all_present_returns_empty_list(self):
+        df = _df_with_product_id()
+        out = missing_pids(df, "mro.ctx.edr", ["P_001", "P_003"])
+        assert out == []

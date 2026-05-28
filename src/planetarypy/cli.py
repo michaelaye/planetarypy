@@ -7,6 +7,8 @@ Usage:
     plp catalog build
 """
 
+from pathlib import Path
+
 import click
 import typer
 
@@ -99,52 +101,213 @@ def _complete_product_id(ctx: click.Context, args: list[str], incomplete: str) -
 def fetch(
     ctx: typer.Context,
     key: str = typer.Argument(None, help="Dotted product key, e.g. mro.ctx.edr"),
-    product_id: str = typer.Argument(None, help="Product identifier",
-                                     autocompletion=_complete_product_id),
+    product_ids: list[str] = typer.Argument(
+        None,
+        help="One or more product identifiers. Optional when --pids-from is given.",
+        autocompletion=_complete_product_id,
+    ),
+    pids_from: Path = typer.Option(
+        None, "--pids-from",
+        help="Read PIDs from PATH (one per line; blanks + '#'-comments ignored). "
+             "Use '-' for stdin. Mutually exclusive with positional PIDs.",
+    ),
+    workers: int = typer.Option(
+        4, "--workers", "-w",
+        help="Parallel download threads in batch mode (default 4).",
+    ),
+    report: str = typer.Option(
+        "errors-only", "--report",
+        help="Batch outcome report mode: errors-only (default) | full | jsonl | csv. "
+             "Single-PID calls ignore this flag.",
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
     label_only: bool = typer.Option(False, "--label-only", "-l", help="Download only the label file"),
     here: bool = typer.Option(False, "--here", "-H", help="Download into current directory instead of planetarypy storage"),
-    folder: bool = typer.Option(False, "--folder", "-d", help="Print the local folder instead of file paths (composes with `cd`)"),
+    folder: bool = typer.Option(False, "--folder", "-d", help="Print the local folder instead of file paths (composes with `cd`; single-PID only)"),
 ):
-    """Download a PDS product by ID.
+    """Download one or more PDS products by ID.
 
     Examples:
-        plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W
-        plp fetch --here mro.ctx.edr P02_001916_2221_XI_42N027W
+        plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W            # single
+        plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W P03_...    # batch (variadic)
+        plp fetch mro.ctx.edr --pids-from my_targets.txt            # batch from file
+        plp fetch mro.ctx.edr --pids-from -                          # batch from stdin
         cd (plp fetch --folder mro.ctx.edr P02_001916_2221_XI_42N027W)
     """
     if key is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
-    if product_id is None:
-        typer.echo("Error: missing PRODUCT_ID argument.", err=True)
-        raise typer.Exit(2)
 
     from pathlib import Path
 
-    from planetarypy.catalog import fetch_product, get_product_urls
+    pids = list(product_ids) if product_ids else []
 
-    typer.echo(f"Resolving {key} / {product_id}...", err=True)
-    try:
-        for url in get_product_urls(key, product_id).values():
-            typer.echo(f"URL: {url}", err=True)
-
-        downloaded = fetch_product(
-            key, product_id,
-            local_dir=Path.cwd() if here else None,
-            label_only=label_only, force=force,
+    if pids_from is not None and pids:
+        typer.echo(
+            "Error: --pids-from is mutually exclusive with positional PIDs.",
+            err=True,
         )
-        # Stdout-only payload so shell command substitution composes:
-        #   --folder         -> single line, the folder        (cd (plp fetch --folder …))
-        #   default          -> one line per file, full paths  (qgis (plp fetch …))
-        if folder:
-            typer.echo(downloaded.local_dir)
-        else:
-            for f in downloaded.files:
-                typer.echo(f)
-    except Exception as e:
+        raise typer.Exit(2)
+
+    if pids_from is not None:
+        from planetarypy.utils import read_pids
+        try:
+            pids = read_pids(pids_from)
+        except FileNotFoundError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(2)
+        if not pids:
+            typer.echo(
+                f"Error: no PIDs found in {pids_from} (file is empty or "
+                "only comments).", err=True,
+            )
+            raise typer.Exit(2)
+
+    if not pids:
+        typer.echo("Error: provide at least one PID (positional or --pids-from).", err=True)
+        raise typer.Exit(2)
+
+    # Single-PID path preserves the existing output contract: URL to stderr,
+    # files (or folder) to stdout, so shell composition stays unchanged.
+    if len(pids) == 1:
+        from planetarypy.catalog import fetch_product, get_product_urls
+        product_id = pids[0]
+        typer.echo(f"Resolving {key} / {product_id}...", err=True)
+        try:
+            for url in get_product_urls(key, product_id).values():
+                typer.echo(f"URL: {url}", err=True)
+            downloaded = fetch_product(
+                key, product_id,
+                local_dir=Path.cwd() if here else None,
+                label_only=label_only, force=force,
+            )
+            if folder:
+                typer.echo(downloaded.local_dir)
+            else:
+                for f in downloaded.files:
+                    typer.echo(f)
+        except Exception as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(1)
+        return
+
+    # Batch path.
+    if folder:
+        typer.echo(
+            "Error: --folder is only valid with a single PID (use --report "
+            "for multi-PID output formats).", err=True,
+        )
+        raise typer.Exit(2)
+
+    from planetarypy.catalog import OfflineError, fetch_products
+    typer.echo(f"Fetching {len(pids)} products from {key} with {workers} workers...", err=True)
+    try:
+        results = fetch_products(
+            key, pids,
+            workers=workers,
+            label_only=label_only, force=force,
+            local_dir=Path.cwd() if here else None,
+        )
+    except OfflineError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
+
+    exit_code = _emit_batch_report(results, report, label="Fetch")
+    if exit_code != 0:
+        raise typer.Exit(exit_code)
+
+
+def _emit_batch_report(results, mode: str, *, label: str = "Batch") -> int:
+    """Print per-PID outcomes from a BatchFetchResult list, return exit code.
+
+    Modes
+    -----
+    errors-only (default)
+        One line per FAILED PID to stderr; trailing summary to stderr.
+        Stdout stays empty so the command composes cleanly when all PIDs
+        succeed and the user just wants the side-effect (downloads on disk).
+    full
+        OK/FAIL line per PID to stdout; trailing summary to stderr.
+    jsonl
+        One JSON object per PID to stdout (machine-readable).
+    csv
+        Header + one row per PID to stdout.
+
+    Returns
+    -------
+    int
+        ``0`` if all PIDs succeeded, ``1`` if any failed. Always returns
+        ``0`` from ``jsonl`` and ``csv`` modes since those are intended
+        for downstream parsing where exit-code carries less meaning than
+        the per-row ``ok`` flag.
+    """
+    import json
+    import sys
+
+    n_failed = sum(1 for r in results if not r.ok)
+    n_ok = len(results) - n_failed
+
+    if mode == "errors-only":
+        for r in results:
+            if not r.ok:
+                typer.echo(
+                    f"FAIL {r.product_id}: "
+                    f"{type(r.exception).__name__}: {r.exception}",
+                    err=True,
+                )
+        typer.echo(
+            f"{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
+            err=True,
+        )
+        return 1 if n_failed else 0
+
+    if mode == "full":
+        for r in results:
+            if r.ok:
+                typer.echo(f"OK   {r.product_id}")
+            else:
+                typer.echo(
+                    f"FAIL {r.product_id}: "
+                    f"{type(r.exception).__name__}: {r.exception}"
+                )
+        typer.echo(
+            f"{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
+            err=True,
+        )
+        return 1 if n_failed else 0
+
+    if mode == "jsonl":
+        for r in results:
+            obj = {"product_id": r.product_id, "ok": r.ok}
+            if r.ok and r.downloaded is not None:
+                obj["files"] = [str(f) for f in r.downloaded.files]
+            elif r.exception is not None:
+                obj["error"] = f"{type(r.exception).__name__}: {r.exception}"
+            typer.echo(json.dumps(obj))
+        return 0
+
+    if mode == "csv":
+        import csv
+        writer = csv.writer(sys.stdout)
+        writer.writerow(["product_id", "ok", "error", "files"])
+        for r in results:
+            if r.ok and r.downloaded is not None:
+                writer.writerow([
+                    r.product_id, "true", "",
+                    ";".join(str(f) for f in r.downloaded.files),
+                ])
+            else:
+                err = (f"{type(r.exception).__name__}: {r.exception}"
+                       if r.exception else "")
+                writer.writerow([r.product_id, "false", err, ""])
+        return 0
+
+    typer.echo(
+        f"Error: unknown --report mode: {mode!r}. "
+        "Choose one of: errors-only, full, jsonl, csv.",
+        err=True,
+    )
+    raise typer.Exit(2)
 
 
 # ── HiRISE commands ─────────────────────────────────────────────────
@@ -1191,6 +1354,173 @@ def indexes_last(
     _render_index_rows(key, subset, total_rows=len(df),
                        total_cols=len(df.columns),
                        label=", ".join(label_parts))
+
+
+@indexes_app.command("select")
+def indexes_select(
+    key: str = typer.Argument(
+        ..., help="Dotted index key, e.g. mro.ctx.edr",
+        shell_complete=_shell_complete_index_key,
+    ),
+    product_ids: list[str] = typer.Argument(
+        None,
+        help="One or more PIDs to filter to. Optional when --pids-from is given.",
+    ),
+    pids_from: Path = typer.Option(
+        None, "--pids-from",
+        help="Read PIDs from PATH (one per line; blanks + '#'-comments ignored). "
+             "Use '-' for stdin. Mutually exclusive with positional PIDs.",
+    ),
+    fmt: str = typer.Option(
+        "auto", "--format",
+        help="Output format: auto (default) | table | csv | jsonl. "
+             "auto = transposed Rich table when matched rows < "
+             "--max-table-rows, otherwise CSV.",
+    ),
+    max_table_rows: int = typer.Option(
+        4, "--max-table-rows",
+        help="Threshold for --format=auto: above this row count, switch "
+             "from the transposed table to CSV. Default 4.",
+    ),
+    report: str = typer.Option(
+        "errors-only", "--report",
+        help="Missing-PID report mode: errors-only (default summary on "
+             "stderr) | full (list every missing PID on stderr).",
+    ),
+):
+    """Filter a registered PDS index to specific PIDs and render the rows.
+
+    Built for the "I have a small list of PIDs, show me those rows" case
+    — the natural companion to ``plp fetch ... --pids-from``. Output goes
+    to stdout (so it pipes cleanly); missing-PID reporting always goes
+    to stderr regardless of ``--format``.
+
+    Examples:
+        plp indexes select mro.ctx.edr P02_001916_2221_XI_42N027W
+        plp indexes select mro.ctx.edr P_A P_B P_C
+        plp indexes select mro.ctx.edr --pids-from my_targets.txt
+        plp indexes select mro.ctx.edr --pids-from - --format jsonl < pids.txt
+    """
+    from planetarypy.pds import get_index, missing_pids
+    from planetarypy.pds.utils import _all_dotted_index_keys
+
+    if key not in _all_dotted_index_keys():
+        typer.echo(f"Unknown index key: {key!r}.", err=True)
+        raise typer.Exit(1)
+
+    pids = list(product_ids) if product_ids else []
+
+    if pids_from is not None and pids:
+        typer.echo(
+            "Error: --pids-from is mutually exclusive with positional PIDs.",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    if pids_from is not None:
+        from planetarypy.utils import read_pids
+        try:
+            pids = read_pids(pids_from)
+        except FileNotFoundError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(2)
+        if not pids:
+            typer.echo(
+                f"Error: no PIDs found in {pids_from} (file is empty or "
+                "only comments).", err=True,
+            )
+            raise typer.Exit(2)
+
+    if not pids:
+        typer.echo(
+            "Error: provide at least one PID (positional or --pids-from).",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    full_df = get_index(key, allow_refresh=False)
+    filtered = get_index(key, allow_refresh=False, pids=pids)
+    missing = missing_pids(filtered, key, pids)
+
+    # Pick effective format.
+    if fmt == "auto":
+        effective = "table" if len(filtered) < max_table_rows else "csv"
+    elif fmt in ("table", "csv", "jsonl"):
+        effective = fmt
+    else:
+        typer.echo(
+            f"Error: unknown --format: {fmt!r}. "
+            "Choose one of: auto, table, csv, jsonl.",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    if effective == "table":
+        _render_index_rows(
+            key, filtered,
+            total_rows=len(full_df), total_cols=len(full_df.columns),
+            label=f"{len(filtered)} of {len(pids)} requested",
+        )
+    elif effective == "csv":
+        import csv
+        import sys
+        writer = csv.writer(sys.stdout)
+        writer.writerow(list(filtered.columns))
+        for _, row in filtered.iterrows():
+            writer.writerow([
+                "" if pd_isna(v) else str(v) for v in row.tolist()
+            ])
+    elif effective == "jsonl":
+        import json
+        for _, row in filtered.iterrows():
+            obj = {
+                col: (None if pd_isna(row[col]) else _jsonable(row[col]))
+                for col in filtered.columns
+            }
+            typer.echo(json.dumps(obj))
+
+    # Missing-PID report (always on stderr; format-independent).
+    if report == "errors-only":
+        if missing:
+            typer.echo(
+                f"select summary: {len(filtered)} rows / "
+                f"{len(pids)} requested, {len(missing)} not found.",
+                err=True,
+            )
+        else:
+            typer.echo(
+                f"select summary: {len(filtered)} rows / "
+                f"{len(pids)} requested, all found.",
+                err=True,
+            )
+    elif report == "full":
+        for pid in missing:
+            typer.echo(f"MISS {pid}", err=True)
+        typer.echo(
+            f"select summary: {len(filtered)} rows / "
+            f"{len(pids)} requested, {len(missing)} not found.",
+            err=True,
+        )
+    else:
+        typer.echo(
+            f"Error: unknown --report mode: {report!r}. "
+            "Choose one of: errors-only, full.",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    if missing:
+        raise typer.Exit(1)
+
+
+def _jsonable(value):
+    """Best-effort coercion to a JSON-serializable scalar."""
+    import datetime as _dt
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, (_dt.date, _dt.datetime)):
+        return value.isoformat()
+    return str(value)
 
 
 @indexes_app.command("info")

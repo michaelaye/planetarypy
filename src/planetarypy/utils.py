@@ -45,6 +45,8 @@ __all__ = [
     "calculate_hours_since_timestamp",
     "NestedTomlDict",
     "compare_remote_file",
+    "parallel_map",
+    "read_pids",
 ]
 
 
@@ -431,3 +433,135 @@ def catch_isis_error(func):
 #         raise FileNotFoundError(f"Configuration file not found at {path}")
 #     else:
 #         return config
+
+
+def parallel_map(
+    func,
+    items,
+    *,
+    workers: int = 4,
+    executor: str = "thread",
+    desc: str | None = None,
+) -> list[tuple]:
+    """Run ``func`` on each item in parallel, continuing past per-item failures.
+
+    Promotes the duplicated ``process_parallel`` pattern from the instrument
+    modules into a single canonical helper. Order of the returned list mirrors
+    the input order — not the completion order — so callers can correlate by
+    index.
+
+    Parameters
+    ----------
+    func : Callable[[T], R]
+        Callable invoked as ``func(item)`` per element. Should be picklable
+        when ``executor='process'``.
+    items : Iterable[T]
+        Items to process. Materialized into a list internally so a generator
+        is fine; the return list will have the same length.
+    workers : int, default 4
+        Pool size. Safe default for typical PDS servers when used with
+        ``executor='thread'``; tune up for CPU-bound work with
+        ``executor='process'``.
+    executor : {"thread", "process"}, default "thread"
+        Concurrency model. ``"thread"`` for I/O-bound tasks (downloads, HTTP
+        requests, disk reads); ``"process"`` for CPU-bound tasks (image
+        calibration, projection).
+    desc : str, optional
+        Description for the tqdm progress bar. ``None`` suppresses the bar.
+
+    Returns
+    -------
+    list[tuple[item, result, exception]]
+        One triple per input item, in input order:
+        - ``(item, result, None)`` on success
+        - ``(item, None, exc)`` if ``func(item)`` raised; the exception is
+          captured, not re-raised, so a batch survives individual failures
+
+    Examples
+    --------
+    >>> def square(x):
+    ...     if x == 3:
+    ...         raise ValueError("nope")
+    ...     return x * x
+    >>> parallel_map(square, [1, 2, 3, 4], workers=2)
+    [(1, 1, None), (2, 4, None), (3, None, ValueError('nope')), (4, 16, None)]
+    """
+    from concurrent.futures import (
+        ProcessPoolExecutor,
+        ThreadPoolExecutor,
+        as_completed,
+    )
+
+    if executor == "thread":
+        pool_cls = ThreadPoolExecutor
+    elif executor == "process":
+        pool_cls = ProcessPoolExecutor
+    else:
+        raise ValueError(
+            f"executor must be 'thread' or 'process', got {executor!r}"
+        )
+
+    items_list = list(items)
+    if not items_list:
+        return []
+
+    results: list[tuple] = [None] * len(items_list)
+
+    with pool_cls(max_workers=workers) as pool:
+        future_to_idx = {
+            pool.submit(func, item): i for i, item in enumerate(items_list)
+        }
+        iterator = as_completed(future_to_idx)
+        if desc is not None:
+            iterator = tqdm(iterator, total=len(items_list), desc=desc)
+        for future in iterator:
+            i = future_to_idx[future]
+            item = items_list[i]
+            try:
+                results[i] = (item, future.result(), None)
+            except Exception as exc:  # noqa: BLE001 — intentional broad catch
+                results[i] = (item, None, exc)
+    return results
+
+
+def read_pids(source) -> list[str]:
+    """Read product IDs from a file (or stdin), one per line.
+
+    Blank lines and lines starting with ``#`` (after leading whitespace) are
+    ignored. Each retained line is right-stripped of trailing whitespace and
+    left intact otherwise. Designed to feed batch-PID APIs like
+    :func:`planetarypy.catalog.fetch_products` and
+    :func:`planetarypy.pds.get_index` (via its ``pids=`` keyword).
+
+    Parameters
+    ----------
+    source : str or pathlib.Path
+        Path to a text file containing one PID per line. Pass ``"-"`` to
+        read from standard input — useful for shell pipelines.
+
+    Returns
+    -------
+    list[str]
+        PIDs in file order. No deduplication; the caller decides whether
+        duplicates matter.
+
+    Examples
+    --------
+    >>> read_pids("my_targets.txt")
+    ['P02_001916_2221_XI_42N027W', 'P03_001234_2222_XI_43N028W']
+    """
+    import sys
+
+    if str(source) == "-":
+        text = sys.stdin.read()
+    else:
+        text = Path(source).read_text()
+
+    pids: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        pids.append(line)
+    return pids

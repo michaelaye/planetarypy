@@ -611,6 +611,155 @@ def fetch_product(
     )
 
 
+class OfflineError(RuntimeError):
+    """Raised by :func:`fetch_products` when the preflight internet check fails.
+
+    The batch fetcher refuses to launch a parallel pool against a server it
+    can't reach — every worker would just error individually, polluting the
+    report with redundant connection-failure noise. Pass
+    ``skip_online_check=True`` to override (useful for offline mirrors or
+    when ``have_internet()`` itself is the unreliable component).
+    """
+
+
+class BatchFetchResult:
+    """Outcome of a single product in a :func:`fetch_products` batch.
+
+    Attributes
+    ----------
+    product_id : str
+        The PID that was requested (NOT the canonical PID the resolver
+        matched, which lives at ``downloaded.product_id`` on success).
+    downloaded : DownloadedProduct or None
+        Populated on success; ``None`` if this PID's fetch raised.
+    exception : Exception or None
+        Captured exception on failure; ``None`` on success.
+    """
+    __slots__ = ("product_id", "downloaded", "exception")
+
+    def __init__(
+        self,
+        product_id: str,
+        downloaded: "DownloadedProduct | None",
+        exception: Exception | None,
+    ):
+        self.product_id = product_id
+        self.downloaded = downloaded
+        self.exception = exception
+
+    @property
+    def ok(self) -> bool:
+        return self.exception is None
+
+    def __repr__(self) -> str:
+        if self.ok:
+            return f"BatchFetchResult({self.product_id!r}, ok=True)"
+        return (
+            f"BatchFetchResult({self.product_id!r}, ok=False, "
+            f"exception={type(self.exception).__name__}: {self.exception})"
+        )
+
+
+def fetch_products(
+    key: str,
+    product_ids,
+    *,
+    workers: int = 4,
+    instrument: str | None = None,
+    product_key: str | None = None,
+    files: list[str] | None = None,
+    label_only: bool = False,
+    force: bool = False,
+    local_dir: Path | None = None,
+    skip_online_check: bool = False,
+) -> list[BatchFetchResult]:
+    """Download a batch of PDS products in parallel; continues past failures.
+
+    Thin wrapper over :func:`fetch_product` using
+    :func:`planetarypy.utils.parallel_map`. Per-PID exceptions are captured
+    into the returned :class:`BatchFetchResult` so a single bad PID never
+    breaks the rest of the batch.
+
+    Parameters
+    ----------
+    key : str
+        Dotted key ``'mission.instrument.product_type'``, or just the
+        mission name (in which case ``instrument`` and ``product_key`` are
+        required). Passed through verbatim to ``fetch_product`` per PID.
+    product_ids : Iterable[str]
+        PIDs to download. Order is preserved in the returned list.
+    workers : int, default 4
+        Thread-pool size. Safe default for typical PDS servers; raise for
+        bulk downloads against tolerant servers.
+    instrument, product_key, files, label_only, force, local_dir
+        Forwarded to :func:`fetch_product` unchanged. ``local_dir`` is
+        shared across all PIDs in the batch — pass ``None`` (default) to
+        get the catalog's per-PID layout.
+    skip_online_check : bool, default False
+        When ``False`` (default), :func:`planetarypy.utils.have_internet`
+        is called before launching the pool; if it returns ``False``,
+        :class:`OfflineError` is raised. Pass ``True`` to bypass the
+        preflight (offline mirrors, captive networks, etc.).
+
+    Returns
+    -------
+    list[BatchFetchResult]
+        One result per input PID, in input order. ``result.ok`` is the
+        quickest success check; ``result.downloaded`` holds the same
+        :class:`DownloadedProduct` you'd get from a single
+        ``fetch_product`` call on success.
+
+    Raises
+    ------
+    OfflineError
+        If the preflight internet check fails and
+        ``skip_online_check=False``.
+
+    Examples
+    --------
+    >>> from planetarypy.catalog import fetch_products
+    >>> results = fetch_products(
+    ...     "mro.ctx.edr",
+    ...     ["P02_001916_2221_XI_42N027W", "P03_001234_2222_XI_43N028W"],
+    ...     workers=4,
+    ... )
+    >>> [r.ok for r in results]
+    [True, True]
+    >>> [r.downloaded.product_id for r in results if r.ok]
+    ['P02_001916_2221_XI_42N027W', 'P03_001234_2222_XI_43N028W']
+    """
+    from planetarypy.utils import have_internet, parallel_map
+
+    pids = list(product_ids)
+    if not pids:
+        return []
+
+    if not skip_online_check and not have_internet():
+        raise OfflineError(
+            "No internet connection detected — refusing to launch parallel "
+            "downloads. Pass skip_online_check=True to override (e.g. for "
+            "offline mirrors or captive networks)."
+        )
+
+    def _fetch_one(pid: str) -> "DownloadedProduct":
+        return fetch_product(
+            key, pid,
+            instrument=instrument, product_key=product_key,
+            files=files, label_only=label_only, force=force,
+            local_dir=local_dir,
+        )
+
+    triples = parallel_map(
+        _fetch_one, pids,
+        workers=workers, executor="thread",
+        desc=f"Fetching {len(pids)} products",
+    )
+    return [
+        BatchFetchResult(product_id=pid, downloaded=result, exception=exc)
+        for (pid, result, exc) in triples
+    ]
+
+
 def get_product_urls(
     key: str,
     product_id: str,

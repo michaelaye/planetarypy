@@ -14,6 +14,7 @@ __all__ = [
     "read_index_slice",
     "rebuild_pid_cache",
     "reorder_meta_row",
+    "pid_column",
 ]
 
 from .static_index import ConfigHandler
@@ -168,6 +169,58 @@ def print_available_indexes(
 # Fallback product-id columns to try when an index has no matching
 # IndexConfig entry in the catalog registry. Order matters.
 _PID_COL_FALLBACKS = ("PRODUCT_ID", "FILE_NAME", "IMAGE_ID", "OBSERVATION_ID")
+
+
+def pid_column(index_key: str, df: "pd.DataFrame") -> str:
+    """Resolve the product-id column name for ``index_key`` against ``df``.
+
+    Mirrors the resolution order used by the PID-completion cache:
+
+      1. ``IndexConfig.product_id_col`` for the matching registry entry, if any.
+      2. ``_PID_COL_FALLBACKS`` (``PRODUCT_ID``, ``FILE_NAME``, ``IMAGE_ID``,
+         ``OBSERVATION_ID``) — in that order.
+
+    Whichever candidate is actually present in ``df.columns`` wins.
+
+    Parameters
+    ----------
+    index_key : str
+        Dotted index key, e.g. ``'mro.ctx.edr'``.
+    df : pandas.DataFrame
+        DataFrame to inspect — the column must exist there to be returned.
+
+    Returns
+    -------
+    str
+        Column name to use as the product-id column.
+
+    Raises
+    ------
+    KeyError
+        If no candidate column is present in ``df``.
+    """
+    candidate_cols: list[str] = []
+    try:
+        from planetarypy.catalog._index_resolver import INDEX_REGISTRY
+        for cfg in INDEX_REGISTRY.values():
+            if (cfg.index_key == index_key
+                    or index_key in cfg.extra_index_keys):
+                candidate_cols.append(cfg.product_id_col)
+                break
+    except Exception:
+        # Catalog registry isn't required for fallback resolution.
+        pass
+    for fallback in _PID_COL_FALLBACKS:
+        if fallback not in candidate_cols:
+            candidate_cols.append(fallback)
+
+    for col in candidate_cols:
+        if col in df.columns:
+            return col
+    raise KeyError(
+        f"No suitable product-id column found in {index_key!r}. "
+        f"Tried: {candidate_cols!r}; available columns: {list(df.columns)!r}"
+    )
 
 # Known PDS file extensions to strip when the picked value is a filename
 # rather than a bare PID (e.g. cassini.uvis.index stores
