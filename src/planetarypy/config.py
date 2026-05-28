@@ -56,6 +56,17 @@ class Config:
             "deprecation notices as reminders to track upstream."
         ))
         doc["filter_deprecation_warnings"] = True
+        doc.add(tomlkit.nl())
+        doc.add(tomlkit.comment(
+            "Row-count threshold above which row-display commands"
+        ))
+        doc.add(tomlkit.comment(
+            "(e.g. `plp indexes select`) switch from the transposed"
+        ))
+        doc.add(tomlkit.comment(
+            "Rich table to CSV. Lower it if your terminal is narrow."
+        ))
+        doc["max_table_rows"] = 4
         self.path.write_text(tomlkit.dumps(doc))
 
     def _read_config(self):
@@ -93,6 +104,19 @@ class Config:
                 "deprecation notices as reminders to track upstream."
             ))
             self.tomldoc["filter_deprecation_warnings"] = True
+            dirty = True
+        if "max_table_rows" not in self.tomldoc:
+            self.tomldoc.add(tomlkit.nl())
+            self.tomldoc.add(tomlkit.comment(
+                "Row-count threshold above which row-display commands"
+            ))
+            self.tomldoc.add(tomlkit.comment(
+                "(e.g. `plp indexes select`) switch from the transposed"
+            ))
+            self.tomldoc.add(tomlkit.comment(
+                "Rich table to CSV. Lower it if your terminal is narrow."
+            ))
+            self.tomldoc["max_table_rows"] = 4
             dirty = True
         if dirty:
             self.save()

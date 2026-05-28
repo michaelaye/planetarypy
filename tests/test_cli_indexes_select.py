@@ -147,7 +147,7 @@ class TestIndexesSelectFormats:
         assert len(rows) == 2
         assert {r["PRODUCT_ID"] for r in rows} == {"P_001", "P_003"}
 
-    def test_max_table_rows_threshold_configurable(self):
+    def test_max_table_rows_threshold_configurable_via_flag(self):
         df = _fake_df()
         keys_p, idx_p = _patch_index(df)
         with keys_p, idx_p:
@@ -160,6 +160,48 @@ class TestIndexesSelectFormats:
         assert result.exit_code == 0
         # No CSV header line when table mode is used.
         assert "PRODUCT_ID,FILE_NAME" not in result.stdout
+
+    def test_max_table_rows_threshold_from_config(self, monkeypatch):
+        """Without --max-table-rows on the CLI, the value comes from the
+        main config (default 4; user can bump or lower)."""
+        df = _fake_df()
+        # Stub the config lookup to return a custom threshold.
+        import planetarypy.cli as cli_mod
+        class _CfgStub:
+            def __getitem__(self, key):
+                return 10 if key == "max_table_rows" else ""
+        monkeypatch.setattr("planetarypy.config.config", _CfgStub())
+
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            # 4 PIDs would normally hit the hardcoded default of 4 and
+            # switch to CSV. With config-set 10, stay in table.
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_001", "P_002", "P_003", "P_004"]
+            )
+        assert result.exit_code == 0
+        assert "PRODUCT_ID,FILE_NAME" not in result.stdout
+
+    def test_cli_flag_overrides_config_value(self, monkeypatch):
+        """CLI ``--max-table-rows`` wins over the config value."""
+        df = _fake_df()
+        class _CfgStub:
+            def __getitem__(self, key):
+                # Config says "always use table" — but CLI flag forces CSV.
+                return 100 if key == "max_table_rows" else ""
+        monkeypatch.setattr("planetarypy.config.config", _CfgStub())
+
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_001", "P_002", "P_003", "P_004",
+                      "--max-table-rows", "2"]
+            )
+        assert result.exit_code == 0
+        # 4 rows >= 2 → CSV mode despite generous config.
+        assert "PRODUCT_ID,FILE_NAME,START_TIME" in result.stdout
 
 
 class TestIndexesSelectMissingReporting:

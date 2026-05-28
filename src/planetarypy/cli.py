@@ -45,6 +45,27 @@ def _apply_warning_filters() -> None:
 _apply_warning_filters()
 
 
+def _resolved_max_table_rows(override: int | None) -> int:
+    """Resolve the row-display threshold for table-vs-CSV auto-switching.
+
+    Order:
+      1. Explicit CLI flag value (``override``) wins when not ``None``.
+      2. Config value ``max_table_rows`` (~/.planetarypy_config.toml).
+      3. Hardcoded fallback of ``4`` if the config is unreadable or the
+         key is absent (older installs without the backfill yet).
+    """
+    if override is not None:
+        return override
+    try:
+        from planetarypy.config import config
+        val = config["max_table_rows"]
+    except Exception:
+        val = ""
+    if isinstance(val, int) and val > 0:
+        return val
+    return 4
+
+
 app = typer.Typer(
     name="plp",
     help="PlanetaryPy — Python tools for planetary science data access.",
@@ -1379,9 +1400,10 @@ def indexes_select(
              "--max-table-rows, otherwise CSV.",
     ),
     max_table_rows: int = typer.Option(
-        4, "--max-table-rows",
+        None, "--max-table-rows",
         help="Threshold for --format=auto: above this row count, switch "
-             "from the transposed table to CSV. Default 4.",
+             "from the transposed table to CSV. Defaults to the "
+             "`max_table_rows` config key (4 if unset).",
     ),
     report: str = typer.Option(
         "errors-only", "--report",
@@ -1449,7 +1471,8 @@ def indexes_select(
 
     # Pick effective format.
     if fmt == "auto":
-        effective = "table" if len(filtered) < max_table_rows else "csv"
+        threshold = _resolved_max_table_rows(max_table_rows)
+        effective = "table" if len(filtered) < threshold else "csv"
     elif fmt in ("table", "csv", "jsonl"):
         effective = fmt
     else:

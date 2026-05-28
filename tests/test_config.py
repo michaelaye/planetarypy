@@ -91,6 +91,45 @@ def test_existing_config_gets_key_backfilled():
         assert "filter_deprecation_warnings = true" in text
 
 
+def test_default_config_includes_max_table_rows():
+    """Fresh configs ship with ``max_table_rows = 4`` so the table-vs-CSV
+    threshold used by ``plp indexes select`` (and future row-display
+    commands) is discoverable in the config file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fresh = Config(Path(tmpdir) / "fresh.toml")
+        assert fresh.get_value("max_table_rows") == 4
+        text = fresh.path.read_text()
+        assert "max_table_rows = 4" in text
+        assert "transposed" in text  # explanatory comment
+
+
+def test_max_table_rows_backfilled_into_legacy_config():
+    """Configs written before the key existed get it backfilled on read."""
+    import tomlkit
+    with tempfile.TemporaryDirectory() as tmpdir:
+        legacy_path = Path(tmpdir) / "legacy.toml"
+        doc = tomlkit.document()
+        doc["storage_root"] = str(Path(tmpdir) / "data")
+        legacy_path.write_text(tomlkit.dumps(doc))
+        cfg = Config(legacy_path)
+        assert cfg.get_value("max_table_rows") == 4
+        text = legacy_path.read_text()
+        assert "max_table_rows = 4" in text
+
+
+def test_existing_max_table_rows_value_is_preserved():
+    """A user who customized ``max_table_rows`` must keep their value."""
+    import tomlkit
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "narrow.toml"
+        doc = tomlkit.document()
+        doc["storage_root"] = str(Path(tmpdir) / "data")
+        doc["max_table_rows"] = 10
+        path.write_text(tomlkit.dumps(doc))
+        cfg = Config(path)
+        assert cfg.get_value("max_table_rows") == 10
+
+
 def test_existing_explicit_false_is_preserved():
     """A user who set ``filter_deprecation_warnings = false`` must not
     have their choice silently flipped to true on the next read."""
