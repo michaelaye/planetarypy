@@ -1228,8 +1228,9 @@ def indexes_list(
 
 @indexes_app.command("peek")
 def indexes_peek(
+    ctx: typer.Context,
     key: str = typer.Argument(
-        ..., help="Dotted index key, e.g. cassini.cda.index",
+        None, help="Dotted index key, e.g. cassini.cda.index",
         shell_complete=_shell_complete_index_key,
     ),
     rows: int = typer.Option(
@@ -1247,6 +1248,10 @@ def indexes_peek(
     Output is transposed (one row of the index per column of the table)
     so it stays readable whether the index has 4 columns or 71.
     """
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from planetarypy.pds import get_index
     from planetarypy.pds.utils import _all_dotted_index_keys
 
@@ -1323,8 +1328,9 @@ def _render_index_rows(key: str, subset, *, total_rows: int,
 
 @indexes_app.command("last")
 def indexes_last(
+    ctx: typer.Context,
     key: str = typer.Argument(
-        ..., help="Dotted index key, e.g. mro.ctx.edr",
+        None, help="Dotted index key, e.g. mro.ctx.edr",
         shell_complete=_shell_complete_index_key,
     ),
     rows: int = typer.Option(
@@ -1347,6 +1353,10 @@ def indexes_last(
     The output format matches ``plp indexes peek`` so columns line up
     the same way; only the row selection differs.
     """
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from planetarypy.pds import get_index
     from planetarypy.pds.utils import _all_dotted_index_keys
 
@@ -1553,10 +1563,15 @@ def _jsonable(value):
 
 @indexes_app.command("info")
 def indexes_info(
-    key: str = typer.Argument(..., help="Dotted index key, e.g. cassini.iss.index",
+    ctx: typer.Context,
+    key: str = typer.Argument(None, help="Dotted index key, e.g. cassini.iss.index",
                               shell_complete=_shell_complete_index_key),
 ):
     """Show config + cache status for a registered PDS index."""
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from rich.console import Console
     from rich.table import Table
 
@@ -1618,6 +1633,7 @@ def indexes_info(
 
 @indexes_app.command("refresh")
 def indexes_refresh(
+    ctx: typer.Context,
     config: bool = typer.Option(
         False, "--config",
         help="Force-refresh upstream URL config (planetarypy_index_urls.toml).",
@@ -1628,9 +1644,10 @@ def indexes_refresh(
 ):
     """Refresh upstream index config or re-download a single index."""
     if not config and not cache:
-        typer.echo("Pass --config to refresh the upstream URL TOML, "
-                   "or --cache <KEY> to re-download a single index.", err=True)
-        raise typer.Exit(1)
+        # No action requested → show help instead of a curt error so the
+        # user can read the available switches in place.
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
 
     if config:
         from planetarypy.pds.static_index import ConfigHandler

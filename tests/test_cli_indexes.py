@@ -38,6 +38,42 @@ def _fake_df(time_col: str | None = "START_TIME") -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# ── help-on-missing-default UX (peek / last / info / refresh) ──────────
+
+
+class TestIndexesHelpOnMissing:
+    """Every indexes verb should print help + exit 0 when its primary
+    argument is missing, instead of typer's auto "Missing argument" error.
+    The pattern is consistent across the sub-app for muscle-memory."""
+
+    def test_peek_bare_invocation_shows_help(self):
+        result = runner.invoke(app, ["indexes", "peek"])
+        assert result.exit_code == 0
+        assert "Usage:" in result.stdout
+        assert "Inspect a registered PDS index" in result.stdout
+
+    def test_last_bare_invocation_shows_help(self):
+        result = runner.invoke(app, ["indexes", "last"])
+        assert result.exit_code == 0
+        assert "Usage:" in result.stdout
+        assert "Show the last entries" in result.stdout
+
+    def test_info_bare_invocation_shows_help(self):
+        result = runner.invoke(app, ["indexes", "info"])
+        assert result.exit_code == 0
+        assert "Usage:" in result.stdout
+        assert "Show config + cache status" in result.stdout
+
+    def test_refresh_bare_invocation_shows_help(self):
+        """`refresh` has no positional arg; the analogous UX is "show help
+        when no actionable flag (--config / --cache) is given"."""
+        result = runner.invoke(app, ["indexes", "refresh"])
+        assert result.exit_code == 0
+        assert "Usage:" in result.stdout
+        assert "--config" in result.stdout
+        assert "--cache" in result.stdout
+
+
 # ── plp indexes last ────────────────────────────────────────────────────
 
 
