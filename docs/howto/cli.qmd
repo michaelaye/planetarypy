@@ -4,6 +4,24 @@ title: "Command-Line Interface"
 
 PlanetaryPy provides a unified CLI via the `plp` command.
 
+## Design philosophy: API first, CLI wraps thin
+
+Every `plp` verb is a thin wrapper over a public Python API. The library
+function gets built and tested first; the CLI command then forwards
+arguments and formats output. Useful logic — parsing PID lists, building
+catalogs, batching downloads, filtering indexes by PIDs, parallel
+execution — lives in `planetarypy.*` modules, not under `cli.py`.
+
+The reason is reuse. Notebooks, batch scripts, and downstream tooling
+should pick up new capabilities the moment they ship — without screen
+scraping or shelling out to `plp`. If a feature is only reachable from
+the command line, it's rotting code: the people who would benefit from
+it most (the ones already inside Python) can't use it. So when you read
+the source for any `plp` command, expect a few argument-validation lines
+followed by a direct call into `planetarypy.pds`, `.catalog`, `.utils`,
+or `.instruments.<mission>`. If you find substantial logic inside
+`cli.py`, that's a bug — please factor it down to the API layer.
+
 ## Installation
 
 ```bash
