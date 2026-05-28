@@ -2,7 +2,7 @@
 
 import random
 import warnings
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -294,21 +294,32 @@ def do_footprintinit(pid, refresh=False):
 
 
 def process_parallel(Executor, task, pids, refresh=None):
-    "Use ProcessPoolExecutor for CPU-bound tasks, and ThreadPoolExecutor for I/O-bound"
-    argslist = []
-    for pid in pids:
-        args = [pid]
-        kwargs = {}
-        if refresh is not None:
-            kwargs["refresh"] = refresh
-        argslist.append((args, kwargs))
-    with Executor() as executor:
-        futures = [executor.submit(task, *args, **kwargs) for args, kwargs in argslist]
+    """Apply ``task`` per PID in parallel; raise on first failure.
 
-        results = []
-        for future in tqdm(as_completed(futures), total=len(futures)):
-            results.append(future.result())
-    return results
+    Backward-compatible shim over
+    :func:`planetarypy.utils.parallel_map` — kept for callers that pass
+    an explicit ``ThreadPoolExecutor`` / ``ProcessPoolExecutor`` class.
+    Prefer ``parallel_map`` directly in new code, which gives you
+    per-item exception capture instead of early termination.
+    """
+    from functools import partial
+
+    from planetarypy.utils import parallel_map
+
+    executor_str = "process" if Executor is ProcessPoolExecutor else "thread"
+    if refresh is None:
+        triples = parallel_map(task, pids, executor=executor_str)
+    else:
+        triples = parallel_map(
+            partial(task, refresh=refresh), pids, executor=executor_str,
+        )
+    # Preserve the original early-failure semantics: raise the first
+    # exception encountered. parallel_map captures all of them, but the
+    # historical callers expect the function to bubble up immediately.
+    for _, _, exc in triples:
+        if exc is not None:
+            raise exc
+    return [r for _, r, _ in triples]
 
 
 class CTXCollection:
