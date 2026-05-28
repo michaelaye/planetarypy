@@ -1358,8 +1358,9 @@ def indexes_last(
 
 @indexes_app.command("select")
 def indexes_select(
+    ctx: typer.Context,
     key: str = typer.Argument(
-        ..., help="Dotted index key, e.g. mro.ctx.edr",
+        None, help="Dotted index key, e.g. mro.ctx.edr",
         shell_complete=_shell_complete_index_key,
     ),
     product_ids: list[str] = typer.Argument(
@@ -1401,6 +1402,10 @@ def indexes_select(
         plp indexes select mro.ctx.edr --pids-from my_targets.txt
         plp indexes select mro.ctx.edr --pids-from - --format jsonl < pids.txt
     """
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
     from planetarypy.pds import get_index, missing_pids
     from planetarypy.pds.utils import _all_dotted_index_keys
 

@@ -42,6 +42,13 @@ def _patch_index(df: pd.DataFrame):
 
 class TestIndexesSelectInputHandling:
 
+    def test_bare_invocation_shows_help_and_exits_zero(self):
+        """Missing KEY → print help, exit 0 (user's preferred UX scheme)."""
+        result = runner.invoke(app, ["indexes", "select"])
+        assert result.exit_code == 0
+        assert "Filter a registered PDS index" in result.stdout
+        assert "Usage:" in result.stdout
+
     def test_unknown_key_exits_with_error(self):
         with patch("planetarypy.pds.utils._all_dotted_index_keys",
                    return_value={"mro.ctx.edr"}):
