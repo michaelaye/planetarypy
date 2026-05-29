@@ -66,12 +66,17 @@ class TestIndexesHelpOnMissing:
 
     def test_refresh_bare_invocation_shows_help(self):
         """`refresh` has no positional arg; the analogous UX is "show help
-        when no actionable flag (--config / --cache) is given"."""
+        when no actionable flag (--config / --cache) is given".
+
+        Asserting on the docstring text rather than the flag names because
+        Rich's click integration renders flags as separately-styled spans
+        (`\\x1b[1;36m-\\x1b[0m\\x1b[1;36m-config\\x1b[0m`), so the plain
+        substring `--config` doesn't appear in the captured stdout under CI.
+        """
         result = runner.invoke(app, ["indexes", "refresh"])
         assert result.exit_code == 0
         assert "Usage:" in result.stdout
-        assert "--config" in result.stdout
-        assert "--cache" in result.stdout
+        assert "Refresh upstream index config" in result.stdout
 
 
 # ── plp indexes last ────────────────────────────────────────────────────
