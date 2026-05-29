@@ -4,6 +4,11 @@
 The shim now delegates to :func:`planetarypy.utils.parallel_map`; these
 tests pin its contract so the public API (signature + early-failure
 semantics + result ordering) survives the refactor.
+
+``ctx_calib`` (and its sibling ``ctx_edr``, pulled in via the package
+``__init__``) imports ``hvplot.pandas`` at module top, which is not
+installed in the minimal CI environment. The whole test module is
+skipped when ``hvplot`` is absent so collection doesn't crash.
 """
 from __future__ import annotations
 
@@ -13,7 +18,9 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import pytest
 
-from planetarypy.instruments.mro.ctx.ctx_calib import process_parallel
+pytest.importorskip("hvplot")
+
+from planetarypy.instruments.mro.ctx.ctx_calib import process_parallel  # noqa: E402
 
 
 def _upcase(pid):
