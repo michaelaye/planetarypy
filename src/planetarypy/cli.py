@@ -327,8 +327,11 @@ def _emit_batch_report(results, mode: str, *, label: str = "Batch") -> int:
             for r in results if not r.ok
         ]
         if fail_blocks:
-            typer.echo("\n\n".join(fail_blocks), err=True)
-            typer.echo("", err=True)  # trailing blank before summary
+            # Leading + trailing blank line quarantines the report from
+            # whatever came before (notably tqdm's progress bar, which
+            # leaves the cursor mid-line and would otherwise collide
+            # with our first FAIL header).
+            typer.echo("\n" + "\n\n".join(fail_blocks) + "\n", err=True)
         typer.echo(
             f"{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
             err=True,
@@ -342,11 +345,12 @@ def _emit_batch_report(results, mode: str, *, label: str = "Batch") -> int:
                 lines.append(f"OK    {_truncate_pid(r.product_id)}")
             else:
                 lines.append(_format_fail_block(r.product_id, r.exception))
-        # Blank line BETWEEN entries (any pair where at least one is a
-        # FAIL block needs visual separation; we just always separate).
-        typer.echo("\n\n".join(lines))
+        # Leading + trailing blank line quarantines the report from
+        # tqdm's progress bar above (cursor-mid-line) and the summary
+        # below. Blank line BETWEEN entries for scannability.
+        typer.echo("\n" + "\n\n".join(lines) + "\n")
         typer.echo(
-            f"\n{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
+            f"{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
             err=True,
         )
         return 1 if n_failed else 0
