@@ -201,6 +201,55 @@ class TestPidKeyForcesCsv:
         assert read_pids_file("-") == ["P_A", "P_B"]
 
 
+# ── Stdin auto-detection via first-line comma sniff ───────────────────
+
+
+class TestStdinAutoDetect:
+
+    def test_stdin_csv_auto_detected_via_comma_sniff(self, monkeypatch):
+        """`head file.csv | plp fetch KEY --pids-from -` works without
+        --pid-key: the first-line comma trips the sniff, pid_column
+        finds PRODUCT_ID, and the column is read."""
+        csv_text = "PRODUCT_ID,DATE\nP_A,2024-01\nP_B,2024-02\n"
+        monkeypatch.setattr("sys.stdin", io.StringIO(csv_text))
+        assert read_pids_file("-", index_key="mro.ctx.edr") == ["P_A", "P_B"]
+
+    def test_stdin_csv_with_suffix(self, monkeypatch):
+        csv_text = "PRODUCT_ID\nPSP_001\nPSP_002\n"
+        monkeypatch.setattr("sys.stdin", io.StringIO(csv_text))
+        # Single-column CSV with PRODUCT_ID header — no comma in the
+        # body lines, but the header has none either, so the sniff
+        # says plain text. Document the limitation.
+        # (When the user wants this case to work, --pid-key PRODUCT_ID
+        # forces CSV regardless.)
+        out = read_pids_file("-", index_key="mro.ctx.edr", suffix="_RED")
+        # Plain-text path: every line is a PID, including "PRODUCT_ID".
+        assert out == ["PRODUCT_ID_RED", "PSP_001_RED", "PSP_002_RED"]
+
+    def test_stdin_csv_no_recognizable_column_errors_with_hint(self, monkeypatch):
+        """Comma trips the sniff, CSV is parsed, but the column names
+        don't match the registry → ValueError pointing at --pid-key."""
+        csv_text = "alpha,beta\nx,y\nm,n\n"
+        monkeypatch.setattr("sys.stdin", io.StringIO(csv_text))
+        with pytest.raises(ValueError, match="Cannot auto-detect"):
+            read_pids_file("-", index_key="mro.ctx.edr")
+
+    def test_stdin_plain_text_no_comma_stays_plain(self, monkeypatch):
+        """No comma anywhere → plain text path; pid_column never runs."""
+        monkeypatch.setattr("sys.stdin", io.StringIO("P_A\nP_B\nP_C\n"))
+        assert read_pids_file("-", index_key="mro.ctx.edr") == [
+            "P_A", "P_B", "P_C",
+        ]
+
+    def test_stdin_plain_text_with_comment_and_blank(self, monkeypatch):
+        """Buffered-stdin path still strips blanks + #-comments
+        identically to utils.read_pids."""
+        monkeypatch.setattr("sys.stdin", io.StringIO(
+            "# header\nP_A\n\n  # indented\nP_B\n"
+        ))
+        assert read_pids_file("-") == ["P_A", "P_B"]
+
+
 # ── Round-trip with the CLI csv output format ──────────────────────────
 
 

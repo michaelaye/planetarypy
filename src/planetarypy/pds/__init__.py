@@ -120,23 +120,26 @@ def read_pids_file(
 ) -> list[str]:
     """Read PIDs from a file or stdin, with CSV column resolution.
 
-    Dispatch rule:
+    Dispatch rule (first match wins):
 
-    - ``.csv`` extension OR ``pid_key`` is given → parsed with pandas.
-      The product-id column is determined by ``pid_key`` (explicit
-      override) or :func:`pid_column` (auto-detect via the catalog's
-      ``IndexConfig`` registry, using ``index_key``). Raises
-      :class:`ValueError` listing the CSV's columns when neither
-      resolves — so the caller can pass the right ``pid_key``.
-    - Anything else (including ``"-"`` for stdin when ``pid_key`` is
-      absent) → one PID per line; blanks and ``#``-prefixed comments
-      stripped. Delegates to :func:`planetarypy.utils.read_pids`.
+    1. ``pid_key`` is given → CSV mode regardless of source.
+    2. File with ``.csv`` extension → CSV mode.
+    3. Stdin (``"-"``) whose first non-blank line contains a comma →
+       CSV mode (small heuristic so ``head file.csv | plp fetch ...``
+       Just Works without an explicit flag).
+    4. Anything else → plain text; one PID per line, blanks and
+       ``#``-prefixed comments stripped.
 
-    Setting ``pid_key`` is the explicit signal that the input is
-    tabular; the CSV path is then taken regardless of the source —
-    including stdin, where pandas reads from ``sys.stdin``. This makes
-    ``head file.csv | plp fetch ... --pids-from - --pid-key COL`` work
-    the same way as ``plp fetch ... --pids-from file.csv``.
+    In CSV mode the product-id column is determined by ``pid_key``
+    (explicit override) or :func:`pid_column` (auto-detect via the
+    catalog's ``IndexConfig`` registry, using ``index_key``). Raises
+    :class:`ValueError` listing the CSV's columns when neither
+    resolves — so the caller can pass the right ``pid_key``.
+
+    The comma sniff is intentionally tiny. PDS product IDs don't
+    contain commas, so plain-text input is reliably distinguishable
+    from CSV input at the first-line level. The cost of being wrong
+    is a clear ValueError pointing the user at ``--pid-key``.
 
     Designed to back the ``--pids-from`` CLI option in
     ``plp fetch`` / ``plp indexes select`` so users can feed a saved CSV
@@ -181,27 +184,59 @@ def read_pids_file(
         When ``pid_key`` is given but not present in the CSV columns.
     """
     src_str = str(source)
+    is_stdin = src_str == "-"
 
-    # Decide whether to parse as CSV. An explicit ``pid_key`` flips us
-    # into CSV mode regardless of source kind — the user is saying
-    # "this is tabular data, here's the column" and we honor that even
-    # for stdin or for unconventional extensions.
-    use_csv = (
-        pid_key is not None
-        or (src_str != "-" and src_str.lower().endswith(".csv"))
-    )
+    # Buffer stdin once so we can both sniff (CSV vs plain text) and
+    # parse without having to re-read a stream that can only be drained
+    # once. File paths don't need this — we can read them twice.
+    stdin_text: str | None = None
+    if is_stdin:
+        import sys
+        stdin_text = sys.stdin.read()
+
+    # Decide whether to parse as CSV:
+    #   1. Explicit ``pid_key`` is the user's tabular-data declaration.
+    #   2. File with ``.csv`` extension — the conventional hint.
+    #   3. Stdin whose first non-blank line contains a comma — a tiny
+    #      heuristic that catches the `head file.csv | plp fetch ...`
+    #      idiom without requiring an explicit flag. Plain-text PIDs
+    #      that happen to contain commas would be misclassified, but
+    #      PDS product IDs don't use commas, so the false-positive rate
+    #      is effectively zero in practice.
+    if pid_key is not None:
+        use_csv = True
+    elif is_stdin:
+        first_line = next(
+            (line for line in stdin_text.splitlines() if line.strip()),
+            "",
+        )
+        use_csv = "," in first_line
+    else:
+        use_csv = src_str.lower().endswith(".csv")
 
     if not use_csv:
-        from planetarypy.utils import read_pids as _read_text_pids
-        pids = _read_text_pids(source)
+        if is_stdin:
+            # We've already consumed stdin into stdin_text; mirror the
+            # plain-text parsing rules from utils.read_pids inline so
+            # we don't try to drain an empty sys.stdin.
+            pids = []
+            for raw_line in stdin_text.splitlines():
+                line = raw_line.rstrip()
+                stripped = line.lstrip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                pids.append(line)
+        else:
+            from planetarypy.utils import read_pids as _read_text_pids
+            pids = _read_text_pids(source)
         if suffix:
             pids = [f"{p}{suffix}" for p in pids]
         return pids
 
     import pandas as pd
-    if src_str == "-":
-        import sys
-        df = pd.read_csv(sys.stdin)
+    if is_stdin:
+        import io
+        df = pd.read_csv(io.StringIO(stdin_text))
     else:
         df = pd.read_csv(source)
 
