@@ -37,6 +37,7 @@ from planetarypy.spice.generic_kernels import (
 # =============================================================================
 
 
+@pytest.mark.slow
 def test_generic_kernel_urls_are_accessible():
     """Verify all generic kernel URLs return 200 OK via HEAD request.
 
