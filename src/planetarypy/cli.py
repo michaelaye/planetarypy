@@ -129,8 +129,16 @@ def fetch(
     ),
     pids_from: Path = typer.Option(
         None, "--pids-from",
-        help="Read PIDs from PATH (one per line; blanks + '#'-comments ignored). "
-             "Use '-' for stdin. Mutually exclusive with positional PIDs.",
+        help="Read PIDs from PATH. Plain text → one PID per line "
+             "(blanks + '#'-comments ignored); .csv → parse and "
+             "auto-detect the PID column via the index registry, or "
+             "specify --pid-key. Use '-' for stdin (treated as plain "
+             "text). Mutually exclusive with positional PIDs.",
+    ),
+    pid_key: str = typer.Option(
+        None, "--pid-key",
+        help="When --pids-from is a CSV, name the column to read PIDs "
+             "from. Overrides the auto-detection that uses --key.",
     ),
     workers: int = typer.Option(
         4, "--workers", "-w",
@@ -171,16 +179,22 @@ def fetch(
         raise typer.Exit(2)
 
     if pids_from is not None:
-        from planetarypy.utils import read_pids
+        from planetarypy.pds import read_pids_file
         try:
-            pids = read_pids(pids_from)
+            pids = read_pids_file(
+                pids_from, index_key=key, pid_key=pid_key,
+            )
         except FileNotFoundError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(2)
+        except (KeyError, ValueError) as e:
             typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(2)
         if not pids:
             typer.echo(
-                f"Error: no PIDs found in {pids_from} (file is empty or "
-                "only comments).", err=True,
+                f"Error: no PIDs found in {pids_from} (file is empty, "
+                "only comments, or the selected column has no values).",
+                err=True,
             )
             raise typer.Exit(2)
 
@@ -1400,8 +1414,16 @@ def indexes_select(
     ),
     pids_from: Path = typer.Option(
         None, "--pids-from",
-        help="Read PIDs from PATH (one per line; blanks + '#'-comments ignored). "
-             "Use '-' for stdin. Mutually exclusive with positional PIDs.",
+        help="Read PIDs from PATH. Plain text → one PID per line "
+             "(blanks + '#'-comments ignored); .csv → parse and "
+             "auto-detect the PID column via the index registry, or "
+             "specify --pid-key. Use '-' for stdin (treated as plain "
+             "text). Mutually exclusive with positional PIDs.",
+    ),
+    pid_key: str = typer.Option(
+        None, "--pid-key",
+        help="When --pids-from is a CSV, name the column to read PIDs "
+             "from. Overrides the auto-detection that uses KEY.",
     ),
     fmt: str = typer.Option(
         "auto", "--format",
@@ -1455,16 +1477,22 @@ def indexes_select(
         raise typer.Exit(2)
 
     if pids_from is not None:
-        from planetarypy.utils import read_pids
+        from planetarypy.pds import read_pids_file
         try:
-            pids = read_pids(pids_from)
+            pids = read_pids_file(
+                pids_from, index_key=key, pid_key=pid_key,
+            )
         except FileNotFoundError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(2)
+        except (KeyError, ValueError) as e:
             typer.echo(f"Error: {e}", err=True)
             raise typer.Exit(2)
         if not pids:
             typer.echo(
-                f"Error: no PIDs found in {pids_from} (file is empty or "
-                "only comments).", err=True,
+                f"Error: no PIDs found in {pids_from} (file is empty, "
+                "only comments, or the selected column has no values).",
+                err=True,
             )
             raise typer.Exit(2)
 

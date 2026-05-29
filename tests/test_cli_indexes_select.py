@@ -249,6 +249,60 @@ class TestIndexesSelectMissingReporting:
         assert result.exit_code == 0
         assert "all found" in result.stderr
 
+    def test_pids_from_csv_auto_detected_column(self, tmp_path):
+        df = _fake_df()
+        f = tmp_path / "targets.csv"
+        import pandas as pd
+        pd.DataFrame({
+            "PRODUCT_ID": ["P_002", "P_004"],
+            "OBSERVATION_TARGET": ["MARS_A", "MARS_B"],
+        }).to_csv(f, index=False)
+
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "--pids-from", str(f)]
+            )
+        assert result.exit_code == 0
+        assert "P_002" in result.stdout
+        assert "P_004" in result.stdout
+
+    def test_pids_from_csv_with_explicit_pid_key(self, tmp_path):
+        df = _fake_df()
+        f = tmp_path / "alt.csv"
+        import pandas as pd
+        pd.DataFrame({
+            "my_pid_col": ["P_001", "P_003"],
+            "ignored": ["x", "y"],
+        }).to_csv(f, index=False)
+
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "--pids-from", str(f), "--pid-key", "my_pid_col"]
+            )
+        assert result.exit_code == 0
+        assert "P_001" in result.stdout
+        assert "P_003" in result.stdout
+
+    def test_pids_from_csv_ambiguous_errors_with_hint(self, tmp_path):
+        df = _fake_df()
+        f = tmp_path / "weird.csv"
+        import pandas as pd
+        pd.DataFrame({"alpha": ["x"], "beta": ["y"]}).to_csv(f, index=False)
+
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "--pids-from", str(f)]
+            )
+        assert result.exit_code == 2
+        assert "Cannot auto-detect" in result.stderr
+        assert "pid_key" in result.stderr
+
     def test_pids_from_file(self, tmp_path):
         df = _fake_df()
         f = tmp_path / "pids.txt"

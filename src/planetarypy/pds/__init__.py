@@ -34,6 +34,7 @@ __all__ = [
     "get_example_pid",
     "get_meta",
     "read_index_slice",
+    "read_pids_file",
     "complete_pid",
     "rebuild_pid_cache",
 ]
@@ -108,6 +109,92 @@ def get_index(
         pid_set = set(map(str, pids))
         df = df[df[col].astype(str).isin(pid_set)]
     return df
+
+
+def read_pids_file(
+    source,
+    *,
+    index_key: str | None = None,
+    pid_key: str | None = None,
+) -> list[str]:
+    """Read PIDs from a file or stdin, with CSV column resolution.
+
+    Format is dispatched by extension:
+
+    - ``.csv`` → parsed with pandas. The product-id column is determined by
+      ``pid_key`` (explicit override) or :func:`pid_column` (auto-detect
+      via the catalog's ``IndexConfig`` registry, using ``index_key``).
+      Raises a clear :class:`ValueError` listing the CSV's columns when
+      neither resolves — so the caller can pass the right ``pid_key``.
+    - Any other path, or ``"-"`` for stdin → one PID per line; blanks and
+      ``#``-prefixed comments stripped. Delegates to
+      :func:`planetarypy.utils.read_pids`.
+
+    Designed to back the ``--pids-from`` CLI option in
+    ``plp fetch`` / ``plp indexes select`` so users can feed a saved CSV
+    (e.g. the output of ``plp indexes select --format csv``) without
+    pre-extracting a one-PID-per-line file.
+
+    Parameters
+    ----------
+    source : Path or str
+        File path, or ``"-"`` for stdin (always treated as plain text).
+    index_key : str, optional
+        Dotted index key used to auto-detect the PID column in CSVs via
+        the catalog's IndexConfig registry. Ignored when ``pid_key`` is
+        given. Accepts either an index key (``cassini.iss.index``) or a
+        catalog product key (``cassini.iss.edr_sat``) — ``pid_column``
+        looks up both forms.
+    pid_key : str, optional
+        Explicit column name for CSV input; wins over auto-detection.
+        Must be an existing column in the CSV.
+
+    Returns
+    -------
+    list[str]
+        PIDs in file order. No deduplication. Empty values from the CSV
+        column are NOT filtered — that's the caller's responsibility.
+
+    Raises
+    ------
+    ValueError
+        For ``.csv`` input when neither ``pid_key`` nor ``index_key``
+        resolves to an existing column.
+    KeyError
+        When ``pid_key`` is given but not present in the CSV columns.
+    """
+    src_str = str(source)
+
+    # Stdin or non-CSV extension → delegate to the plain-text reader.
+    if src_str == "-" or not src_str.lower().endswith(".csv"):
+        from planetarypy.utils import read_pids as _read_text_pids
+        return _read_text_pids(source)
+
+    import pandas as pd
+    df = pd.read_csv(source)
+
+    if pid_key is not None:
+        if pid_key not in df.columns:
+            raise KeyError(
+                f"pid_key={pid_key!r} is not a column of {source!s}. "
+                f"Available columns: {list(df.columns)}"
+            )
+        col = pid_key
+    else:
+        col = None
+        if index_key is not None:
+            try:
+                col = pid_column(index_key, df)
+            except KeyError:
+                col = None
+        if col is None:
+            raise ValueError(
+                f"Cannot auto-detect a PID column in {source!s}. "
+                f"CSV columns are {list(df.columns)}. "
+                "Pass pid_key=<column> to select one explicitly."
+            )
+
+    return df[col].astype(str).tolist()
 
 
 def missing_pids(

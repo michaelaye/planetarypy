@@ -97,6 +97,63 @@ class TestFetchInputHandling:
         assert result.exit_code == 2
         assert "provide at least one PID" in result.stderr
 
+    def test_pids_from_csv_auto_detected_column(self, monkeypatch, tmp_path):
+        """When --pids-from is a CSV, the PID column is auto-detected
+        via the index registry (PRODUCT_ID for mro.ctx.edr)."""
+        import pandas as pd
+        import planetarypy.utils as utils_mod
+        monkeypatch.setattr(utils_mod, "have_internet", lambda: True)
+        monkeypatch.setattr(
+            catalog_mod, "fetch_product",
+            lambda key, pid, **kw: _fake_downloaded(pid),
+        )
+        f = tmp_path / "targets.csv"
+        pd.DataFrame({
+            "PRODUCT_ID": ["P_A", "P_B"],
+            "DATE": ["2024-01", "2024-02"],
+        }).to_csv(f, index=False)
+
+        result = runner.invoke(
+            app, ["fetch", "mro.ctx.edr", "--pids-from", str(f)]
+        )
+        assert result.exit_code == 0
+        assert "2/2 OK" in result.stderr
+
+    def test_pids_from_csv_with_explicit_pid_key(self, monkeypatch, tmp_path):
+        import pandas as pd
+        import planetarypy.utils as utils_mod
+        monkeypatch.setattr(utils_mod, "have_internet", lambda: True)
+        monkeypatch.setattr(
+            catalog_mod, "fetch_product",
+            lambda key, pid, **kw: _fake_downloaded(pid),
+        )
+        f = tmp_path / "weird.csv"
+        pd.DataFrame({
+            "my_pid": ["P_A", "P_B"],
+            "extras": [1, 2],
+        }).to_csv(f, index=False)
+
+        result = runner.invoke(
+            app, ["fetch", "mro.ctx.edr",
+                  "--pids-from", str(f), "--pid-key", "my_pid"]
+        )
+        assert result.exit_code == 0
+        assert "2/2 OK" in result.stderr
+
+    def test_pids_from_csv_with_ambiguous_columns_errors_helpfully(self, tmp_path):
+        """CSV with no auto-detectable column should error and tell the
+        user about --pid-key."""
+        import pandas as pd
+        f = tmp_path / "weird.csv"
+        pd.DataFrame({"alpha": ["x"], "beta": ["y"]}).to_csv(f, index=False)
+
+        result = runner.invoke(
+            app, ["fetch", "mro.ctx.edr", "--pids-from", str(f)]
+        )
+        assert result.exit_code == 2
+        assert "Cannot auto-detect" in result.stderr
+        assert "pid_key" in result.stderr
+
     def test_missing_pids_file_is_error(self, tmp_path):
         result = runner.invoke(
             app, ["fetch", "mro.ctx.edr",
