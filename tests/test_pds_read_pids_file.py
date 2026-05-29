@@ -160,6 +160,47 @@ class TestSuffix:
         assert read_pids_file(f, suffix="") == ["A", "B"]
 
 
+# ── pid_key forces CSV parsing on stdin / non-csv paths ───────────────
+
+
+class TestPidKeyForcesCsv:
+
+    def test_pid_key_parses_stdin_as_csv(self, monkeypatch):
+        """`head file.csv | plp fetch ... --pid-key obsid` should work
+        the same as if the file had been passed directly."""
+        csv_text = "obsid,date\nP_A,2024-01\nP_B,2024-02\n"
+        monkeypatch.setattr("sys.stdin", io.StringIO(csv_text))
+        assert read_pids_file("-", pid_key="obsid") == ["P_A", "P_B"]
+
+    def test_pid_key_parses_txt_as_csv(self, tmp_path):
+        """A user with CSV content saved as .txt can still opt in by
+        passing pid_key — the flag is the user's CSV declaration."""
+        f = tmp_path / "data.txt"
+        f.write_text("obsid,date\nP_A,2024-01\nP_B,2024-02\n")
+        assert read_pids_file(f, pid_key="obsid") == ["P_A", "P_B"]
+
+    def test_pid_key_on_stdin_combines_with_suffix(self, monkeypatch):
+        csv_text = "obsid\nPSP_001\nPSP_002\n"
+        monkeypatch.setattr("sys.stdin", io.StringIO(csv_text))
+        assert read_pids_file(
+            "-", pid_key="obsid", suffix="_RED",
+        ) == ["PSP_001_RED", "PSP_002_RED"]
+
+    def test_pid_key_on_stdin_with_missing_column_raises(self, monkeypatch):
+        csv_text = "alpha,beta\nx,y\n"
+        monkeypatch.setattr("sys.stdin", io.StringIO(csv_text))
+        with pytest.raises(KeyError) as exc:
+            read_pids_file("-", pid_key="obsid")
+        assert "obsid" in str(exc.value)
+        assert "alpha" in str(exc.value) and "beta" in str(exc.value)
+
+    def test_stdin_without_pid_key_stays_plain_text(self, monkeypatch):
+        """Sanity: the existing stdin-as-text behavior is preserved
+        when pid_key is absent. CSV-on-stdin requires opting in."""
+        monkeypatch.setattr("sys.stdin", io.StringIO("P_A\nP_B\n"))
+        assert read_pids_file("-") == ["P_A", "P_B"]
+
+
 # ── Round-trip with the CLI csv output format ──────────────────────────
 
 

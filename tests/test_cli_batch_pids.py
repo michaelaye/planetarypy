@@ -224,8 +224,10 @@ class TestFetchReportModes:
             app, ["fetch", "mro.ctx.edr", "P_A", "BAD", "P_C"]
         )
         assert result.exit_code == 1
-        assert "FAIL BAD" in result.stderr
-        assert "1/3 OK, 2 failed" in result.stderr or "2/3 OK, 1 failed" in result.stderr
+        # New format: "FAIL  BAD" on its own line, error indented below.
+        assert "FAIL  BAD" in result.stderr
+        assert "└" in result.stderr  # error-marker for the indented body
+        assert "2/3 OK, 1 failed" in result.stderr
 
     def test_full_report_lists_every_pid(self, monkeypatch):
         self._setup(monkeypatch, bad_pid="BAD")
@@ -233,8 +235,10 @@ class TestFetchReportModes:
             app, ["fetch", "mro.ctx.edr", "P_A", "BAD", "--report", "full"]
         )
         assert result.exit_code == 1
-        assert "OK   P_A" in result.stdout
-        assert "FAIL BAD" in result.stdout
+        # New format: "OK    P_A" (4-space gap to align with FAIL block)
+        assert "OK    P_A" in result.stdout
+        assert "FAIL  BAD" in result.stdout
+        assert "└" in result.stdout  # indented error body
 
     def test_jsonl_report_is_machine_parseable(self, monkeypatch):
         self._setup(monkeypatch, bad_pid="BAD")
@@ -264,6 +268,52 @@ class TestFetchReportModes:
         assert lines[0].startswith("product_id,ok,error,files")
         assert any(line.startswith("P_A,true,") for line in lines[1:])
         assert any(line.startswith("BAD,false,") for line in lines[1:])
+
+    def test_fail_block_format_pid_on_own_line_error_indented(self, monkeypatch):
+        """The new report format: PID on one line, error indented and
+        wrapped on the lines below — easier to scan than the old
+        `FAIL PID: ErrorType: msg` one-liner.
+        (Batch path only; ≥2 PIDs needed to engage fetch_products.)"""
+        self._setup(monkeypatch, bad_pid="BAD")
+        result = runner.invoke(
+            app, ["fetch", "mro.ctx.edr", "P_A", "BAD"]
+        )
+        # PID line is bare; error is indented under a └ marker.
+        assert "FAIL  BAD\n" in result.stderr  # newline after PID
+        assert "      └ " in result.stderr  # indented body marker
+        assert "RuntimeError" in result.stderr
+
+    def test_long_pid_is_truncated_with_middle_ellipsis(self, monkeypatch):
+        """PIDs over 60 chars get middle-ellipsis truncation so the
+        report doesn't wrap horizontally on the user's terminal.
+        (Batch path only — single-PID call uses the older codepath.)"""
+        long_pid = "X" * 100  # 100 chars, well over the 60-char cap
+        short_pid = "Y_SHORT"
+        def _fail(key, pid, **kw):
+            raise RuntimeError("nope")
+        monkeypatch.setattr(catalog_mod, "fetch_product", _fail)
+        import planetarypy.utils as utils_mod
+        monkeypatch.setattr(utils_mod, "have_internet", lambda: True)
+
+        # 2 PIDs → batch path → _format_fail_block engages.
+        result = runner.invoke(app, ["fetch", "mro.ctx.edr",
+                                     long_pid, short_pid])
+        assert "…" in result.stderr  # ellipsis present in the long-PID line
+        # Truncated long-PID line should now fit a reasonable terminal.
+        for line in result.stderr.splitlines():
+            if line.startswith("FAIL") and "…" in line:
+                assert len(line) < 80
+
+    def test_full_mode_separates_entries_with_blank_lines(self, monkeypatch):
+        """Visual separation: blank line between every entry so failures
+        don't pile into a wall of text."""
+        self._setup(monkeypatch, bad_pid="BAD")
+        result = runner.invoke(
+            app, ["fetch", "mro.ctx.edr",
+                  "P_A", "BAD", "P_C", "--report", "full"]
+        )
+        # \n\n appears between OK lines and FAIL blocks.
+        assert "\n\n" in result.stdout
 
     def test_unknown_report_mode_rejected(self, monkeypatch):
         self._setup(monkeypatch, bad_pid=None)

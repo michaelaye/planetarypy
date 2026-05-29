@@ -120,16 +120,23 @@ def read_pids_file(
 ) -> list[str]:
     """Read PIDs from a file or stdin, with CSV column resolution.
 
-    Format is dispatched by extension:
+    Dispatch rule:
 
-    - ``.csv`` → parsed with pandas. The product-id column is determined by
-      ``pid_key`` (explicit override) or :func:`pid_column` (auto-detect
-      via the catalog's ``IndexConfig`` registry, using ``index_key``).
-      Raises a clear :class:`ValueError` listing the CSV's columns when
-      neither resolves — so the caller can pass the right ``pid_key``.
-    - Any other path, or ``"-"`` for stdin → one PID per line; blanks and
-      ``#``-prefixed comments stripped. Delegates to
-      :func:`planetarypy.utils.read_pids`.
+    - ``.csv`` extension OR ``pid_key`` is given → parsed with pandas.
+      The product-id column is determined by ``pid_key`` (explicit
+      override) or :func:`pid_column` (auto-detect via the catalog's
+      ``IndexConfig`` registry, using ``index_key``). Raises
+      :class:`ValueError` listing the CSV's columns when neither
+      resolves — so the caller can pass the right ``pid_key``.
+    - Anything else (including ``"-"`` for stdin when ``pid_key`` is
+      absent) → one PID per line; blanks and ``#``-prefixed comments
+      stripped. Delegates to :func:`planetarypy.utils.read_pids`.
+
+    Setting ``pid_key`` is the explicit signal that the input is
+    tabular; the CSV path is then taken regardless of the source —
+    including stdin, where pandas reads from ``sys.stdin``. This makes
+    ``head file.csv | plp fetch ... --pids-from - --pid-key COL`` work
+    the same way as ``plp fetch ... --pids-from file.csv``.
 
     Designed to back the ``--pids-from`` CLI option in
     ``plp fetch`` / ``plp indexes select`` so users can feed a saved CSV
@@ -139,7 +146,7 @@ def read_pids_file(
     Parameters
     ----------
     source : Path or str
-        File path, or ``"-"`` for stdin (always treated as plain text).
+        File path, or ``"-"`` for stdin.
     index_key : str, optional
         Dotted index key used to auto-detect the PID column in CSVs via
         the catalog's IndexConfig registry. Ignored when ``pid_key`` is
@@ -148,7 +155,9 @@ def read_pids_file(
         looks up both forms.
     pid_key : str, optional
         Explicit column name for CSV input; wins over auto-detection.
-        Must be an existing column in the CSV.
+        Must be an existing column in the CSV. **When set, also forces
+        CSV parsing on stdin / non-csv-extension paths** — the flag is
+        the user's declaration that the input is tabular.
     suffix : str, optional
         Appended to each PID after reading. Convenient for files that
         carry observation-level identifiers when the downstream caller
@@ -173,8 +182,16 @@ def read_pids_file(
     """
     src_str = str(source)
 
-    # Stdin or non-CSV extension → delegate to the plain-text reader.
-    if src_str == "-" or not src_str.lower().endswith(".csv"):
+    # Decide whether to parse as CSV. An explicit ``pid_key`` flips us
+    # into CSV mode regardless of source kind — the user is saying
+    # "this is tabular data, here's the column" and we honor that even
+    # for stdin or for unconventional extensions.
+    use_csv = (
+        pid_key is not None
+        or (src_str != "-" and src_str.lower().endswith(".csv"))
+    )
+
+    if not use_csv:
         from planetarypy.utils import read_pids as _read_text_pids
         pids = _read_text_pids(source)
         if suffix:
@@ -182,7 +199,11 @@ def read_pids_file(
         return pids
 
     import pandas as pd
-    df = pd.read_csv(source)
+    if src_str == "-":
+        import sys
+        df = pd.read_csv(sys.stdin)
+    else:
+        df = pd.read_csv(source)
 
     if pid_key is not None:
         if pid_key not in df.columns:

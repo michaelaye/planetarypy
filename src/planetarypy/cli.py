@@ -260,17 +260,48 @@ def fetch(
         raise typer.Exit(exit_code)
 
 
+def _truncate_pid(pid: str, max_len: int = 60) -> str:
+    """Middle-ellipsis truncation for PIDs that would otherwise wrap the
+    report. Defaults to 60 so typical PIDs (25-30 chars) are untouched
+    but pathological cases (whole CSV rows masquerading as PIDs) are
+    tamed before they hit the terminal."""
+    if len(pid) <= max_len:
+        return pid
+    keep = max_len - 1  # one slot for the ellipsis
+    head = keep // 2
+    tail = keep - head
+    return f"{pid[:head]}…{pid[-tail:]}"
+
+
+def _format_fail_block(pid: str, exc: BaseException) -> str:
+    """Render a multi-line FAIL entry: truncated PID on its own line,
+    error message indented and wrapped on the lines below."""
+    import shutil
+    import textwrap
+
+    width = max(40, min(shutil.get_terminal_size((80, 24)).columns, 100))
+    body = f"{type(exc).__name__}: {exc}"
+    wrapped = textwrap.fill(
+        body, width=width,
+        initial_indent="      └ ",
+        subsequent_indent="        ",
+    )
+    return f"FAIL  {_truncate_pid(pid)}\n{wrapped}"
+
+
 def _emit_batch_report(results, mode: str, *, label: str = "Batch") -> int:
     """Print per-PID outcomes from a BatchFetchResult list, return exit code.
 
     Modes
     -----
     errors-only (default)
-        One line per FAILED PID to stderr; trailing summary to stderr.
-        Stdout stays empty so the command composes cleanly when all PIDs
-        succeed and the user just wants the side-effect (downloads on disk).
+        One multi-line FAIL block per failed PID to stderr, blank-line
+        separated; trailing summary to stderr. Stdout stays empty so the
+        command composes cleanly when all PIDs succeed and the user just
+        wants the side-effect (downloads on disk).
     full
-        OK/FAIL line per PID to stdout; trailing summary to stderr.
+        OK lines for successes (one each, stdout), FAIL blocks for
+        failures (multi-line, stdout); trailing summary to stderr.
     jsonl
         One JSON object per PID to stdout (machine-readable).
     csv
@@ -291,13 +322,13 @@ def _emit_batch_report(results, mode: str, *, label: str = "Batch") -> int:
     n_ok = len(results) - n_failed
 
     if mode == "errors-only":
-        for r in results:
-            if not r.ok:
-                typer.echo(
-                    f"FAIL {r.product_id}: "
-                    f"{type(r.exception).__name__}: {r.exception}",
-                    err=True,
-                )
+        fail_blocks = [
+            _format_fail_block(r.product_id, r.exception)
+            for r in results if not r.ok
+        ]
+        if fail_blocks:
+            typer.echo("\n\n".join(fail_blocks), err=True)
+            typer.echo("", err=True)  # trailing blank before summary
         typer.echo(
             f"{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
             err=True,
@@ -305,16 +336,17 @@ def _emit_batch_report(results, mode: str, *, label: str = "Batch") -> int:
         return 1 if n_failed else 0
 
     if mode == "full":
+        lines = []
         for r in results:
             if r.ok:
-                typer.echo(f"OK   {r.product_id}")
+                lines.append(f"OK    {_truncate_pid(r.product_id)}")
             else:
-                typer.echo(
-                    f"FAIL {r.product_id}: "
-                    f"{type(r.exception).__name__}: {r.exception}"
-                )
+                lines.append(_format_fail_block(r.product_id, r.exception))
+        # Blank line BETWEEN entries (any pair where at least one is a
+        # FAIL block needs visual separation; we just always separate).
+        typer.echo("\n\n".join(lines))
         typer.echo(
-            f"{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
+            f"\n{label} summary: {n_ok}/{len(results)} OK, {n_failed} failed.",
             err=True,
         )
         return 1 if n_failed else 0
