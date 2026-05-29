@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.0] - 2026-05-29
+
+CSV inputs and a better failure report for the batch-PID workflow. Real-world driver: feeding a HiRISE observation-CSV through `head | plp fetch` to grab the first few RED products — which surfaced two design oversights (stdin always parsed as plain text; FAIL block was an unreadable wall of text) plus the discovery that the suffix idiom belongs in the API too.
+
+### Added
+
+- **`planetarypy.pds.read_pids_file(source, *, index_key=None, pid_key=None, suffix=None)`** — single entry point for "read PIDs from a file or stdin", with smart format dispatch:
+  1. `pid_key` set → CSV (the explicit "this is tabular" signal).
+  2. File with `.csv` extension → CSV.
+  3. Stdin whose first non-blank line contains a comma → CSV (small heuristic so `head file.csv | plp fetch ...` Just Works).
+  4. Otherwise → plain text via `planetarypy.utils.read_pids`.
+
+  In CSV mode the PID column is resolved by `pid_key` (explicit) or `pid_column(index_key, df)` (auto-detect via the catalog registry). Failure raises `ValueError` listing the CSV's columns so the caller knows what to pass to `pid_key`. The optional `suffix` is appended to every returned PID; empty string is a no-op. Designed API-first so notebooks and scripts can ingest CSVs without going through the CLI.
+
+- **`plp fetch --pid-key NAME` / `plp indexes select --pid-key NAME`** — name the CSV column to read PIDs from when auto-detection can't (or shouldn't) pick. Also forces CSV parsing on stdin / non-csv-extension paths, so `head file.csv | plp fetch KEY --pids-from - --pid-key NAME` works.
+- **`plp fetch --pid-suffix STR` / `plp indexes select --pid-suffix STR`** — append a fixed string to every PID read from `--pids-from`. Motivated by HiRISE-style files that carry observation IDs (`PSP_xxxxx_yyyy`) when the downstream call needs a more specific product (`PSP_xxxxx_yyyy_RED`). Intentionally scoped to file/stdin input only; positional PIDs are passed through verbatim because hand-typed PIDs already carry their full identifier.
+- **`docs/howto/hirise_rdr_red_batch.md`** — cheat sheet walking through the four ways to grab HiRISE RDR `_RED` products: single positional, variadic positional, full CSV file (with `--pid-key`), and `head`-pipe via stdin. Includes a flag-summary table for the four scenarios.
+
+### Changed
+
+- **Batch FAIL output is now multi-line and scannable.** The previous one-line-per-failure format (`FAIL PID: ErrorType: msg`) became a wall of unreadable text when error messages were long. New shape:
+  ```
+  FAIL  ESP_089803_2650_RED
+        └ ProductNotFoundError: Product 'ESP_089803_2650_RED' not
+          found for mro.hirise.rdr. Check the product_id spelling.
+
+  FAIL  …
+  ```
+  PIDs over 60 chars get middle-ellipsis truncation (`X…Y`) so pathological cases (whole CSV rows that became pseudo-PIDs from a misconfigured input) don't overflow the terminal. Error message is indented under a `└` marker, soft-wrapped to terminal width (capped at 100). Blank line between entries. Report is padded with leading and trailing blank lines so it stays visually quarantined from `tqdm`'s progress bar (which leaves the cursor mid-line and would otherwise collide with the first FAIL). `OK` lines in `--report full` stay one line each. `jsonl` and `csv` modes are unchanged (their consumers don't need formatting).
+
+### Internal
+
+- 23 new tests across `tests/test_pds_read_pids_file.py` (covering `read_pids_file` dispatch, CSV auto-detection, explicit `pid_key`, suffix application, stdin sniff, plain-text fallback) and `tests/test_cli_batch_pids.py` (covering CLI `--pid-key`, `--pid-suffix`, new FAIL block formatting, long-PID truncation, blank-line separation). Two pre-existing tests updated for the new format strings.
+- CI hygiene: `tests/test_ctx_calib_shim.py` adopts `pytest.importorskip("hvplot")` so collection survives in the minimal pip env; `test_generic_kernel_urls_are_accessible` in `test_kernels.py` marked `@pytest.mark.slow` so flaky NAIF HEAD requests stop blocking every-push CI (the test still runs locally; a scheduled-workflow home is left as a separate follow-up).
+
 ## [0.66.0] - 2026-05-29
 
 Batch-PID cycle: API-first capability for "do this thing for a list of PIDs", surfaced as two new CLI verbs and a parallel batch helper that other commands can plug into. Plus a small UX consistency pass across the `plp indexes` sub-app and a duplicate-code cleanup in `instruments.mro.ctx`.
