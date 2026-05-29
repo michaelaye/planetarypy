@@ -287,6 +287,27 @@ class TestIndexesSelectMissingReporting:
         assert "P_001" in result.stdout
         assert "P_003" in result.stdout
 
+    def test_pid_suffix_appended_to_each_pid(self, tmp_path):
+        """--pid-suffix appends the string before filtering the index."""
+        import pandas as pd
+        # The fake df has PRODUCT_IDs P_001..P_005. Synth obsids → adding
+        # _suffix shouldn't match anything in the df → 0 rows shown,
+        # 2 missing — that's the contract we're verifying.
+        df = _fake_df()
+        f = tmp_path / "obsids.txt"
+        f.write_text("OBS_A\nOBS_B\n")
+
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "--pids-from", str(f), "--pid-suffix", "_RED"]
+            )
+        # Both transformed PIDs (OBS_A_RED, OBS_B_RED) miss the index.
+        assert result.exit_code == 1
+        assert "0 rows" in result.stderr
+        assert "2 not found" in result.stderr
+
     def test_pids_from_csv_ambiguous_errors_with_hint(self, tmp_path):
         df = _fake_df()
         f = tmp_path / "weird.csv"

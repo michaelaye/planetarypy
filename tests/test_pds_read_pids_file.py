@@ -127,6 +127,39 @@ class TestCsvExplicitPidKey:
         assert "alpha" in msg and "beta" in msg
 
 
+# ── suffix kwarg ───────────────────────────────────────────────────────
+
+
+class TestSuffix:
+
+    def test_suffix_appended_to_text_pids(self, tmp_path):
+        f = tmp_path / "obsids.txt"
+        f.write_text("PSP_001\nPSP_002\n")
+        assert read_pids_file(f, suffix="_RED") == ["PSP_001_RED", "PSP_002_RED"]
+
+    def test_suffix_appended_to_csv_pids(self, tmp_path):
+        f = tmp_path / "obsids.csv"
+        pd.DataFrame({"PRODUCT_ID": ["PSP_001", "PSP_002"]}).to_csv(f, index=False)
+        out = read_pids_file(f, index_key="mro.ctx.edr", suffix="_RED")
+        assert out == ["PSP_001_RED", "PSP_002_RED"]
+
+    def test_suffix_with_explicit_pid_key(self, tmp_path):
+        f = tmp_path / "alt.csv"
+        pd.DataFrame({"obsid": ["A", "B"]}).to_csv(f, index=False)
+        assert read_pids_file(f, pid_key="obsid", suffix="_X") == ["A_X", "B_X"]
+
+    def test_suffix_none_is_noop(self, tmp_path):
+        f = tmp_path / "obsids.txt"
+        f.write_text("A\nB\n")
+        assert read_pids_file(f, suffix=None) == ["A", "B"]
+
+    def test_empty_suffix_is_noop(self, tmp_path):
+        f = tmp_path / "obsids.txt"
+        f.write_text("A\nB\n")
+        # Empty string is falsy → treated as no suffix (avoids "A" → "A").
+        assert read_pids_file(f, suffix="") == ["A", "B"]
+
+
 # ── Round-trip with the CLI csv output format ──────────────────────────
 
 

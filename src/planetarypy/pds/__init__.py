@@ -116,6 +116,7 @@ def read_pids_file(
     *,
     index_key: str | None = None,
     pid_key: str | None = None,
+    suffix: str | None = None,
 ) -> list[str]:
     """Read PIDs from a file or stdin, with CSV column resolution.
 
@@ -148,6 +149,13 @@ def read_pids_file(
     pid_key : str, optional
         Explicit column name for CSV input; wins over auto-detection.
         Must be an existing column in the CSV.
+    suffix : str, optional
+        Appended to each PID after reading. Convenient for files that
+        carry observation-level identifiers when the downstream caller
+        actually needs a more specific product (e.g. HiRISE obsids
+        ``PSP_003092_0985`` + ``"_RED"`` → ``PSP_003092_0985_RED``).
+        Applied after CSV column extraction; the underlying values are
+        not mutated.
 
     Returns
     -------
@@ -168,7 +176,10 @@ def read_pids_file(
     # Stdin or non-CSV extension → delegate to the plain-text reader.
     if src_str == "-" or not src_str.lower().endswith(".csv"):
         from planetarypy.utils import read_pids as _read_text_pids
-        return _read_text_pids(source)
+        pids = _read_text_pids(source)
+        if suffix:
+            pids = [f"{p}{suffix}" for p in pids]
+        return pids
 
     import pandas as pd
     df = pd.read_csv(source)
@@ -194,7 +205,10 @@ def read_pids_file(
                 "Pass pid_key=<column> to select one explicitly."
             )
 
-    return df[col].astype(str).tolist()
+    pids = df[col].astype(str).tolist()
+    if suffix:
+        pids = [f"{p}{suffix}" for p in pids]
+    return pids
 
 
 def missing_pids(

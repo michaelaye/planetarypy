@@ -140,6 +140,13 @@ def fetch(
         help="When --pids-from is a CSV, name the column to read PIDs "
              "from. Overrides the auto-detection that uses --key.",
     ),
+    pid_suffix: str = typer.Option(
+        None, "--pid-suffix",
+        help="Append this string to every PID read from --pids-from. "
+             "E.g. --pid-suffix _RED turns each HiRISE obsid into the "
+             "corresponding RED product. Ignored when PIDs are supplied "
+             "as positional arguments.",
+    ),
     workers: int = typer.Option(
         4, "--workers", "-w",
         help="Parallel download threads in batch mode (default 4).",
@@ -183,6 +190,7 @@ def fetch(
         try:
             pids = read_pids_file(
                 pids_from, index_key=key, pid_key=pid_key,
+                suffix=pid_suffix,
             )
         except FileNotFoundError as e:
             typer.echo(f"Error: {e}", err=True)
@@ -1425,6 +1433,13 @@ def indexes_select(
         help="When --pids-from is a CSV, name the column to read PIDs "
              "from. Overrides the auto-detection that uses KEY.",
     ),
+    pid_suffix: str = typer.Option(
+        None, "--pid-suffix",
+        help="Append this string to every PID read from --pids-from. "
+             "Useful for files that carry observation-level identifiers "
+             "when the index actually keys on a more specific product "
+             "(e.g. HiRISE obsid + '_RED').",
+    ),
     fmt: str = typer.Option(
         "auto", "--format",
         help="Output format: auto (default) | table | csv | jsonl. "
@@ -1481,6 +1496,7 @@ def indexes_select(
         try:
             pids = read_pids_file(
                 pids_from, index_key=key, pid_key=pid_key,
+                suffix=pid_suffix,
             )
         except FileNotFoundError as e:
             typer.echo(f"Error: {e}", err=True)

@@ -140,6 +140,28 @@ class TestFetchInputHandling:
         assert result.exit_code == 0
         assert "2/2 OK" in result.stderr
 
+    def test_pid_suffix_appended_to_each_pid(self, monkeypatch, tmp_path):
+        """--pid-suffix _RED turns each obsid into PSP_xxxxx_yyyy_RED
+        before the fetcher sees it."""
+        import planetarypy.utils as utils_mod
+        monkeypatch.setattr(utils_mod, "have_internet", lambda: True)
+
+        seen_pids: list[str] = []
+        def _capture(key, pid, **kw):
+            seen_pids.append(pid)
+            return _fake_downloaded(pid)
+        monkeypatch.setattr(catalog_mod, "fetch_product", _capture)
+
+        f = tmp_path / "obsids.txt"
+        f.write_text("PSP_001\nPSP_002\n")
+
+        result = runner.invoke(
+            app, ["fetch", "mro.hirise.rdr",
+                  "--pids-from", str(f), "--pid-suffix", "_RED"]
+        )
+        assert result.exit_code == 0
+        assert seen_pids == ["PSP_001_RED", "PSP_002_RED"]
+
     def test_pids_from_csv_with_ambiguous_columns_errors_helpfully(self, tmp_path):
         """CSV with no auto-detectable column should error and tell the
         user about --pid-key."""
