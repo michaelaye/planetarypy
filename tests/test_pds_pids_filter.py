@@ -124,6 +124,45 @@ class TestGetIndexPidsFilter:
 # ── missing_pids ────────────────────────────────────────────────────────
 
 
+class TestGetIndexColumnsFilter:
+
+    def test_columns_projects_in_order(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.ctx.edr",
+                        columns=["START_TIME", "PRODUCT_ID"])
+        assert list(out.columns) == ["START_TIME", "PRODUCT_ID"]
+        assert len(out) == len(df)
+
+    def test_columns_with_pids_filter_compose(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.ctx.edr",
+                        pids=["P_002", "P_004"],
+                        columns=["PRODUCT_ID", "FILE_NAME"])
+        assert list(out.columns) == ["PRODUCT_ID", "FILE_NAME"]
+        assert list(out["PRODUCT_ID"]) == ["P_002", "P_004"]
+
+    def test_unknown_column_raises_keyerror_with_available_listed(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        with pytest.raises(KeyError) as exc:
+            get_index("mro.ctx.edr", columns=["BOGUS", "PRODUCT_ID"])
+        msg = str(exc.value)
+        assert "BOGUS" in msg
+        assert "PRODUCT_ID" in msg  # listed under available
+
+    def test_columns_none_keeps_every_column(self, monkeypatch):
+        df = _df_with_product_id()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.ctx.edr", columns=None)
+        assert list(out.columns) == list(df.columns)
+
+
 class TestMissingPids:
 
     def test_returns_pids_absent_from_dataframe(self):

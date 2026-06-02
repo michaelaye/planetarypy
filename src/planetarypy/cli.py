@@ -1295,6 +1295,11 @@ def indexes_peek(
         3, "--rows", "-n",
         help="Number of random rows to show (default 3).",
     ),
+    columns: str = typer.Option(
+        None, "--columns", "-c",
+        help="Comma-separated column projection, e.g. "
+             "'PRODUCT_ID,START_TIME'. Default keeps every column.",
+    ),
 ):
     """Inspect a registered PDS index: shape, column names, a few random rows.
 
@@ -1317,10 +1322,16 @@ def indexes_peek(
         typer.echo(f"Unknown index key: {key!r}.", err=True)
         raise typer.Exit(1)
 
-    df = get_index(key, allow_refresh=False)
+    full = get_index(key, allow_refresh=False)
+    try:
+        df = get_index(key, allow_refresh=False,
+                       columns=_parse_columns(columns))
+    except KeyError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(2)
     n = max(0, min(rows, len(df)))
     sample = df.sample(n=n) if n > 0 else df.head(0)
-    _render_index_rows(key, sample, total_rows=len(df),
+    _render_index_rows(key, sample, total_rows=len(full),
                        total_cols=len(df.columns),
                        label=f"showing {n} random")
 
@@ -1400,6 +1411,12 @@ def indexes_last(
         help="Sort by a time column before taking the last rows. "
              "Auto-detects START_TIME / OBSERVATION_TIME / IMAGE_TIME / TIME.",
     ),
+    columns: str = typer.Option(
+        None, "--columns", "-c",
+        help="Comma-separated column projection, e.g. "
+             "'PRODUCT_ID,START_TIME'. Applied AFTER --sort so the time "
+             "column can drive sorting even if you project it away.",
+    ),
 ):
     """Show the last entries of a registered PDS index, transposed.
 
@@ -1423,7 +1440,8 @@ def indexes_last(
         raise typer.Exit(1)
 
     df = get_index(key, allow_refresh=False)
-    n = max(0, min(rows, len(df)))
+    total_rows = len(df)
+    n = max(0, min(rows, total_rows))
 
     label_parts = [f"last {n}"]
     if sort:
@@ -1440,8 +1458,23 @@ def indexes_last(
             label_parts.append(f"by {time_col}")
 
     subset = df.tail(n) if n > 0 else df.head(0)
-    _render_index_rows(key, subset, total_rows=len(df),
-                       total_cols=len(df.columns),
+
+    # Column projection applied AFTER sort so --sort can still use a
+    # time column that the user is projecting away from the display.
+    col_spec = _parse_columns(columns)
+    if col_spec is not None:
+        missing = [c for c in col_spec if c not in subset.columns]
+        if missing:
+            typer.echo(
+                f"Error: unknown column(s) {missing!r} in {key!r}. "
+                f"Available: {list(subset.columns)!r}",
+                err=True,
+            )
+            raise typer.Exit(2)
+        subset = subset[col_spec]
+
+    _render_index_rows(key, subset, total_rows=total_rows,
+                       total_cols=len(subset.columns),
                        label=", ".join(label_parts))
 
 
@@ -1492,6 +1525,12 @@ def indexes_select(
         "errors-only", "--report",
         help="Missing-PID report mode: errors-only (default summary on "
              "stderr) | full (list every missing PID on stderr).",
+    ),
+    columns: str = typer.Option(
+        None, "--columns", "-c",
+        help="Comma-separated column projection, e.g. "
+             "'PRODUCT_ID,START_TIME,LATITUDE'. Applied to every output "
+             "format (table / csv / jsonl). Default keeps every column.",
     ),
 ):
     """Filter a registered PDS index to specific PIDs and render the rows.
@@ -1557,7 +1596,23 @@ def indexes_select(
 
     full_df = get_index(key, allow_refresh=False)
     filtered = get_index(key, allow_refresh=False, pids=pids)
+    # missing_pids needs the PID column on `filtered`, so compute the
+    # diff BEFORE we project columns away.
     missing = missing_pids(filtered, key, pids)
+
+    # Column projection: validate against the unprojected `filtered`
+    # (which still has every column) and apply to the display copy.
+    col_spec = _parse_columns(columns)
+    if col_spec is not None:
+        bad = [c for c in col_spec if c not in filtered.columns]
+        if bad:
+            typer.echo(
+                f"Error: unknown column(s) {bad!r} in {key!r}. "
+                f"Available: {list(filtered.columns)!r}",
+                err=True,
+            )
+            raise typer.Exit(2)
+        filtered = filtered[col_spec]
 
     # Pick effective format.
     if fmt == "auto":
@@ -1629,6 +1684,21 @@ def indexes_select(
 
     if missing:
         raise typer.Exit(1)
+
+
+def _parse_columns(spec: str | None) -> list[str] | None:
+    """Parse a comma-separated --columns spec into a list.
+
+    Returns ``None`` for an absent spec (caller-side "keep all columns").
+    Empty / whitespace-only spec also yields ``None`` so a user
+    accidentally typing ``--columns ""`` doesn't silently project to zero
+    columns. Strips whitespace around each name so
+    ``--columns "PRODUCT_ID, START_TIME"`` works.
+    """
+    if not spec:
+        return None
+    cols = [c.strip() for c in spec.split(",") if c.strip()]
+    return cols or None
 
 
 def _jsonable(value):

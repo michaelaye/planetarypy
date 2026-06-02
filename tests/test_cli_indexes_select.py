@@ -210,6 +210,83 @@ class TestIndexesSelectFormats:
         assert "PRODUCT_ID,FILE_NAME,START_TIME" in result.stdout
 
 
+class TestIndexesSelectColumnsFilter:
+
+    def test_columns_projects_table_output(self, tmp_path):
+        df = _fake_df()
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_002", "--columns", "PRODUCT_ID,START_TIME"]
+            )
+        assert result.exit_code == 0
+        assert "PRODUCT_ID" in result.stdout
+        assert "START_TIME" in result.stdout
+        assert "FILE_NAME" not in result.stdout
+
+    def test_columns_projects_csv_output(self):
+        df = _fake_df()
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_001", "P_002", "P_003", "P_004",
+                      "--columns", "PRODUCT_ID,START_TIME",
+                      "--format", "csv"]
+            )
+        assert result.exit_code == 0
+        lines = result.stdout.strip().splitlines()
+        assert lines[0] == "PRODUCT_ID,START_TIME"
+        # 4 data rows: each starts with a PID.
+        assert all(line.startswith("P_") for line in lines[1:])
+
+    def test_columns_projects_jsonl_output(self):
+        import json
+        df = _fake_df()
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_001", "P_002",
+                      "--columns", "PRODUCT_ID,START_TIME",
+                      "--format", "jsonl"]
+            )
+        assert result.exit_code == 0
+        rows = [json.loads(l) for l in result.stdout.strip().splitlines()]
+        for r in rows:
+            assert set(r.keys()) == {"PRODUCT_ID", "START_TIME"}
+
+    def test_unknown_column_exits_with_helpful_error(self):
+        df = _fake_df()
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_001", "--columns", "BOGUS"]
+            )
+        assert result.exit_code == 2
+        assert "BOGUS" in result.stderr
+        assert "PRODUCT_ID" in result.stderr  # available cols listed
+
+    def test_missing_pid_diff_runs_BEFORE_column_projection(self):
+        """Even when --columns excludes the PID column, the
+        missing-PIDs diff must still work — i.e. column projection
+        is applied after the diff is computed."""
+        df = _fake_df()
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_001", "GHOST_X",
+                      "--columns", "START_TIME"]   # excludes PRODUCT_ID
+            )
+        # Exit 1 because GHOST_X missing — surface intact despite the
+        # projection removing the PID column.
+        assert result.exit_code == 1
+        assert "1 not found" in result.stderr
+
+
 class TestIndexesSelectMissingReporting:
 
     def test_missing_pids_summary_default(self):

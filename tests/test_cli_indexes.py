@@ -401,6 +401,105 @@ class TestApplyWarningFilters:
 # ── peek still works (regression guard for the helper refactor) ─────────
 
 
+class TestIndexesColumnsFilter:
+    """`--columns COL1,COL2` projects the display to the named columns.
+    Applies to peek and last; select has its own test class."""
+
+    def _patch_get_index(self, df):
+        """Patch get_index so it honors the columns kwarg (mimicking the
+        real implementation) without going through the Index machinery."""
+        def _fake(key, allow_refresh=False, **kw):
+            out = df.copy()
+            cols = kw.get("columns")
+            if cols is not None:
+                cols = list(cols)
+                missing = [c for c in cols if c not in out.columns]
+                if missing:
+                    raise KeyError(
+                        f"Column(s) not in {key!r}: {missing!r}. "
+                        f"Available columns: {list(out.columns)!r}"
+                    )
+                out = out[cols]
+            return out
+        return patch("planetarypy.pds.get_index", side_effect=_fake)
+
+    def test_peek_projects_to_named_columns(self):
+        df = _fake_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             self._patch_get_index(df):
+            result = runner.invoke(
+                app, ["indexes", "peek", "mro.ctx.edr",
+                      "--columns", "PRODUCT_ID,START_TIME"]
+            )
+        assert result.exit_code == 0
+        # Table header shows column names of the projection.
+        assert "PRODUCT_ID" in result.output
+        assert "START_TIME" in result.output
+        # FILE_NAME projected away.
+        assert "FILE_NAME" not in result.output
+
+    def test_peek_strips_whitespace_in_columns_spec(self):
+        df = _fake_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             self._patch_get_index(df):
+            result = runner.invoke(
+                app, ["indexes", "peek", "mro.ctx.edr",
+                      "--columns", "PRODUCT_ID , START_TIME "]
+            )
+        assert result.exit_code == 0
+        assert "FILE_NAME" not in result.output
+
+    def test_peek_unknown_column_exits_with_helpful_error(self):
+        df = _fake_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             self._patch_get_index(df):
+            result = runner.invoke(
+                app, ["indexes", "peek", "mro.ctx.edr",
+                      "--columns", "BOGUS"]
+            )
+        assert result.exit_code == 2
+        assert "BOGUS" in result.stderr
+        # Available columns surfaced for discoverability.
+        assert "PRODUCT_ID" in result.stderr
+
+    def test_last_projects_after_sort_so_time_col_can_still_drive_sort(self):
+        """--sort needs the time column; --columns must NOT prevent
+        that even when the user projects the time column out."""
+        df = _fake_df()  # has START_TIME
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            # Project away START_TIME; --sort should still find it.
+            result = runner.invoke(
+                app, ["indexes", "last", "mro.ctx.edr",
+                      "--columns", "PRODUCT_ID,FILE_NAME",
+                      "--sort", "--rows", "2"]
+            )
+        assert result.exit_code == 0
+        assert "by START_TIME" in result.output
+        # Display projected: no START_TIME column shown.
+        # Look for it as a row label in the transposed table.
+        lines = result.output.splitlines()
+        start_time_label_lines = [l for l in lines
+                                  if "│START_TIME" in l or "│ START_TIME" in l]
+        assert not start_time_label_lines
+
+    def test_last_unknown_column_exits_with_error(self):
+        df = _fake_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            result = runner.invoke(
+                app, ["indexes", "last", "mro.ctx.edr",
+                      "--columns", "BOGUS"]
+            )
+        assert result.exit_code == 2
+        assert "BOGUS" in result.stderr
+
+
 class TestIndexesPeekStillWorks:
     """The helper extraction shouldn't break the existing peek command."""
 

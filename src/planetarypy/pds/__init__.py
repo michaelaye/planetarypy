@@ -48,6 +48,7 @@ def get_index(
     force_config_update: bool = False,
     *,
     pids: Iterable[str] | None = None,
+    columns: Iterable[str] | None = None,
 ) -> DataFrame:
     """Retrieve a specific index file .
 
@@ -71,12 +72,18 @@ def get_index(
         product-id column (resolved via :func:`pid_column`). PIDs that
         don't match any row are silently dropped from the result; use
         :func:`missing_pids` to find them.
+    columns : Iterable[str], keyword-only, optional
+        Column names to project the returned DataFrame to, in the order
+        given. Exact (case-sensitive) match against the parquet's column
+        set; unknown names raise :class:`KeyError` listing the available
+        columns. ``None`` (default) keeps every column.
 
     Returns
     -------
     pandas.DataFrame
         DataFrame containing the index data, read from the local parquet file.
-        When ``pids`` is given, only rows matching those PIDs are returned.
+        When ``pids`` is given, only rows matching those PIDs are returned;
+        when ``columns`` is given, only those columns are returned.
     """
     # Use InventoryIndex for special inventory files that have multi-target CSV format
     if dotted_index_key.endswith('.inventory'):
@@ -108,6 +115,15 @@ def get_index(
         col = pid_column(dotted_index_key, df)
         pid_set = set(map(str, pids))
         df = df[df[col].astype(str).isin(pid_set)]
+    if columns is not None:
+        requested = list(columns)
+        missing = [c for c in requested if c not in df.columns]
+        if missing:
+            raise KeyError(
+                f"Column(s) not in {dotted_index_key!r}: {missing!r}. "
+                f"Available columns: {list(df.columns)!r}"
+            )
+        df = df[requested]
     return df
 
 
