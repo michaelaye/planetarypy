@@ -461,7 +461,11 @@ def hiedr(
     red: bool = typer.Option(False, "--red", help="Download RED CCDs (RED0–RED9, 20 files)"),
     ir: bool = typer.Option(False, "--ir", help="Download IR CCDs (IR10–IR11, 4 files)"),
     bg: bool = typer.Option(False, "--bg", help="Download BG CCDs (BG12–BG13, 4 files)"),
-    ccds: str = typer.Option(None, "--ccds", help="Specific CCD numbers, e.g. '4,5' for RED4+RED5 only"),
+    ccds: list[str] = typer.Option(
+        None, "--ccds",
+        help="Specific CCD numbers. Repeatable AND comma-separated: "
+             "'--ccds 4 --ccds 5' is equivalent to '--ccds 4,5'.",
+    ),
     here: bool = typer.Option(False, "--here", "-H", help="Download into current directory"),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
 ):
@@ -496,7 +500,7 @@ def hiedr(
     if bg:
         colors.append("bg")
 
-    ccd_nums = [int(n) for n in ccds.split(",")] if ccds else None
+    ccd_nums = _parse_ccds(ccds)
     saveroot = Path.cwd() if here else None
 
     products = edr_products(obsid, colors=colors, ccds=ccd_nums, saveroot=saveroot)
@@ -522,7 +526,11 @@ def himos(
     red: bool = typer.Option(False, "--red", help="Process RED CCDs"),
     ir: bool = typer.Option(False, "--ir", help="Process IR CCDs"),
     bg: bool = typer.Option(False, "--bg", help="Process BG CCDs"),
-    ccds: str = typer.Option(None, "--ccds", help="Specific CCD numbers, e.g. '4,5'"),
+    ccds: list[str] = typer.Option(
+        None, "--ccds",
+        help="Specific CCD numbers. Repeatable AND comma-separated: "
+             "'--ccds 4 --ccds 5' is equivalent to '--ccds 4,5'.",
+    ),
     mapfile: str = typer.Option(None, "--map", "-m", help="ISIS map projection file (.map)"),
     overwrite: bool = typer.Option(False, "--force", "-f", help="Reprocess even if mosaic exists"),
 ):
@@ -557,7 +565,7 @@ def himos(
     if bg:
         colors.append("bg")
 
-    ccd_nums = [int(n) for n in ccds.split(",")] if ccds else None
+    ccd_nums = _parse_ccds(ccds)
 
     try:
         results = create_mosaics(
@@ -1687,6 +1695,41 @@ def indexes_select(
 
     if missing:
         raise typer.Exit(1)
+
+
+def _parse_ccds(specs) -> list[int] | None:
+    """Flatten a ``--ccds`` spec into a list of CCD numbers (ints).
+
+    Same dual-idiom shape as :func:`_parse_columns` — accepts repeated
+    flags, comma-separated values inside one flag, and mixed forms:
+
+    - ``--ccds 4 --ccds 5`` → ``[4, 5]``
+    - ``--ccds "4,5"`` → ``[4, 5]``
+    - ``--ccds 4 --ccds "5,6"`` → ``[4, 5, 6]``
+
+    Returns ``None`` when no spec is given. Raises ``typer.BadParameter``
+    on a value that isn't a positive int — CCD numbers are always
+    small integers (HiRISE: 0..13).
+    """
+    if specs is None:
+        return None
+    if isinstance(specs, str):
+        specs = [specs]
+    nums: list[int] = []
+    for spec in specs:
+        if not spec:
+            continue
+        for n in spec.split(","):
+            n = n.strip()
+            if not n:
+                continue
+            try:
+                nums.append(int(n))
+            except ValueError:
+                raise typer.BadParameter(
+                    f"--ccds expects integers; got {n!r} in {spec!r}."
+                )
+    return nums or None
 
 
 def _parse_columns(specs) -> list[str] | None:
