@@ -225,6 +225,20 @@ class TestIndexesSelectColumnsFilter:
         assert "START_TIME" in result.stdout
         assert "FILE_NAME" not in result.stdout
 
+    def test_columns_accepts_repeated_flag(self):
+        df = _fake_df()
+        keys_p, idx_p = _patch_index(df)
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr",
+                      "P_002",
+                      "-c", "PRODUCT_ID", "-c", "START_TIME"]
+            )
+        assert result.exit_code == 0
+        assert "PRODUCT_ID" in result.stdout
+        assert "START_TIME" in result.stdout
+        assert "FILE_NAME" not in result.stdout
+
     def test_columns_projects_csv_output(self):
         df = _fake_df()
         keys_p, idx_p = _patch_index(df)

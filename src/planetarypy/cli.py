@@ -1295,10 +1295,11 @@ def indexes_peek(
         3, "--rows", "-n",
         help="Number of random rows to show (default 3).",
     ),
-    columns: str = typer.Option(
+    columns: list[str] = typer.Option(
         None, "--columns", "-c",
-        help="Comma-separated column projection, e.g. "
-             "'PRODUCT_ID,START_TIME'. Default keeps every column.",
+        help="Column projection. Repeatable AND comma-separated: "
+             "'-c PRODUCT_ID -c IMAGE_TIME' is equivalent to "
+             "'--columns PRODUCT_ID,IMAGE_TIME'. Default keeps every column.",
     ),
 ):
     """Inspect a registered PDS index: shape, column names, a few random rows.
@@ -1411,11 +1412,12 @@ def indexes_last(
         help="Sort by a time column before taking the last rows. "
              "Auto-detects START_TIME / OBSERVATION_TIME / IMAGE_TIME / TIME.",
     ),
-    columns: str = typer.Option(
+    columns: list[str] = typer.Option(
         None, "--columns", "-c",
-        help="Comma-separated column projection, e.g. "
-             "'PRODUCT_ID,START_TIME'. Applied AFTER --sort so the time "
-             "column can drive sorting even if you project it away.",
+        help="Column projection. Repeatable AND comma-separated: "
+             "'-c PRODUCT_ID -c IMAGE_TIME' is equivalent to "
+             "'--columns PRODUCT_ID,IMAGE_TIME'. Applied AFTER --sort so "
+             "the time column can drive sorting even if you project it away.",
     ),
 ):
     """Show the last entries of a registered PDS index, transposed.
@@ -1526,11 +1528,12 @@ def indexes_select(
         help="Missing-PID report mode: errors-only (default summary on "
              "stderr) | full (list every missing PID on stderr).",
     ),
-    columns: str = typer.Option(
+    columns: list[str] = typer.Option(
         None, "--columns", "-c",
-        help="Comma-separated column projection, e.g. "
-             "'PRODUCT_ID,START_TIME,LATITUDE'. Applied to every output "
-             "format (table / csv / jsonl). Default keeps every column.",
+        help="Column projection. Repeatable AND comma-separated: "
+             "'-c PRODUCT_ID -c IMAGE_TIME' is equivalent to "
+             "'--columns PRODUCT_ID,IMAGE_TIME'. Applied to every "
+             "output format (table / csv / jsonl).",
     ),
 ):
     """Filter a registered PDS index to specific PIDs and render the rows.
@@ -1686,18 +1689,36 @@ def indexes_select(
         raise typer.Exit(1)
 
 
-def _parse_columns(spec: str | None) -> list[str] | None:
-    """Parse a comma-separated --columns spec into a list.
+def _parse_columns(specs) -> list[str] | None:
+    """Flatten a ``--columns`` spec into a list of column names.
 
-    Returns ``None`` for an absent spec (caller-side "keep all columns").
-    Empty / whitespace-only spec also yields ``None`` so a user
-    accidentally typing ``--columns ""`` doesn't silently project to zero
-    columns. Strips whitespace around each name so
-    ``--columns "PRODUCT_ID, START_TIME"`` works.
+    Accepts both idioms — and any mix:
+
+    - **Repeated flag** (Typer ``multiple=True``):
+      ``-c PRODUCT_ID -c START_TIME`` → ``["PRODUCT_ID", "START_TIME"]``
+    - **Comma-separated inside one flag**:
+      ``--columns "PRODUCT_ID,START_TIME"`` → ``["PRODUCT_ID", "START_TIME"]``
+    - **Mixed**:
+      ``-c PRODUCT_ID -c "START,STOP"`` → ``["PRODUCT_ID", "START", "STOP"]``
+
+    Returns ``None`` when no spec was given (so callers default to
+    "keep all columns"). Whitespace around each name is stripped, so
+    ``-c "PRODUCT_ID , START_TIME"`` works.
     """
-    if not spec:
+    if specs is None:
         return None
-    cols = [c.strip() for c in spec.split(",") if c.strip()]
+    # Coerce a single string to a one-element list for uniform handling
+    # (back-compat for callers that still pass a string directly).
+    if isinstance(specs, str):
+        specs = [specs]
+    cols: list[str] = []
+    for spec in specs:
+        if not spec:
+            continue
+        for c in spec.split(","):
+            c = c.strip()
+            if c:
+                cols.append(c)
     return cols or None
 
 

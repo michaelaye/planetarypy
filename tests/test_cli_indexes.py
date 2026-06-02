@@ -439,6 +439,39 @@ class TestIndexesColumnsFilter:
         # FILE_NAME projected away.
         assert "FILE_NAME" not in result.output
 
+    def test_peek_accepts_repeated_columns_flag(self):
+        """`-c PRODUCT_ID -c START_TIME` is the variadic idiom; should
+        produce the same projection as the comma-separated form."""
+        df = _fake_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             self._patch_get_index(df):
+            result = runner.invoke(
+                app, ["indexes", "peek", "mro.ctx.edr",
+                      "-c", "PRODUCT_ID", "-c", "START_TIME"]
+            )
+        assert result.exit_code == 0
+        assert "PRODUCT_ID" in result.output
+        assert "START_TIME" in result.output
+        assert "FILE_NAME" not in result.output
+
+    def test_peek_mixes_repeated_and_comma_separated(self):
+        """`-c PRODUCT_ID -c "FILE_NAME,START_TIME"` should flatten."""
+        df = _fake_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             self._patch_get_index(df):
+            result = runner.invoke(
+                app, ["indexes", "peek", "mro.ctx.edr",
+                      "-c", "PRODUCT_ID",
+                      "-c", "FILE_NAME,START_TIME"]
+            )
+        assert result.exit_code == 0
+        # All three columns present.
+        assert "PRODUCT_ID" in result.output
+        assert "FILE_NAME" in result.output
+        assert "START_TIME" in result.output
+
     def test_peek_strips_whitespace_in_columns_spec(self):
         df = _fake_df()
         with patch("planetarypy.pds.utils._all_dotted_index_keys",
