@@ -193,17 +193,19 @@ def test_log_yesterday_check_forces_should_check(access_log):
     assert access_log.should_check is True
 
 
-# --- Extra: log_remote_timestamp ---
+# --- Extra: log_remote_check ---
 
 
-def test_log_remote_timestamp(access_log):
+def test_log_remote_check(access_log):
+    """log_remote_check writes the server timestamp AND bumps last_checked
+    in a single call — the two fields are one logical operation."""
     ts = datetime(2025, 6, 15, 12, 30, 0)
-    access_log.log_remote_timestamp(ts)
+    access_log.log_remote_check(ts)
     access_log.save()
 
     stored = access_log.get(KEY, "remote_timestamp")
     assert stored == ts
-    # Also logs check time
+    # And the wall-clock check time was bumped as part of the same call.
     assert access_log.last_check is not None
 
 

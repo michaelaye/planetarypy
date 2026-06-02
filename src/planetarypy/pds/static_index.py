@@ -154,7 +154,7 @@ class StaticRemoteHandler:
             logger.warning(f"Could not retrieve remote timestamp for {self.url}: {e}")
             return None
         else:
-            self.log.log_remote_timestamp(tstamp)
+            self.log.log_remote_check(tstamp)
             self._remote_timestamp = tstamp
         return tstamp
     
@@ -170,7 +170,7 @@ class StaticRemoteHandler:
         ``should_check`` only controls whether to FETCH a fresh
         timestamp; it does NOT gate the comparison. (Doing so was a
         bug: ``__init__`` already updated ``last_check`` via
-        ``log_remote_timestamp``, so the gate would suppress the
+        ``log_remote_check``, so the gate would suppress the
         comparison on every subsequent call within the day, leaving
         ``update_available`` stuck at its previous value.)
         """

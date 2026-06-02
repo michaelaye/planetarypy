@@ -52,8 +52,25 @@ class AccessLog(NestedTomlDict):
         self.log_check_time()
         logger.debug(f"Logged available update URL for {self.key}: {url}")
 
-    def log_remote_timestamp(self, timestamp: dt):
-        self.set(self.key, "remote_timestamp", timestamp.replace(microsecond=0))
+    def log_remote_check(self, server_last_modified: dt):
+        """Atomically record a successful HEAD check against the remote.
+
+        Writes two correlated fields that together describe one logical
+        event ("I asked the remote about its freshness, and here's what
+        I got back"):
+
+        - ``remote_timestamp`` — the server's ``Last-Modified`` value
+          (server clock); compared to ``last_updated`` by
+          :meth:`StaticRemoteHandler.update_available`.
+        - ``last_checked`` — wall-clock-now at our end; consumed by
+          :attr:`should_check` to rate-limit future polls.
+
+        Callers should NOT also call :meth:`log_check_time` — doing the
+        HEAD *is* the check, the timestamp is the thing it returned, and
+        this method records both as one unit.
+        """
+        self.set(self.key, "remote_timestamp",
+                 server_last_modified.replace(microsecond=0))
         self.log_check_time()
 
     def _log_yesterday_check(self):
