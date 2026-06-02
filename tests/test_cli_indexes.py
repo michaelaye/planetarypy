@@ -64,6 +64,79 @@ class TestIndexesHelpOnMissing:
         assert "Usage:" in result.stdout
         assert "Show config + cache status" in result.stdout
 
+
+class TestIndexesInfoFreshness:
+    """`plp indexes info KEY` surfaces when the parquet was last
+    downloaded (``last_update`` on the access log) and when we last
+    checked upstream for a newer one (``last_check``)."""
+
+    def _patch_index(self, monkeypatch, *, last_update, last_check):
+        from datetime import datetime
+        from unittest.mock import MagicMock
+
+        # Stub _all_dotted_index_keys so the existence check passes.
+        monkeypatch.setattr(
+            "planetarypy.pds.utils._all_dotted_index_keys",
+            lambda: {"mro.ctx.edr"},
+        )
+        # Stub _index_config_for and _completion_id_col_for to keep the
+        # rest of the table happy without a real registry round-trip.
+        monkeypatch.setattr(
+            "planetarypy.pds.utils._index_config_for",
+            lambda key: None,
+        )
+        monkeypatch.setattr(
+            "planetarypy.pds.utils._completion_id_col_for",
+            lambda key: "PRODUCT_ID",
+        )
+
+        fake_log = MagicMock()
+        fake_log.last_update = last_update
+        fake_log.last_check = last_check
+
+        fake_remote = MagicMock()
+        fake_remote.log = fake_log
+
+        class _StubIndex:
+            def __init__(self, *a, **kw): pass
+            @property
+            def url(self): return "https://example/index.lbl"
+            @property
+            def remote_type(self): return "dynamic"
+            @property
+            def local_parq_path(self):
+                from pathlib import Path
+                return Path("/nonexistent/path.parq")
+            remote = fake_remote
+        monkeypatch.setattr("planetarypy.pds.Index", _StubIndex)
+        return fake_log
+
+    def test_info_shows_last_updated_and_last_checked_with_relative_age(
+        self, monkeypatch,
+    ):
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        self._patch_index(
+            monkeypatch,
+            last_update=now - timedelta(days=5, hours=2),
+            last_check=now - timedelta(minutes=30),
+        )
+        result = runner.invoke(app, ["indexes", "info", "mro.ctx.edr"])
+        assert result.exit_code == 0
+        assert "last updated" in result.stdout
+        assert "5d ago" in result.stdout
+        assert "last checked" in result.stdout
+        assert "30m ago" in result.stdout
+
+    def test_info_shows_never_when_log_empty(self, monkeypatch):
+        self._patch_index(monkeypatch, last_update=None, last_check=None)
+        result = runner.invoke(app, ["indexes", "info", "mro.ctx.edr"])
+        assert result.exit_code == 0
+        # Both fields fall back to "(never)" when the log carries no datetime.
+        assert "last updated" in result.stdout
+        assert "last checked" in result.stdout
+        assert "(never)" in result.stdout
+
     def test_refresh_bare_invocation_shows_help(self):
         """`refresh` has no positional arg; the analogous UX is "show help
         when no actionable flag (--config / --cache) is given".

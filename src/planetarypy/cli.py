@@ -1641,6 +1641,36 @@ def _jsonable(value):
     return str(value)
 
 
+def _format_when(d) -> str:
+    """Render a datetime with a short relative-time suffix.
+
+    Examples:
+        ``2026-05-29 10:16:23  (4d ago)``
+        ``(never)``
+    """
+    if d is None:
+        return "(never)"
+    import datetime as _dt
+    now = _dt.datetime.now()
+    # Align tz-awareness if one side has it and the other doesn't.
+    if d.tzinfo is not None and now.tzinfo is None:
+        now = now.replace(tzinfo=d.tzinfo)
+    elif d.tzinfo is None and now.tzinfo is not None:
+        d = d.replace(tzinfo=now.tzinfo)
+    secs = (now - d).total_seconds()
+    if secs < 0:
+        rel = "in the future"
+    elif secs < 60:
+        rel = "just now"
+    elif secs < 3600:
+        rel = f"{int(secs // 60)}m ago"
+    elif secs < 86400:
+        rel = f"{int(secs // 3600)}h ago"
+    else:
+        rel = f"{int(secs // 86400)}d ago"
+    return f"{d.strftime('%Y-%m-%d %H:%M:%S')}  ({rel})"
+
+
 @indexes_app.command("info")
 def indexes_info(
     ctx: typer.Context,
@@ -1686,6 +1716,15 @@ def indexes_info(
         table.add_row("local cached", f"yes — {parq}  ({size_mb:.1f} MB)")
     else:
         table.add_row("local cached", "no")
+
+    # Freshness state from the access log (when did we last download the
+    # parquet, and when did we last check upstream for an update).
+    try:
+        log = idx.remote.log
+        table.add_row("last updated", _format_when(log.last_update))
+        table.add_row("last checked", _format_when(log.last_check))
+    except Exception as e:
+        table.add_row("last updated/checked", f"(unavailable: {e})")
 
     table.add_row(
         "completion column", _completion_id_col_for(key)
