@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.0] - 2026-06-03
+
+Column projection across the `plp indexes` family, a dual-idiom (repeated-flag-or-comma) treatment for both `--columns` and `--ccds`, a more visible freshness state on `plp indexes info`, plus a real bug that had been silently telling users their HiRISE indexes were up to date when they weren't.
+
+### Added
+
+- **`plp indexes peek/last/select --columns/-c COL[,COL...]`** — project the displayed rows to the named columns, in the order given. Comma-separated, repeated-flag, or any mix all work:
+  ```bash
+  plp indexes last mro.ctx.edr --columns "PRODUCT_ID,IMAGE_TIME" --rows 2 --sort
+  plp indexes peek mro.ctx.edr -c PRODUCT_ID -c IMAGE_TIME
+  plp indexes select mro.ctx.edr P_A -c PRODUCT_ID -c "IMAGE_TIME,EMISSION_ANGLE"
+  ```
+  Unknown column names produce a clear error listing every available column. Two ordering subtleties handled: `plp indexes last --sort` runs sort before projection so the time column can drive the sort even if you project it away; `plp indexes select` computes `missing_pids` before projection so the PID column survives for the diff.
+- **`planetarypy.pds.get_index(..., columns=None)`** — keyword-only parameter mirroring the CLI flag. Exact (case-sensitive) match; unknown names raise `KeyError` listing every available column. API-first per the project's CLI-thin / lib-fat discipline.
+- **`plp hiedr --ccds` and `plp himos --ccds` accept the same dual idiom** as `--columns`: `--ccds 4,5`, `--ccds 4 --ccds 5`, or any mix. Non-integer tokens raise a clean `BadParameter` instead of crashing inside the CCD loop. New helper `_parse_ccds` mirrors `_parse_columns`; both old call sites now share it instead of inlining `[int(n) for n in ccds.split(",")] if ccds else None`.
+- **`update available?` row on `plp indexes info`** — completes the freshness picture alongside the existing `last updated` and `last checked` rows. Renders `yes — run \`plp indexes refresh --cache KEY\`` or `no` (or `(check failed: ...)` if the remote HEAD couldn't be reached).
+
+### Fixed
+
+- **`StaticRemoteHandler.update_available` silently returning False on stale-but-cached state.** Real-world report: `plp indexes info mro.hirise.edr` claimed no update was available when the user had manually confirmed a newer index existed. Root cause: `Index(...)` instantiation calls `get_remote_timestamp()`, which writes both `remote_timestamp` and (via the bundled `log_remote_check` side-effect) `last_checked` to "now". That silences `should_check` for the next 24h. The next read of `update_available` then short-circuited on `not self.should_check` and never ran the `remote_time > last_update` comparison — leaving the flag stuck at whatever was previously logged (typically False after a long-past download). The fix removes the `should_check` gate from the comparison path: `should_check` now only gates whether to *fetch a fresh* remote timestamp; the comparison runs whenever a `remote_timestamp` is available (cached or fresh). Regression test pins the exact scenario (cached remote-ts > last_update + should_check False + flag unset → must be True). After upgrading, the very next invocation of any `plp indexes` verb correctly flips the flag for affected indexes.
+
+### Changed
+
+- **`AccessLog.log_remote_timestamp` renamed to `log_remote_check`** with a clarified docstring that spells out the two writes performed atomically (`remote_timestamp` from the server's `Last-Modified`, plus `last_checked` from our wall-clock). The previous name suggested a single-field setter, which was what made the bug above so hard to spot — readers two layers up couldn't see that calling it also bumped `last_checked`. Behavior unchanged; single internal caller updated.
+
+### Internal
+
+- 17 new tests across the touched layers: `test_pds_pids_filter.py` (`columns` projection API: 4 tests), `test_cli_indexes.py` (peek/last `--columns` + dual idiom + projection-after-sort: 5 tests), `test_cli_indexes_select.py` (select `--columns` across table/csv/jsonl formats + missing-PIDs-diff-survives-projection: 5 tests), `test_cli_parse_ccds.py` (the new helper, all forms + non-int error: 9 tests), `test_pds_static_index.py` (the regression for the silent-staleness bug: 1 test), `test_pds_index_logging.py` (renamed `test_log_remote_check`).
+
 ## [0.67.1] - 2026-06-02
 
 A small UX improvement for `plp indexes info`: the local-cache row finally gets two siblings reporting when that cache was last downloaded and when we last asked upstream about updates. The data was already tracked on every index's `AccessLog`; this release just surfaces it.
