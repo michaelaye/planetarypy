@@ -70,16 +70,36 @@ jobs:
       # Idempotent after a cache hit: download_generic_kernels() skips
       # any file that already exists.  On a fresh cache this serially
       # seeds the kernels so parallel pytest-xdist workers don't race.
+      # Retries on transient NAIF timeouts so a flaky network on the
+      # runner doesn't fail an otherwise-green release.
       run: |
-        python -c "from planetarypy.spice.generic_kernels import download_generic_kernels; download_generic_kernels()"
+        attempt=0
+        until python -c "from planetarypy.spice.generic_kernels import download_generic_kernels; download_generic_kernels()"; do
+          attempt=$((attempt + 1))
+          if [ $attempt -ge 3 ]; then
+            echo "::error::NAIF prefetch failed after 3 attempts."
+            exit 1
+          fi
+          echo "::warning::NAIF prefetch attempt $attempt failed; retrying after 20s..."
+          sleep 20
+        done
 
     - name: Prefetch HiRISE RDR cumulative index
       shell: bash -l {0}
-      # Same idempotency story as the SPICE prefetch: first run seeds
-      # the parquet cache; subsequent runs hit the cache hit.  Covers
-      # test_spicer.TestSolarAzimuth which queries the RDR index.
+      # Same idempotency + retry story as the SPICE prefetch: first
+      # run seeds the parquet cache; subsequent runs hit the cache hit.
+      # Covers test_spicer.TestSolarAzimuth which queries the RDR index.
       run: |
-        python -c "from planetarypy.pds import get_index; get_index('mro.hirise.rdr')"
+        attempt=0
+        until python -c "from planetarypy.pds import get_index; get_index('mro.hirise.rdr')"; do
+          attempt=$((attempt + 1))
+          if [ $attempt -ge 3 ]; then
+            echo "::error::HiRISE RDR prefetch failed after 3 attempts."
+            exit 1
+          fi
+          echo "::warning::HiRISE RDR prefetch attempt $attempt failed; retrying after 20s..."
+          sleep 20
+        done
 
     - name: Run tests
       shell: bash -l {0}
