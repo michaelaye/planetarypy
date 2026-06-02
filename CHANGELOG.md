@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.1] - 2026-06-02
+
+A small UX improvement for `plp indexes info`: the local-cache row finally gets two siblings reporting when that cache was last downloaded and when we last asked upstream about updates. The data was already tracked on every index's `AccessLog`; this release just surfaces it.
+
+### Changed
+- **`plp indexes info KEY`** gains two new rows in the Rich-rendered table:
+  ```
+  last updated   2026-02-23 11:01:28  (99d ago)
+  last checked   2026-06-02 22:08:37  (just now)
+  ```
+  Each renders with a compact relative-age suffix (`just now` / `30m ago` / `5h ago` / `99d ago`) alongside the absolute timestamp, or `(never)` when the access log carries no datetime yet (fresh installs, or indexes you haven't touched). At a glance you can now tell whether your cached parquet is stale and whether the once-per-day update check has fired recently.
+
+### Internal
+- New `_format_when(d)` helper in `cli.py`: renders a datetime with a relative-age suffix; handles tz-aware/naive mismatches so it's robust to whatever the log writer produces. 2 new regression tests in `TestIndexesInfoFreshness` (real-datetime → relative-age strings; `None` → `(never)`) — both stub `Index` + `AccessLog` to stay fast and offline.
+
 ## [0.67.0] - 2026-05-29
 
 CSV inputs and a better failure report for the batch-PID workflow. Real-world driver: feeding a HiRISE observation-CSV through `head | plp fetch` to grab the first few RED products — which surfaced two design oversights (stdin always parsed as plain text; FAIL block was an unreadable wall of text) plus the discovery that the suffix idiom belongs in the API too.
