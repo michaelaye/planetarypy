@@ -1852,11 +1852,18 @@ def indexes_info(
         table.add_row("local cached", "no")
 
     # Freshness state from the access log (when did we last download the
-    # parquet, and when did we last check upstream for an update).
+    # parquet, when did we last check upstream, and is a newer one waiting).
     try:
         log = idx.remote.log
         table.add_row("last updated", _format_when(log.last_update))
         table.add_row("last checked", _format_when(log.last_check))
+        try:
+            ua = idx.update_available
+        except Exception as e:
+            ua_text = f"(check failed: {e})"
+        else:
+            ua_text = "yes — run `plp indexes refresh --cache KEY`" if ua else "no"
+        table.add_row("update available?", ua_text)
     except Exception as e:
         table.add_row("last updated/checked", f"(unavailable: {e})")
 

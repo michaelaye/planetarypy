@@ -280,6 +280,35 @@ class TestStaticRemoteHandler:
         handler.log.log_update_available(False)
         assert handler.update_available is False
 
+    def test_update_available_true_when_cached_remote_newer_AND_should_not_check(
+        self, config_env, monkeypatch,
+    ):
+        """Regression for the silent-staleness bug.
+
+        Scenario that bit mro.hirise.edr in the wild:
+          - last_update is months in the past.
+          - remote_timestamp is cached (from a previous ``Index()``
+            instantiation that called ``get_remote_timestamp`` and thereby
+            bumped ``last_check``).
+          - should_check is therefore False (we just checked).
+          - log.update_available was never set True because the property
+            had short-circuited on ``should_check`` and never run the
+            comparison.
+
+        The fix removes the ``should_check`` gate from the comparison;
+        whenever a cached remote_timestamp is newer than last_update,
+        update_available must return True regardless of how recently we
+        last touched the network.
+        """
+        handler = self._make_handler(config_env, monkeypatch, should_check=False)
+        old_local = datetime.datetime(2025, 10, 30, 16, 26, 49)
+        new_remote = datetime.datetime(2026, 5, 30, 1, 15, 9)
+        handler.log.set("mro.ctx.edr", "last_updated", old_local)
+        handler.log.set("mro.ctx.edr", "remote_timestamp", new_remote)
+        handler.log.log_update_available(False)
+        handler.log.save()
+        assert handler.update_available is True
+
     def test_update_available_true_when_remote_newer(self, config_env, monkeypatch):
         """update_available returns True when remote timestamp is newer than last update."""
         monkeypatch.setattr(AccessLog, "should_check", property(lambda self: True))

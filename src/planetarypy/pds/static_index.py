@@ -160,33 +160,56 @@ class StaticRemoteHandler:
     
     @property
     def update_available(self) -> bool:
-        """Check if an update is available based on remote timestamp."""
-        if self.log.update_available:  # no need to check further if we logged this.
+        """Check if an update is available based on remote timestamp.
+
+        We compare the remote ``Last-Modified`` against the local
+        ``last_update``. The comparison runs whenever a remote timestamp
+        is available — cached from a previous check OR freshly fetched —
+        regardless of how recently we last touched the remote.
+
+        ``should_check`` only controls whether to FETCH a fresh
+        timestamp; it does NOT gate the comparison. (Doing so was a
+        bug: ``__init__`` already updated ``last_check`` via
+        ``log_remote_timestamp``, so the gate would suppress the
+        comparison on every subsequent call within the day, leaving
+        ``update_available`` stuck at its previous value.)
+        """
+        if self.log.update_available:  # already flagged → fast path
             return True
-        elif not self.should_check:
-            logger.debug(f"Skipping update check for {self.index_key}, checked recently.")
-            return False
-        
-        logged_timestamp = self.log.get(self.index_key, "remote_timestamp")
-        if logged_timestamp is not None:
-            remote_time = logged_timestamp
-        else:
+
+        # Prefer the cached remote_timestamp (the one ``__init__`` wrote
+        # on first instantiation). Only fetch fresh if nothing is cached
+        # AND it's time for a new check.
+        remote_time = self.log.get(self.index_key, "remote_timestamp")
+        if remote_time is None and self.should_check:
             remote_time = self.remote_timestamp
-        
+
         if remote_time is None:
+            logger.debug(
+                f"No remote timestamp available for {self.index_key}; "
+                "cannot determine if an update is available."
+            )
             return False
-        
+
         last_update = self.log.last_update
         if last_update is None:
-            logger.info(f"No previous update logged for {self.index_key}, update available")
+            logger.info(
+                f"No previous update logged for {self.index_key}, update available"
+            )
             self.log.log_update_available(True)
             return True
-        
+
         if remote_time > last_update:
-            logger.info(f"Update available for {self.index_key}: remote timestamp {remote_time} > last update {last_update}")
+            logger.info(
+                f"Update available for {self.index_key}: remote timestamp "
+                f"{remote_time} > last update {last_update}"
+            )
             self.log.log_update_available(True)
             return True
         else:
-            logger.debug(f"No update available for {self.index_key}: remote time {remote_time} <= last update {last_update}")
+            logger.debug(
+                f"No update available for {self.index_key}: remote time "
+                f"{remote_time} <= last update {last_update}"
+            )
             return False
 
