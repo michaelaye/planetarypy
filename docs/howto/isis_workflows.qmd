@@ -1,0 +1,117 @@
+---
+title: "HOWTO ISIS3 workflows with planetarypy"
+---
+
+planetarypy can drive an ISIS3 calibration / projection pipeline —
+`ctx_calib`, `isis/projected.py`, and parts of the HiRISE module call
+out to ISIS3 binaries via a Python wrapper. **ISIS itself is not a
+Python package and is not installed by `pip install planetarypy`.**
+It's a large, separately-managed binary distribution from USGS. This
+page explains the two-part install and how the failure modes look.
+
+## Two-part install
+
+| What | Source | Size | Who installs it |
+|---|---|---|---|
+| **ISIS3 binaries** (cube file tools, projection, calibration, …) | USGS / conda-forge or docker | Several GB | The user, separately, into its own environment |
+| **Python glue** (`kalasiris`, `geopandas`, `hvplot`) | `pip install planetarypy[isis]` | A few hundred MB | planetarypy's `[isis]` extra |
+
+### Step 1 — install ISIS itself (one time)
+
+The recommended path is a dedicated conda environment:
+
+```bash
+conda create -n isis -c usgs-astrogeology -c conda-forge isis
+```
+
+Alternatively, [USGS provides docker images](https://github.com/USGS-Astrogeology/ISIS3#docker)
+that bundle ISIS + its dependencies. The docker option avoids
+conda-env management entirely and is the easier path for users who
+don't already live in conda.
+
+Either way, the goal is the same: have ISIS binaries (`hi2isis`,
+`spiceinit`, `hical`, etc.) reachable on your `$PATH` when you run
+Python.
+
+### Step 2 — install planetarypy's Python glue
+
+```bash
+pip install "planetarypy[isis]"
+```
+
+This adds three Python packages to your current environment:
+
+- `kalasiris` — Python wrapper that subprocesses out to the ISIS CLI tools.
+- `geopandas` — for reading ISIS-emitted footprint shapefiles into `GeoDataFrame`s.
+- `hvplot` — for interactive rasterized display of cube files.
+
+It does NOT install ISIS itself. If you don't have ISIS on PATH yet,
+you'll find out the moment you try to run a calibration pipeline.
+
+### Step 3 — make ISIS available to your Python session
+
+If you installed ISIS into its own conda env, activate it first, then
+run planetarypy from within it (after `pip install
+planetarypy[isis]` in that env):
+
+```bash
+conda activate isis
+pip install "planetarypy[isis]"   # inside the isis env
+python my_calibration_script.py
+```
+
+Or if you prefer to run planetarypy from a different env and just
+borrow ISIS's binaries, prepend the ISIS env's `bin/` directory to
+your `$PATH`:
+
+```bash
+export PATH="$(conda env list | awk '$1=="isis"{print $NF}')/bin:$PATH"
+```
+
+The docker workflow handles this automatically — every shell inside
+the container has the binaries on PATH.
+
+## What the failure modes look like
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `ModuleNotFoundError: No module named 'kalasiris'` (or geopandas / hvplot) when calling a calibration function | You installed planetarypy without the `[isis]` extra | `pip install "planetarypy[isis]"` |
+| `FileNotFoundError: [Errno 2] No such file or directory: 'hi2isis'` (or similar ISIS-tool name) | ISIS binaries are not on `$PATH` | Activate your ISIS conda env, or `export PATH=...isis/bin:$PATH` |
+| ISIS subprocess returns a non-zero exit code | The tool ran but rejected its inputs (bad cube, missing kernel, wrong data dir) | The `ProcessError` printout from the wrapper shows the stdout/stderr — read it; the ISIS message is usually clear |
+
+The three failure surfaces are distinct on purpose. If a user runs
+
+```python
+from planetarypy.instruments.mro.ctx import ctx_calib
+collection = ctx_calib.CTXCollection([...])
+collection.calibrate()
+```
+
+they should see at most one of the three failures, and each tells
+them what to do next.
+
+## What's importable without the `[isis]` extra
+
+The `[isis]` extra is purely for the **execution** of ISIS pipelines.
+The CTX modules themselves remain importable on a core install:
+
+```python
+# Works with just `pip install planetarypy`:
+from planetarypy.instruments.mro.ctx import ctx_calib, ctx_edr
+from planetarypy.isis import projected
+```
+
+The functions that actually invoke ISIS (`.calibrate()`, `.plot_any()`,
+`.read_gml_to_gdf()`, etc.) defer their heavy imports until called —
+so opening one of these modules in a notebook or browsing the API
+doesn't require any of the `[isis]` deps. Only **running** the
+pipelines does.
+
+This is the same shape as `[spice]`: the modules are reachable, the
+heavy work needs the extra.
+
+## Pointers
+
+- [USGS Astrogeology ISIS3 install guide](https://github.com/USGS-Astrogeology/ISIS3) — the canonical source.
+- [`kalasiris` documentation](https://kalasiris.readthedocs.io/) — the Python wrapper that planetarypy's ISIS layer is built on.
+- `planetarypy.instruments.mro.ctx.ctx_calib` and `planetarypy.isis.projected` — the two main API surfaces that drive ISIS pipelines.
