@@ -1,0 +1,152 @@
+---
+title: "HOWTO planetaryimage functions today"
+---
+
+The original
+[`planetaryimage`](https://github.com/planetarypy/planetaryimage) package
+filled an important gap years ago: a Python-native reader for PDS3
+`.IMG` files and ISIS3 `.cub` cubes back when GDAL's coverage of
+planetary formats was thin and rasterio wasn't an obvious choice. The
+package is no longer actively maintained, and most of what it did is
+now available with one or two lines of modern code using libraries
+PlanetaryPy already depends on.
+
+This page maps every `planetaryimage` operation that turns up in
+real-world notebooks to its modern equivalent. The motivating example
+is [this 2015 demo
+notebook](https://nbviewer.org/urls/gist.githubusercontent.com/godber/dfb5d012fda603619ab9/raw/b1db599f53a5c468075ff854e9056698bd005cc7/gistfile1.json),
+which loads PDS3 images from the Mars rovers, inspects them, and
+displays them with matplotlib.
+
+## TL;DR — minimal, exact one-line substitution
+
+```python
+# Old
+import matplotlib.pyplot as plt
+from planetaryimage import PDS3Image
+img = PDS3Image.open("rover_image.IMG")
+plt.imshow(img.data, cmap='gray')
+
+# Modern — same display behavior, just rasterio for the read
+import matplotlib.pyplot as plt
+import rasterio
+with rasterio.open("rover_image.IMG") as ds:
+    plt.imshow(ds.read(1), cmap='gray')
+```
+
+That's it. The same one-line substitution handles ISIS3 `.cub` files —
+GDAL picks the driver from the file. No `planetaryimage` import, no
+behavior change at the display.
+
+### Optional upgrade — auto-stretched display
+
+PlanetaryPy ships `planetarypy.plotting.imshow_gray`, which is *not* a
+direct replacement for `plt.imshow(arr, cmap='gray')` (it adds
+percentile-based contrast stretching that makes faint planetary
+imagery readable without tweaking `vmin` / `vmax` by hand). When you'd
+otherwise reach for `plt.imshow(..., vmin=..., vmax=...)`, swap it in:
+
+```python
+from planetarypy.plotting import imshow_gray
+with rasterio.open("rover_image.IMG") as ds:
+    imshow_gray(ds.read(1))   # auto-stretch, sensible defaults
+```
+
+Use the plain `plt.imshow` form when you want literal pixel-value
+display; use `imshow_gray` when you want something readable on screen.
+
+## The translation table
+
+| Old (planetaryimage) | Modern equivalent | Notes |
+|---|---|---|
+| `PDS3Image.open(path)` | `rasterio.open(path)` | Uses GDAL's `PDS` driver. Returns a `DatasetReader`; call `.read(1)` for the band-1 numpy array. |
+| `PDS3Image.open(path)` (label-aware alt) | `pdr.read(path)` | [Planetary Data Reader](https://github.com/MillionConcepts/pdr) (MillionConcepts) — the same project that powers `planetarypy.catalog`. Mission-aware, pure Python, returns labels alongside arrays. Heavier dep; only worth pulling in when you need the structured label. |
+| `CubeFile.open(path)` (ISIS3 cubes) | `rasterio.open(path)` | Same call. GDAL's ISIS3 driver handles `.cub`. |
+| `img.data` | `ds.read(1)` (single band) / `ds.read()` (all bands) | rasterio returns a numpy array directly. |
+| `img.data.shape` | `(ds.count, ds.height, ds.width)` or `ds.read().shape` | rasterio splits band count from spatial dims; `read()` reassembles into one array. |
+| `img.data.dtype` | `ds.dtypes[0]` | Per-band; usually all the same. |
+| `plt.imshow(img.data, cmap='gray')` | `plt.imshow(arr, cmap='gray')` — same call. | For an auto-stretched display use `planetarypy.plotting.imshow_gray(arr)` instead — *not* a literal substitution (it adds percentile stretching) but usually what you actually want for planetary imagery. |
+| `scipy.misc.imsave(path, arr)` | `imageio.imwrite(path, arr)` | `scipy.misc.imsave` was removed in SciPy 1.3. For georeferenced writes use `rasterio.open(path, 'w', ...).write(arr, 1)` instead. |
+
+## The 2015 notebook, modernized
+
+The original notebook was four operations: load several PDS3 images, print metadata, display two of them.
+
+```python
+from glob import glob
+import rasterio
+import matplotlib.pyplot as plt
+
+# Load — same one-liner whether the file is PDS3 .IMG or ISIS3 .cub
+pdsfiles = glob("tests/data/*.img")
+datasets = [rasterio.open(p) for p in pdsfiles]
+
+# Inspect
+for path, ds in zip(pdsfiles, datasets):
+    print(f"{path}: dtype={ds.dtypes[0]} "
+          f"shape=({ds.count}, {ds.height}, {ds.width})")
+
+# Display — exact behavior of the original notebook
+pancam = datasets[3].read(1)
+plt.imshow(pancam, cmap='gray')
+
+# Same approach for an ISIS3 cube — no different call
+with rasterio.open("some_isis.cub") as cube:
+    plt.imshow(cube.read(1), cmap='gray')
+```
+
+Four fewer imports than the original (`planetaryimage`, `scipy.misc`,
+`matplotlib.image`, `scipy.ndimage` were all in the old preamble),
+one fewer concept (`img.data` → `ds.read(1)`), exactly the same output.
+
+If you'd rather have auto-stretched display (recommended for most
+planetary imagery, since raw pixel-value distributions are typically
+narrow), swap `plt.imshow(arr, cmap='gray')` for
+`imshow_gray(arr)` as shown in the TL;DR.
+
+## When rasterio isn't enough
+
+Reach for **`pdr`** instead when you need:
+
+- The **structured PDS label** — object hierarchy, units, comments. GDAL flattens labels into a string-keyed tag dump that loses the hierarchy; `pdr` keeps it as nested Python.
+- **PDS3 formats that GDAL doesn't speak fluently** — early line-prefix encodings, non-standard payload layouts. Rare in practice for well-known missions; common in older / experimental datasets.
+- **Mission-specific quirks** — e.g. some products bundle attached labels with payloads in ways the GDAL driver doesn't fully unwind.
+
+For everything else — pixels + CRS + overviews + windowed reads +
+remote `/vsicurl/` access — rasterio is strictly more capable than the
+old `planetaryimage` was.
+
+## What PlanetaryPy adds on top
+
+Once you're reading with rasterio, several PlanetaryPy helpers compose
+naturally with the `DatasetReader`:
+
+- **`planetarypy.plotting.imshow_gray(arr)`** — grayscale display with
+  sensible auto-stretch.
+- **`planetarypy.plotting.add_sun_indicator(ax, sun_azimuth_deg)`** —
+  overlay a sun direction arrow on any matplotlib axes; takes the
+  azimuth in degrees clockwise from image top (PDS `SUB_SOLAR_AZIMUTH`
+  convention for unprojected images). Instrument-agnostic — works for
+  any image whose label / metadata exposes that quantity. The HiRISE
+  helper `sun_azimuth_from_top` is one convenient way to get the
+  azimuth, but the indicator itself isn't HiRISE-specific.
+- **`planetarypy.plotting.imshow_with_sun(image, sun_azimuth_deg)`** —
+  one-call combo of `imshow_gray` + `add_sun_indicator` for the common
+  case.
+- **`planetarypy.geo.Point`** + the `pixel_to_lonlat` / `lonlat_to_pixel`
+  helpers — bidirectional coordinate transforms that take a rasterio
+  dataset directly.
+- **`planetarypy.instruments.mro.hirise.get_browse`** — HiRISE browse
+  JPEGs in one call, no manual URL building.
+
+The general pattern: use rasterio (or `pdr` when label-aware) to load,
+then use PlanetaryPy's instrument-aware helpers for everything that
+follows.
+
+## Acknowledgment
+
+The `planetaryimage` package shipped exactly the right abstraction at a
+time when nothing else was available. The fact that it's no longer
+needed for the use cases above is a downstream success of GDAL's
+planetary-format support catching up — credit to the OSGeo / GDAL
+maintainers and to the MillionConcepts team for the `pdr` ecosystem.
