@@ -27,12 +27,10 @@ classifiers = [
 dependencies = [
     "astropy",         # For astronomy calculations
     "typer>=0.9",      # For command-line interface
-    "fastcore",        # For utilities like improved Path
     "numpy",           # For numerical operations
     "pandas",          # For data handling
     "pooch",           # For downloading and caching data files
     "pvl",             # For PDS label parsing
-    "lxml",            # For XML handling
     "python-dateutil", # For date parsing
     "requests",        # For HTTP requests
     "tomlkit",         # For configuration handling
@@ -43,6 +41,7 @@ dependencies = [
     "rasterio",        # For geospatial transforms
     "pyproj",          # For CRS reprojection
     "rioxarray",       # For reading geo-referenced rasters
+    "matplotlib",      # For planetarypy.plotting + plp visualize verbs
 ]
 
 [project.urls]
@@ -53,8 +52,6 @@ Repository = "https://github.com/planetarypy/planetarypy"
 # Optional dependencies for SPICE-related functionality
 spice = [
     "spiceypy",       # For SPICE kernel handling
-    "matplotlib",     # For plotting
-    "planets>=0.8",   # For planetary calculations
 ]
 # Development dependencies
 dev = [

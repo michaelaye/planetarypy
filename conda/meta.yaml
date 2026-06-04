@@ -24,12 +24,10 @@ requirements:
     - python >=3.11
     - astropy
     - typer >=0.9
-    - fastcore
     - numpy
     - pandas
     - pooch
     - pvl
-    - lxml
     - python-dateutil
     - requests
     - tomlkit
@@ -40,6 +38,7 @@ requirements:
     - rasterio
     - pyproj
     - rioxarray
+    - matplotlib-base
 
 test:
   imports:

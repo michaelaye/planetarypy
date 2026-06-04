@@ -27,7 +27,7 @@ import pandas as pd
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message=".*pvl.collections.Units.*")
     import pvl
-from fastcore.utils import Path
+from pathlib import Path
 from loguru import logger
 from tqdm.auto import tqdm
 
