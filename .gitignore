@@ -142,7 +142,6 @@ src/planetarypy/instruments/print.prt
 .idea/
 .claude/
 .playwright-mcp/
-CLAUDE.md
 
 # Quarto build artifacts
 docs/objects.json
