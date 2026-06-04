@@ -30,6 +30,51 @@ from planetarypy.pds import get_index
 
 CONFIGPATH = Path.home() / ".planetarypy_mro_ctx.toml"
 
+# Default CTX config written on first import when the user has no
+# `~/.planetarypy_mro_ctx.toml` yet. Same shape as the existing file;
+# users with a mirror or non-default storage paths edit it after the
+# first write. Mirrors the auto-create pattern in
+# `planetarypy.config.Config._create_default_config`.
+_DEFAULT_CTX_CONFIG = """\
+# configuration for MRO CTX data
+# Auto-created on first import; edit to point at local mirrors.
+
+[edr]
+# where to get new data from the PDS archive
+url = "https://pds-imaging.jpl.nasa.gov/data/mro/ctx"
+
+# Read-only mirror (group share, may be unmounted when off-site).
+# Empty path => no mirror configured; only consulted when set.
+[edr.mirror]
+path = ""
+with_volume = true
+with_pid = false
+with_data_segment = false
+
+# Local writeable store: where NEW downloads go AND where we look if
+# the mirror doesn't have the file (or is unmounted).
+[edr.local]
+# empty -> config.storage_root/mro/ctx
+# relative -> joined to config.storage_root
+# absolute -> used as-is
+path = ""
+with_volume = true
+with_pid = true
+
+[calib]
+# where to search calibrated data
+# empty -> config.storage_root/mro/ctx; otherwise joined per the
+# absolute/relative rules above.
+storage = ""
+with_volume = true
+with_pid = true
+calibrated_ext = ".lev1"
+mapped_ext = ".lev2"
+"""
+
+if not CONFIGPATH.exists():
+    CONFIGPATH.write_text(_DEFAULT_CTX_CONFIG)
+
 with CONFIGPATH.open() as f:
     CTXCONFIG = tomlkit.load(f)
 
