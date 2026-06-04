@@ -185,6 +185,7 @@ These patterns are uniform across the existing `plp` verbs; new commands should 
 - CLI tests use `typer.testing.CliRunner` and **mock the API layer** (e.g. `monkeypatch.setattr(catalog_mod, "fetch_product", ...)`). They should not run a subprocess or hit the network.
 - ProcessPoolExecutor tests must skip under pytest-xdist (nested process pools don't survive worker fork/spawn). Pattern: `@pytest.mark.skipif("PYTEST_XDIST_WORKER" in os.environ, reason="...")`.
 - Test class organization: group related tests in `class TestFoo:`. One test method per concrete scenario.
+- **The dev-environment kitchen-sink problem.** Running pytest in a dev environment that has every dep installed (core + spice + isis + plotting tools) **cannot** validate the declared-dependency contract. Real users `pip install planetarypy` without those extras and hit `ModuleNotFoundError` on imports that worked locally. CI's `minimal-install` job (in `.github/workflows/test.yaml`) catches this by creating a fresh venv, `pip install .` with no extras, and exercising every public submodule + CLI verb. **Before changing anything in `[project.dependencies]` or `[project.optional-dependencies]`, mentally run that job first**: does my change break the no-extras smoke?
 
 ---
 

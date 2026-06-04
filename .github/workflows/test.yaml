@@ -113,3 +113,62 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         files: ./coverage.xml
         fail_ci_if_error: false
+
+  minimal-install:
+    # Validates the declared-dependency contract: `pip install planetarypy`
+    # (no extras, no dev deps) should let users `import` every public
+    # submodule and run `plp --help`. Without this job, dep-contract bugs
+    # only manifest when external users hit them — see the v0.68.1
+    # release-cycle post-mortem for the matplotlib-in-[spice] /
+    # lxml-via-pandas.read_html cases this catches.
+    name: Minimal install smoke test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install planetarypy (no extras, no dev)
+      run: |
+        python -m venv /tmp/minimal
+        source /tmp/minimal/bin/activate
+        pip install --upgrade pip
+        pip install .
+
+    - name: Import every public submodule
+      run: |
+        source /tmp/minimal/bin/activate
+        python -c "
+        import planetarypy
+        from planetarypy.config import config
+        from planetarypy.plotting import imshow_gray, add_sun_indicator, imshow_with_sun
+        from planetarypy.pds import (
+            get_index, missing_pids, pid_column, read_pids_file,
+            print_available_indexes, complete_pid,
+        )
+        from planetarypy.catalog import (
+            list_missions, list_instruments, list_products,
+            search, fetch_product, fetch_products, get_product_urls,
+            BatchFetchResult, OfflineError,
+        )
+        from planetarypy.constants import Mars, Earth, Moon
+        from planetarypy import geo, utils
+        from planetarypy.instruments.mro import hirise
+        from planetarypy.instruments.mro.ctx import ctx_edr, ctx_calib
+        from planetarypy.instruments.go import ssi
+        print('All public imports OK')
+        "
+
+    - name: Run plp --help on every verb
+      run: |
+        source /tmp/minimal/bin/activate
+        plp --help > /dev/null
+        plp catalog --help > /dev/null
+        plp indexes --help > /dev/null
+        plp spice --help > /dev/null
+        plp fetch --help > /dev/null
+        plp indexes select --help > /dev/null
