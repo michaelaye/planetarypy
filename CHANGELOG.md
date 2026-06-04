@@ -14,8 +14,9 @@ A maintenance release: stale dependencies removed, one misclassified dependency 
 
 ### Removed
 - **`fastcore` from core dependencies.** Only use in the codebase was `from fastcore.utils import Path` in `src/planetarypy/pds/index_labels.py`; replaced with `from pathlib import Path` (semantically identical for our usage — all call sites pass strings to `Path(...)`).
-- **`lxml` from core dependencies.** Zero imports anywhere in `src/` or `tests/`. Also confirmed it's not a transitive dep of `pvl`.
 - **`planets` from the `[spice]` extra.** Zero imports anywhere; `planetarypy.constants` (PCK + JPL DE440 + NSSDC composed in `constants/__init__.py`, added in v0.61.0 and overhauled in v0.64.0) provides everything `planets` was previously used for.
+
+(Note: `lxml` was briefly removed in a pre-tag iteration of this release, but the tag-push CI caught that it's required at runtime by `pandas.read_html()` in `spice/archived_kernels.py:180` — kept in the dependency list with a comment documenting the transitive use.)
 
 ### Added
 - **`CLAUDE.md` at the repo root**, promoted from a gitignored personal-doc to a committed shared resource. Comprehensive working agreement for AI coding agents (Claude Code, Cursor with Claude, Copilot Chat) operating in this repo: project map, code/CLI/testing conventions, development principles (surgical fixes, semver rule, partial-answers-aren't-agreement, state-machine bug review heuristics, etc.), full release process. The deliberately-excluded category is personal interaction infrastructure (output formatting headers, memory writing protocols) — those stay in maintainers' personal `~/.claude/CLAUDE.md`.

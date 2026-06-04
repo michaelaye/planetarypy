@@ -31,6 +31,7 @@ dependencies = [
     "pandas",          # For data handling
     "pooch",           # For downloading and caching data files
     "pvl",             # For PDS label parsing
+    "lxml",            # Runtime backend for pandas.read_html in spice/archived_kernels.py
     "python-dateutil", # For date parsing
     "requests",        # For HTTP requests
     "tomlkit",         # For configuration handling
