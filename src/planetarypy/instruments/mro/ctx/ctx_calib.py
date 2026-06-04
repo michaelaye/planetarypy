@@ -7,8 +7,6 @@ from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
-import geopandas as gpd
-import hvplot.pandas  # noqa: F401
 import pandas as pd
 from loguru import logger
 from tqdm.auto import tqdm
@@ -207,6 +205,7 @@ class Calib:
 
     def plot_any(self, path):
         "returns re-usable holoviews plot object"
+        import hvplot.pandas  # noqa: F401  # registers the .hvplot accessor
         da = utils.read_image(path)
         return da.hvplot(rasterize=True, aspect="equal", cmap="gray")
 
@@ -498,6 +497,7 @@ class CTXCollection:
 
     def read_gml_to_gdf(self, refresh=False):
         """Read the GML files from the collection and return a GeoDataFrame."""
+        import geopandas as gpd
 
         if self.geodataframe_path.is_file() and not refresh:
             logger.info(

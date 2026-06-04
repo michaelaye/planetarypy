@@ -12,7 +12,6 @@ from pathlib import Path
 import numpy as np
 import warnings
 
-import hvplot.pandas  # noqa: F401
 import pooch
 
 # pvl 1.3.2 self-triggers PendingDeprecationWarning; see pvl#109

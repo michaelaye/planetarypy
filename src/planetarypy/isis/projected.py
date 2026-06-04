@@ -7,8 +7,6 @@ from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
-import geopandas as gpd
-import hvplot.pandas  # noqa: F401
 import pandas as pd
 from loguru import logger
 from tqdm.auto import tqdm
@@ -101,14 +99,17 @@ class IsisCube:
 
     @property
     def shape_as_geoseries(self):
+        import geopandas as gpd
         return gpd.read_file(self.shape_path)["geometry"]
-    
+
     @property
     def shape_as_polygon(self):
-        
+        # TODO: not implemented yet; placeholder property.
+        pass
 
     def plot(self):
         "returns re-usable holoviews plot object"
+        import hvplot.pandas  # noqa: F401  # registers the .hvplot accessor
         da = utils.read_image(self.fpath)
         return da.hvplot(rasterize=True, aspect="equal", cmap="gray")
 
@@ -263,6 +264,7 @@ class IsisCubes:
 
     def read_gml_to_gdf(self, refresh=False):
         """Read the GML files from the collection and return a GeoDataFrame."""
+        import geopandas as gpd
 
         if self.geodataframe_path.is_file() and not refresh:
             logger.info(
