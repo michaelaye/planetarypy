@@ -25,8 +25,19 @@ try:
         overlapstats,
         spiceinit,
     )
-except KeyError:
-    warnings.warn("kalasiris has a problem initializing ISIS")
+except (KeyError, ImportError):
+    # KeyError: kalasiris is installed but ISIS env vars (ISISROOT,
+    # ISISDATA) aren't set — ISIS won't actually run.
+    # ImportError: kalasiris itself isn't installed; user is on a
+    # core install without the [isis] extra. Either way, importing
+    # this module should still succeed; the @catch_isis_error
+    # decorator surfaces a clear ImportError when an ISIS-using
+    # function is actually called.
+    warnings.warn(
+        "kalasiris not importable (ISIS pipeline will be unavailable). "
+        "Install the extra with `pip install \"planetarypy[isis]\"` and "
+        "ensure ISIS itself is on $PATH. See docs/howto/isis_workflows.qmd."
+    )
 
 
 class IsisCube:

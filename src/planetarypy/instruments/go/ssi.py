@@ -4,7 +4,7 @@ from loguru import logger
 from yarl import URL
 
 from planetarypy.config import config
-from planetarypy.pds.utils import get_index
+from planetarypy.pds import get_index
 from planetarypy.utils import url_retrieve
 
 BROWSE_URLBASE = URL("https://pds-rings.seti.org/viewmaster/volumes/GO_0xxx/")
