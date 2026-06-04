@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.2] - 2026-06-04
+
+A "fix the install contract" release. Every change is shaped like a bug fix: the package declares what it actually needs, ships the docs to use it, and surfaces clear errors when something's missing. No new public-API capability — the heavy modules (ctx_calib, isis/projected) have always required geopandas + hvplot + kalasiris; this release just makes that fact visible to pip, deptry, and the user.
+
+### Fixed
+
+- **Undeclared runtime deps `geopandas` and `hvplot` are now properly declared.** Both modules `ctx_calib.py` and `isis/projected.py` did top-level `import geopandas as gpd` / `import hvplot.pandas` without those packages being in any dependency list. Users on a fresh `pip install planetarypy` hit a `ModuleNotFoundError` the moment they imported the CTX or ISIS submodules. The dev-env-kitchen-sink local tests couldn't see this because every dev already had those packages installed for other work.
+- **The kalasiris try/except in ctx_calib.py and isis/projected.py was too narrow.** It caught `KeyError` (ISIS env vars not set) but not `ImportError` (kalasiris itself not installed). On a fresh install without the new `[isis]` extra, that meant a hard `ModuleNotFoundError` instead of the warning the code was trying to emit. Widened to `(KeyError, ImportError)` matching the pattern in `utils.py:18`.
+- **`utils.catch_isis_error` silently returned `None` when ISIS wasn't available.** The decorated function then surfaced as `TypeError: 'NoneType' object is not callable` to the user, with no indication that the `[isis]` extra was the actual missing thing. Now raises a clear `ImportError` pointing at `pip install "planetarypy[isis]"` and the new ISIS docs page (the previous silent-None was the worst of both worlds).
+- **`ctx_edr.py` crashed at import on a fresh system** because it did `with CONFIGPATH.open() as f` without checking whether `~/.planetarypy_mro_ctx.toml` existed. Mirrored the auto-create pattern used by `planetarypy.config.Config`: a sane default is written on first import (PDS public URL for downloads, empty mirror/local paths that fall back to `{storage_root}/mro/ctx`), users edit afterwards.
+- **`ssi.py` had a stale import** — `from planetarypy.pds.utils import get_index` (the function lives in `planetarypy.pds`, not `pds.utils`). Broken for ages; only surfaced now because the new smoke job is the first thing that imports `ssi` without a kitchen-sink env masking the issue.
+
+### Added
+
+- **New `[isis]` optional extra: `kalasiris`, `geopandas`, `hvplot`.** Strictly a declaration of deps that the codebase has always needed for ISIS pipelines; no new capability. The extra installs the Python-side glue; ISIS itself remains a separately-managed heavy install (`conda create -n isis -c usgs-astrogeology isis` or the USGS docker image, with its `bin/` directory on `$PATH`). Same shape as the existing `[spice]` extra.
+- **`scipy` added to the existing `[spice]` extra.** `spicer.py` uses `scipy.spatial.transform.Rotation` via a lazy import; the declaration was missing. Same "fix the contract" framing.
+- **`rich` and `shapely` added to core deps.** Used directly by `cli.py` (rich tables in many sub-commands) and `geo.Point.to_shapely()` via lazy import. Both were previously relying on transitive availability (rich via typer, shapely via geopandas in dev envs); declaring them is the honest contract.
+- **`docs/howto/isis_workflows.qmd`** documents the two-part ISIS install (USGS binaries + the `[isis]` Python extra), how to make ISIS binaries reachable on `$PATH`, and the three distinct failure modes users may see (no `[isis]` extra / ISIS not on PATH / ISIS subprocess error) with a specific remediation for each.
+- **`minimal-install` CI job** runs in parallel with the matrixed test job. Creates a fresh venv, `pip install .` with no extras / no dev, imports every public submodule, runs `plp --help` on every sub-app. This is what would have caught every bug listed above before they ever shipped — it's the new permanent guardrail against dev-env-kitchen-sink blindspots. CLAUDE.md gains a "Testing conventions" note pointing at it.
+
+### Changed
+
+- **Lazy-imported `geopandas` and `hvplot` in the ISIS-pipeline modules.** Both moved from module-top to inside the functions that actually use them (`ctx_calib.read_gml_to_gdf`, `ctx_calib.plot_any`, `isis/projected.shape_as_geoseries`, `isis/projected.read_gml_to_gdf`, `isis/projected.plot`). Users on a core install can now `from planetarypy.instruments.mro.ctx import ctx_calib` cleanly — calling the heavy functions without the `[isis]` extra raises a clear ImportError at the call site instead of crashing the module import. Same lazy-import pattern that already existed for `scipy` in `spicer.py:67` and `psutil` in `hirise.py:940`.
+- **`ctx_edr.py` no longer imports `hvplot.pandas`.** It was dead code — no `.hvplot()` call site in that file. The accessor registration happens wherever the actual caller imports.
+- **`utils.catch_isis_error` re-raises `ProcessError` instead of swallowing it.** The previous catch-and-print swallowed real failures, leaving callers thinking operations had succeeded when they hadn't. Now logs (via loguru) and re-raises so callers can react.
+
+### Removed
+
+- **Stray top-level `spicer.py`** at the repo root. Pre-refactor orphan from the v0.52 era; superseded by `src/planetarypy/spice/spicer.py` long ago. Imported `planets` and `traitlets` neither of which we ship. Nothing referenced it.
+
+### Internal
+
+- **`deptry` configuration added to `pyproject.toml`** under `[tool.deptry]`: excludes docs/notebooks/scripts; maps `python-dateutil` → `dateutil`; documents the legitimate per-rule ignores (planetarypy self-imports, psutil's try/except gate, lxml's call-time use by pandas.read_html, dev-tooling CLI deps, click as a transitive of typer). `deptry .` now reports "Success! No dependency issues found" cleanly — a static-analysis companion to the runtime smoke job.
+
 ## [0.68.1] - 2026-06-04
 
 A maintenance release: stale dependencies removed, one misclassified dependency moved into core where it belongs, and two pieces of documentation added for collaborators (AI or otherwise) working in the repo.
