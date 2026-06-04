@@ -40,6 +40,8 @@ requirements:
     - pyproj
     - rioxarray
     - matplotlib-base
+    - rich
+    - shapely
 
 test:
   imports:
