@@ -405,20 +405,52 @@ def file_variations(filename: str | Path, extensions: list[str]) -> list[Path]:
     return [Path(filename).with_suffix(extension) for extension in extensions]
 
 
+_ISIS_EXTRA_MISSING_MSG = (
+    "ISIS support requires the [isis] extra: "
+    '`pip install "planetarypy[isis]"`. '
+    "Note that ISIS itself is a separate (heavy) install — typically "
+    "`conda create -n isis -c usgs-astrogeology isis` or the USGS "
+    "docker image — and its bin/ directory must be on $PATH. "
+    "See docs/howto/isis_workflows.qmd for the full install path."
+)
+
+
 def catch_isis_error(func):
-    """can be used as decorator for any ISIS function"""
+    """Decorator: surface ISIS pipeline errors with clear messages.
+
+    Two distinct failure modes are handled:
+
+    - **Missing `[isis]` extra** (kalasiris not importable) →
+      replaces the wrapped function with a stub that raises
+      ``ImportError`` pointing at the extra and the ISIS install path.
+      Silently returning ``None`` (the previous behavior) hid the
+      problem; the new stub fails loudly so the user knows what to
+      install.
+
+    - **ISIS subprocess error** (``kalasiris.pysis.ProcessError``) →
+      logs the command + stdout + stderr via loguru at ERROR level
+      and re-raises so callers know the operation failed.
+    """
+    import functools
+
     if not ISIS_AVAILABLE:
-        logger.warning("ISIS not available.")
-        return
+        @functools.wraps(func)
+        def stub(*args, **kwargs):
+            raise ImportError(_ISIS_EXTRA_MISSING_MSG)
+        return stub
+
+    @functools.wraps(func)
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except ProcessError as err:
-            print("Had ISIS error:")
-            print(" ".join(err.cmd))
-            print(err.stdout)
-            print(err.stderr)
-
+            logger.error(
+                "ISIS subprocess failed:\n"
+                f"  command: {' '.join(err.cmd)}\n"
+                f"  stdout:  {err.stdout}\n"
+                f"  stderr:  {err.stderr}"
+            )
+            raise
     return inner
 
 
