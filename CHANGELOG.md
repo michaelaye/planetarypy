@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.1] - 2026-06-04
+
+A maintenance release: stale dependencies removed, one misclassified dependency moved into core where it belongs, and two pieces of documentation added for collaborators (AI or otherwise) working in the repo.
+
+### Fixed
+- **`matplotlib` promoted from `[spice]` extra to core dependencies.** `planetarypy.plotting` (`imshow_gray`, `add_sun_indicator`, `imshow_with_sun`) and the `plp` visualize verbs all import matplotlib unconditionally; none of that is SPICE-related. With matplotlib in `[spice]`, anyone running `pip install planetarypy` without the extra and then `from planetarypy.plotting import imshow_gray` saw a confusing ImportError that mentioned matplotlib but not anything SPICE-related. The fix makes the install correct for that workflow.
+
+### Removed
+- **`fastcore` from core dependencies.** Only use in the codebase was `from fastcore.utils import Path` in `src/planetarypy/pds/index_labels.py`; replaced with `from pathlib import Path` (semantically identical for our usage — all call sites pass strings to `Path(...)`).
+- **`lxml` from core dependencies.** Zero imports anywhere in `src/` or `tests/`. Also confirmed it's not a transitive dep of `pvl`.
+- **`planets` from the `[spice]` extra.** Zero imports anywhere; `planetarypy.constants` (PCK + JPL DE440 + NSSDC composed in `constants/__init__.py`, added in v0.61.0 and overhauled in v0.64.0) provides everything `planets` was previously used for.
+
+### Added
+- **`CLAUDE.md` at the repo root**, promoted from a gitignored personal-doc to a committed shared resource. Comprehensive working agreement for AI coding agents (Claude Code, Cursor with Claude, Copilot Chat) operating in this repo: project map, code/CLI/testing conventions, development principles (surgical fixes, semver rule, partial-answers-aren't-agreement, state-machine bug review heuristics, etc.), full release process. The deliberately-excluded category is personal interaction infrastructure (output formatting headers, memory writing protocols) — those stay in maintainers' personal `~/.claude/CLAUDE.md`.
+- **`docs/howto/planetaryimage_today.qmd`** — modern replacements for the (no-longer-maintained) `planetaryimage` package's functions. Direct translation table for `PDS3Image.open` / `CubeFile.open` / `img.data` / `plt.imshow(..., cmap='gray')` to the rasterio + `planetarypy.plotting` equivalents. Includes the modernized version of a widely-shared 2015 demo notebook and a section on when `pdr` is the better choice over rasterio. Auto-discovered by the existing `docs/howto/index.qmd` listing block.
+
+### Internal
+- 798 tests pass serially under the cleaned-up dep set. Verified the `fastcore` → `pathlib` swap is invisible via focused test runs on `tests/test_pds_static_index.py`, `tests/test_pds_pids_filter.py`, and `tests/test_cli_indexes.py`.
+
 ## [0.68.0] - 2026-06-03
 
 Column projection across the `plp indexes` family, a dual-idiom (repeated-flag-or-comma) treatment for both `--columns` and `--ccds`, a more visible freshness state on `plp indexes info`, plus a real bug that had been silently telling users their HiRISE indexes were up to date when they weren't.
