@@ -68,6 +68,8 @@ The config-handler pattern (lazy first-fetch, daily-check-via-AccessLog, force-r
 
 **`get_index(key, ...)`** (`pds/__init__.py`) is the user-facing reader. Supports row filtering via `pids=` (uses `pid_column(key, df)` to resolve the right column) and column projection via `columns=`. `missing_pids(df, key, pids)` returns the diff.
 
+**`resolve_pids(key, pids, df, *, prefix=False)`** (`pds/__init__.py`) maps each requested PID to the full PRODUCT_IDs it resolves to: exact match → `[pid]`; else (when `prefix=True`) any PID that is a leading `startswith` prefix of real PRODUCT_IDs → all of them (sorted); else `[]`. This is the generic "short product ID" mechanism — a HiRISE obsid handed to a per-CCD index expands to every CCD product, with **no instrument-specific code**. `get_index(..., prefix=True)` routes its `pids=` filter through it; exact matches always win over prefix expansion.
+
 **`read_pids_file(source, *, index_key=None, pid_key=None, suffix=None)`** in `pds/__init__.py` is the canonical entry point for the `--pids-from` CLI option. Dispatch rule:
 
 1. `pid_key` set → CSV mode (the explicit "this is tabular" signal).
@@ -126,6 +128,11 @@ Typer app with sub-apps grouped by Rich help panel:
 - `plp catalog …` (Discovery), `plp indexes …` (Discovery), `plp spice …` (Discovery)
 - Top-level commands by panel: Fetch & download, Visualize, Inspect a product, Science computations, Maintenance (`plp ctx-migrate`)
 
+**Verb inventory** (one line per sub-app — names drift rarely, so they live here to save a grep; the *implementation* still lives in code, read it before editing):
+- `plp catalog`: build, list, show, search, samples, summary, ambiguous
+- `plp indexes`: list, peek, last, counts, select, info, refresh
+- `plp spice`: missions, info, fetch, cached, generic
+
 **Design philosophy: API first, CLI wraps thin.** Every `plp` verb is a thin wrapper over a public Python API. Build and test the library function first; the CLI command then forwards arguments and formats output. Useful logic — parsing PID lists, building catalogs, batching downloads, filtering indexes by PIDs, parallel execution — lives in `planetarypy.*` modules, not under `cli.py`. The reason is reuse: notebooks and downstream tooling should pick up new capabilities without screen-scraping or shelling out to `plp`. If you find substantial logic inside `cli.py`, that's a bug — factor it down to the API layer.
 
 This is also documented (with a user-facing framing) in `docs/howto/cli.qmd`.
@@ -176,6 +183,8 @@ These patterns are uniform across the existing `plp` verbs; new commands should 
   - `--pids-from PATH | -` (file or stdin; CSV auto-detected via comma sniff or explicit `--pid-key`).
   - `--pid-key NAME` (CSV column name; forces CSV parsing of stdin/.txt).
   - `--pid-suffix STR` (appended to each PID read from `--pids-from`; **not applied to positional PIDs** — hand-typed PIDs are passed through verbatim because the user owns the full string).
+
+- **Prefix expansion for short PIDs** (via `resolve_pids`). A PID that doesn't match a full PRODUCT_ID but is a leading prefix of real ones expands to all matches (e.g. a HiRISE obsid → every CCD product). Asymmetric by side-effect: `plp indexes select` does it **automatically** (read-only; notes `'OBS' → N products by prefix` on stderr), while `plp fetch` gates it behind an explicit `--prefix` flag (it downloads — silent 1→N expansion would surprise). `fetch --prefix` requires KEY to be a registered index. An empty `select` result no longer dumps the schema-only transposed table — it prints a one-line `0 rows … not found` summary on stderr and leaves stdout empty (pipe-clean).
 
 - **Batch report format.** For batch-of-PIDs verbs, `--report errors-only|full|jsonl|csv`. Use the `_emit_batch_report` helper in `cli.py` so output stays consistent. FAIL blocks are multi-line, indented, with middle-ellipsis PID truncation at 60 chars; padded with leading/trailing blank lines so the report stays visually quarantined from any tqdm progress bar that came before.
 

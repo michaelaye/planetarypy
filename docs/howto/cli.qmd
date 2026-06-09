@@ -45,7 +45,7 @@ Download a PDS data product by its dotted key and product identifier.
 | Argument | Description |
 |----------|-------------|
 | `key` | Dotted product key, e.g. `mro.ctx.edr` |
-| `product_id` | Product identifier, e.g. `P02_001916_2221_XI_42N027W` |
+| `product_ids` | One or more product identifiers (variadic), e.g. `P02_001916_2221_XI_42N027W`. Optional when `--pids-from` is given. |
 
 **Options:**
 
@@ -54,9 +54,14 @@ Download a PDS data product by its dotted key and product identifier.
 | `--force` | `-f` | Re-download even if already cached locally |
 | `--label-only` | `-l` | Download only the label file |
 | `--here` | `-H` | Download into current directory instead of planetarypy storage |
-| `--folder` | `-d` | Print the local folder on stdout instead of the per-file paths (composes with `cd`) |
+| `--folder` | `-d` | Print the local folder on stdout instead of the per-file paths (single-PID only; composes with `cd`) |
+| `--prefix` | | Treat a PID that doesn't match a full PRODUCT_ID but **is a leading prefix** of real ones as a request for *all* matching products (e.g. a HiRISE obsid → every CCD product). Reads the index to resolve; requires `key` to be a registered index. Off by default to avoid surprise bulk downloads. |
+| `--workers` | `-w` | Parallel download threads in batch mode (default 4) |
+| `--report` | | Batch outcome report: `errors-only` (default) \| `full` \| `jsonl` \| `csv`. Single-PID calls ignore this |
 
-**Stdout behaviour:** by default `plp fetch` emits one absolute file path per line on stdout, so shell substitution like `qgis (plp fetch ...)` passes every downloaded file as an argument. With `--folder` it emits a single line — the local directory — so `cd (plp fetch --folder ...)` works.
+It also accepts the shared **PID-input family** described under [Batch PID input](#batch-pid-input-shared-flags) — `--pids-from`, `--pid-key`, `--pid-suffix`.
+
+**Stdout behaviour:** for a single PID, `plp fetch` emits one absolute file path per line on stdout, so shell substitution like `qgis (plp fetch ...)` passes every downloaded file as an argument. With `--folder` it emits a single line — the local directory — so `cd (plp fetch --folder ...)` works. In batch mode (multiple PIDs), per-PID outcomes go to stderr per `--report`.
 
 **Examples:**
 
@@ -64,14 +69,21 @@ Download a PDS data product by its dotted key and product identifier.
 # Download a CTX EDR image to planetarypy storage
 plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W
 
+# Batch: several PIDs at once (variadic)
+plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W J03_046269_1842_XN_04N222W
+
+# Batch from a file (one PID per line) or stdin
+plp fetch mro.ctx.edr --pids-from my_targets.txt
+cat ids.txt | plp fetch mro.ctx.edr --pids-from -
+
+# A HiRISE obsid → every CCD product of that observation
+plp fetch mro.hirise.edr ESP_075205_0930 --prefix
+
 # Download into the current working directory
 plp fetch --here mro.ctx.edr P02_001916_2221_XI_42N027W
 
 # Download only the label file
 plp fetch --label-only cassini.iss.edr_sat 1_N1523786525.118
-
-# Open every downloaded file in qgis (default stdout = file paths)
-qgis (plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W)
 
 # cd into the product folder (--folder = single-line stdout)
 cd (plp fetch --folder mro.ctx.edr P02_001916_2221_XI_42N027W)
@@ -148,4 +160,156 @@ plp catalog build
 
 # Force full rebuild
 plp catalog build --force
+```
+
+### `plp indexes` — Browse and read PDS index tables
+
+The `indexes` sub-app is the operational surface for the PDS3 index files
+(`.lbl` + `.tab`) that planetarypy downloads, parses, and caches as parquet.
+Indexes are addressed by the dotted **`{mission}.{instrument}.{indexname}`**
+key, e.g. `mro.ctx.edr`, `cassini.iss.ring_summary`, `mro.hirise.rdr`.
+
+Every verb prints help and exits 0 when invoked with no arguments, so
+`plp indexes select` (no key) shows usage rather than an error.
+
+| Verb | Purpose |
+|------|---------|
+| `list` | Browse which indexes exist (by mission / instrument) and their cache status |
+| `peek` | Inspect one index: shape, column names, a few random rows (transposed) |
+| `last` | Show the last (newest) entries of an index, transposed |
+| `counts` | Tabulate value frequencies of one or more columns (`value_counts`) |
+| `select` | Filter an index to specific PIDs and render the matching rows |
+| `info` | Config + cache status for one index (URLs, local cache, freshness, update-available) |
+| `refresh` | Refresh the upstream URL config, or re-download a single index's cache |
+
+#### `plp indexes list`
+
+```bash
+plp indexes list [SCOPE] [--tree]
+```
+
+`SCOPE` narrows the view: omit it for a mission summary, give a mission
+(`cassini`) for its instruments, or a `mission.instrument` (`cassini.iss`)
+for its indexes with cache status. `--tree` prints the full legacy tree.
+
+```bash
+plp indexes list                     # all missions, summary table
+plp indexes list cassini             # cassini instruments
+plp indexes list cassini.iss         # cassini.iss indexes (with cache status)
+plp indexes list --tree              # full tree
+```
+
+#### `plp indexes peek` / `plp indexes last`
+
+```bash
+plp indexes peek <key> [-c COL[,COL...]]
+plp indexes last <key> [--rows N] [--sort] [-c COL[,COL...]]
+```
+
+`peek` shows a few random rows; `last` shows the trailing rows (most PDS
+indexes are appended chronologically, so the last row is the newest — pass
+`--sort` to sort by a time column when the file isn't ordered). Both render
+**transposed** (one index row per output column) so wide schemas stay
+readable, and both accept `--columns/-c` for projection.
+
+```bash
+plp indexes peek mro.ctx.edr
+plp indexes last mro.hirise.rdr --rows 5
+plp indexes last mro.ctx.edr -c PRODUCT_ID,IMAGE_TIME
+```
+
+#### `plp indexes counts`
+
+```bash
+plp indexes counts <key> [COLUMN] [-c COL[,COL...]] [--top N] [--dropna]
+```
+
+A `pandas.value_counts` view: how many rows carry each distinct value of a
+column, with percent-of-total. Handy for categorical columns
+(`TARGET_NAME`, `MISSION_PHASE_NAME`, `INSTRUMENT_MODE_ID`) before filtering.
+`--top N` limits to the N most frequent (default 10; `0` for all);
+`--dropna` excludes missing values.
+
+```bash
+plp indexes counts mro.ctx.edr TARGET_NAME
+plp indexes counts mro.ctx.edr MISSION_PHASE_NAME --top 0
+plp indexes counts mro.ctx.edr -c TARGET_NAME,MISSION_PHASE_NAME
+```
+
+#### `plp indexes select`
+
+```bash
+plp indexes select <key> [PIDS...] [--format FMT] [-c COL[,COL...]] [--report MODE]
+```
+
+Filter an index to specific PIDs and render the matching rows — the natural
+companion to `plp fetch ... --pids-from`. Rows go to **stdout** (so it pipes
+cleanly); the resolution report (prefix expansions, missing PIDs) goes to
+**stderr** regardless of format.
+
+**Prefix expansion (automatic):** a PID that matches no full `PRODUCT_ID`
+exactly but is a **leading prefix** of real ones expands to *all* matching
+products — so a HiRISE obsid handed to the per-CCD EDR index returns every
+CCD product. An exact match is never expanded. (`plp fetch` does the same,
+but only behind the explicit `--prefix` flag, since it downloads.)
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--format` | | `auto` (default; transposed table when few rows, else CSV) \| `table` \| `csv` \| `jsonl` |
+| `--columns` | `-c` | Column projection (comma-separated and/or repeated) |
+| `--max-table-rows` | | Row count above which `auto` switches to CSV (default: `max_table_rows` config, 3) |
+| `--report` | | `errors-only` (default) \| `full` (list every missing PID) |
+
+Plus the shared [Batch PID input](#batch-pid-input-shared-flags) flags.
+
+```bash
+plp indexes select mro.ctx.edr P02_001916_2221_XI_42N027W
+plp indexes select mro.hirise.edr ESP_075205_0930          # obsid → all CCD products
+plp indexes select mro.ctx.edr --pids-from my_targets.txt
+plp indexes select mro.ctx.edr --pids-from - --format jsonl < pids.txt
+```
+
+#### `plp indexes info` / `plp indexes refresh`
+
+```bash
+plp indexes info <key>
+plp indexes refresh [--config] [--cache KEY]
+```
+
+`info` shows one index's remote URL, remote type, local cache path + size,
+when it was last updated and last checked, and whether a newer version is
+available upstream. `refresh --config` re-fetches the upstream URL config;
+`refresh --cache KEY` force-re-downloads that index's parquet.
+
+```bash
+plp indexes info mro.hirise.edr
+plp indexes refresh --config
+plp indexes refresh --cache mro.ctx.edr
+```
+
+### Batch PID input (shared flags)
+
+`plp fetch` and `plp indexes select` share one family of flags for feeding a
+batch of product IDs from a file or stdin instead of (or in addition to)
+positional PIDs:
+
+| Option | Description |
+|--------|-------------|
+| `--pids-from PATH \| -` | Read PIDs from a file or stdin (`-`). Plain text → one PID per line (blank lines and `#`-comments ignored). `.csv` → parsed, PID column auto-detected from the index registry (or set `--pid-key`). Mutually exclusive with positional PIDs. |
+| `--pid-key NAME` | Column name to read PIDs from when `--pids-from` is a CSV; also forces CSV parsing of a `.txt`/stdin source. |
+| `--pid-suffix STR` | String appended to every PID read from `--pids-from` (e.g. `--pid-suffix _RED` turns a HiRISE obsid into its RED product). **Not** applied to positional PIDs — hand-typed PIDs are passed through verbatim. |
+
+CSV is auto-detected when the source has a `.csv` extension, when `--pid-key`
+is given, or when stdin's first non-blank line contains a comma. Otherwise
+the source is read as plain text.
+
+```bash
+# plain-text list, one PID per line
+plp indexes select mro.ctx.edr --pids-from targets.txt
+
+# CSV with an explicit PID column
+plp fetch mro.hirise.rdr --pids-from obs.csv --pid-key OBSERVATION_ID --pid-suffix _RED
+
+# stdin (comma in first line → CSV auto-detected)
+head -5 catalog.csv | plp indexes select mro.ctx.edr --pids-from -
 ```
