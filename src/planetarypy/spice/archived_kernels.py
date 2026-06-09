@@ -210,6 +210,17 @@ def get_datasets():
             df[col] = df[col].apply(
                 lambda x: x[1] if isinstance(x, tuple) and x[1] else None
             )
+
+    # read_html yields every cell as a string; the CSV cache round-trips
+    # through pandas type inference and comes back as float. Coerce here so
+    # the fresh-parse path and the cached path agree — otherwise the first
+    # process after a daily cache refresh sees a str "Data Size (GB)" and
+    # `plp spice` crashes on its `:g` format.
+    if "Data Size (GB)" in df.columns:
+        df["Data Size (GB)"] = pd.to_numeric(
+            df["Data Size (GB)"], errors="coerce"
+        )
+
     logger.debug(
         f"Parsed datasets table: {df.shape[0]} missions x {df.shape[1]} columns"
     )

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.3] - 2026-06-09
+
+A one-bug patch. `plp spice missions` and `plp spice info` crashed for real users on a schedule — and the test suite couldn't see it because the cache was laundering the bug.
+
+### Fixed
+
+- **`plp spice missions` / `info` crashed with `ValueError: Unknown format code 'g' for object of type 'str'` whenever the once-per-day datasets cache refreshed.** `get_datasets()` parses the NAIF archive table with `pandas.read_html`, which yields every cell as a string — including `Data Size (GB)`. The CLI formats that column with `f"{...:g}"`, which only works on a number. The bug was invisible in normal use and in CI because the parsed table is cached to CSV, and the CSV round-trip silently coerces the column back to float; every process *after* a refresh read the float-typed cache and worked, while the one process that *did* the refresh held string-typed data and crashed. Fixed at the source: `get_datasets()` now coerces `Data Size (GB)` to numeric right after parsing, so the fresh-`read_html` path and the cached-CSV path return identical dtypes. A deterministic, offline regression test (`test_fresh_parse_coerces_data_size_to_numeric`) mocks `read_html` with string cells and pins the dtype contract — it fails against the pre-fix code.
+
 ## [0.68.2] - 2026-06-04
 
 A "fix the install contract" release. Every change is shaped like a bug fix: the package declares what it actually needs, ships the docs to use it, and surfaces clear errors when something's missing. No new public-API capability — the heavy modules (ctx_calib, isis/projected) have always required geopandas + hvplot + kalasiris; this release just makes that fact visible to pip, deptry, and the user.
