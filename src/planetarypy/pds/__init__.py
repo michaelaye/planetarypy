@@ -149,23 +149,28 @@ def read_pids_file(
     Dispatch rule (first match wins):
 
     1. ``pid_key`` is given → CSV mode regardless of source.
-    2. File with ``.csv`` extension → CSV mode.
-    3. Stdin (``"-"``) whose first non-blank line contains a comma →
-       CSV mode (small heuristic so ``head file.csv | plp fetch ...``
-       Just Works without an explicit flag).
+    2. File with ``.csv``, ``.tsv`` or ``.tab`` extension → CSV mode.
+    3. Stdin (``"-"``) whose first non-blank line contains a comma or a
+       tab → CSV mode (small heuristic so ``head file.csv | plp fetch
+       ...`` Just Works without an explicit flag).
     4. Anything else → plain text; one PID per line, blanks and
        ``#``-prefixed comments stripped.
 
-    In CSV mode the product-id column is determined by ``pid_key``
-    (explicit override) or :func:`pid_column` (auto-detect via the
-    catalog's ``IndexConfig`` registry, using ``index_key``). Raises
-    :class:`ValueError` listing the CSV's columns when neither
-    resolves — so the caller can pass the right ``pid_key``.
+    In CSV mode the **delimiter is auto-detected** from the header line:
+    a tab in the first line selects TSV, otherwise comma. This makes
+    tab-separated exports (a common spreadsheet "download as TSV"
+    output) parse into real columns instead of collapsing into one. The
+    product-id column is then determined by ``pid_key`` (explicit
+    override) or :func:`pid_column` (auto-detect via the catalog's
+    ``IndexConfig`` registry, using ``index_key``). Raises
+    :class:`ValueError` listing the columns when neither resolves — so
+    the caller can pass the right ``pid_key``.
 
-    The comma sniff is intentionally tiny. PDS product IDs don't
-    contain commas, so plain-text input is reliably distinguishable
-    from CSV input at the first-line level. The cost of being wrong
-    is a clear ValueError pointing the user at ``--pid-key``.
+    The comma/tab sniff is intentionally tiny. PDS product IDs don't
+    contain commas or tabs, so plain-text input is reliably
+    distinguishable from tabular input at the first-line level. The cost
+    of being wrong is a clear ValueError pointing the user at
+    ``--pid-key``.
 
     Designed to back the ``--pids-from`` CLI option in
     ``plp fetch`` / ``plp indexes select`` so users can feed a saved CSV
@@ -216,9 +221,13 @@ def read_pids_file(
     # parse without having to re-read a stream that can only be drained
     # once. File paths don't need this — we can read them twice.
     stdin_text: str | None = None
+    first_line = ""
     if is_stdin:
         import sys
         stdin_text = sys.stdin.read()
+        first_line = next(
+            (line for line in stdin_text.splitlines() if line.strip()), ""
+        )
 
     # Decide whether to parse as CSV:
     #   1. Explicit ``pid_key`` is the user's tabular-data declaration.
@@ -232,13 +241,9 @@ def read_pids_file(
     if pid_key is not None:
         use_csv = True
     elif is_stdin:
-        first_line = next(
-            (line for line in stdin_text.splitlines() if line.strip()),
-            "",
-        )
-        use_csv = "," in first_line
+        use_csv = ("," in first_line) or ("\t" in first_line)
     else:
-        use_csv = src_str.lower().endswith(".csv")
+        use_csv = src_str.lower().endswith((".csv", ".tsv", ".tab"))
 
     if not use_csv:
         if is_stdin:
@@ -262,9 +267,16 @@ def read_pids_file(
     import pandas as pd
     if is_stdin:
         import io
-        df = pd.read_csv(io.StringIO(stdin_text))
+        sep = "\t" if "\t" in first_line else ","
+        df = pd.read_csv(io.StringIO(stdin_text), sep=sep)
     else:
-        df = pd.read_csv(source)
+        # Peek the header to choose the delimiter, so tab-separated
+        # exports (a common spreadsheet "download as TSV" output) parse
+        # into real columns instead of collapsing into a single one.
+        with open(source) as _f:
+            header = next((ln for ln in _f if ln.strip()), "")
+        sep = "\t" if "\t" in header else ","
+        df = pd.read_csv(source, sep=sep)
 
     if pid_key is not None:
         if pid_key not in df.columns:

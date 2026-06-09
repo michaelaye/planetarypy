@@ -267,3 +267,81 @@ class TestRoundTripWithCliCsvOutput:
         assert read_pids_file(f, index_key="mro.ctx.edr") == [
             "P_001", "P_002", "P_003",
         ]
+
+
+# ── TSV / auto-delimiter ───────────────────────────────────────────────
+
+
+class TestTsvAutoDelimiter:
+
+    def test_tsv_extension_with_index_key(self, tmp_path):
+        f = tmp_path / "targets.tsv"
+        pd.DataFrame({
+            "PRODUCT_ID": ["P_001", "P_002"],
+            "DATE": ["2024-01-01", "2024-02-01"],
+        }).to_csv(f, sep="\t", index=False)
+        assert read_pids_file(f, index_key="mro.ctx.edr") == ["P_001", "P_002"]
+
+    def test_tsv_extension_with_pid_key(self, tmp_path):
+        f = tmp_path / "targets.tsv"
+        pd.DataFrame({
+            "observation_id": ["ESP_1", "ESP_2"],
+            "lat": [1.0, 2.0],
+        }).to_csv(f, sep="\t", index=False)
+        assert read_pids_file(f, pid_key="observation_id") == ["ESP_1", "ESP_2"]
+
+    def test_tab_extension(self, tmp_path):
+        f = tmp_path / "targets.tab"
+        pd.DataFrame({"PRODUCT_ID": ["P_A"]}).to_csv(f, sep="\t", index=False)
+        assert read_pids_file(f, index_key="mro.ctx.edr") == ["P_A"]
+
+    def test_tab_delimited_csv_extension_with_pid_key(self, tmp_path):
+        """The reported bug: a tab-separated file named .csv with
+        --pid-key. The delimiter must auto-detect as tab so the named
+        column is found, instead of the whole header collapsing into a
+        single column (which produced 'is not a column')."""
+        f = tmp_path / "seasonal.csv"
+        f.write_text(
+            'observation_id\t"roll"\t"Status"\n'
+            'ESP_075205_0930\t-5\tCOMPLETED\n'
+            'ESP_075205_0931\t3\tPLANNED\n'
+        )
+        out = read_pids_file(f, pid_key="observation_id")
+        assert out == ["ESP_075205_0930", "ESP_075205_0931"]
+
+    def test_tab_delimited_csv_extension_auto_detect_column(self, tmp_path):
+        f = tmp_path / "seasonal.csv"
+        pd.DataFrame({
+            "PRODUCT_ID": ["P_001", "P_002"],
+            "extra": ["a", "b"],
+        }).to_csv(f, sep="\t", index=False)
+        assert read_pids_file(f, index_key="mro.ctx.edr") == ["P_001", "P_002"]
+
+    def test_stdin_tab_sniff_routes_to_csv_without_pid_key(self, monkeypatch):
+        # A tab in the first line alone must route stdin to CSV mode (not
+        # plain text); index_key then auto-detects the column.
+        monkeypatch.setattr(
+            "sys.stdin",
+            io.StringIO("PRODUCT_ID\tDATE\nP_1\t2024\nP_2\t2024\n"),
+        )
+        assert read_pids_file("-", index_key="mro.ctx.edr") == ["P_1", "P_2"]
+
+    def test_stdin_tab_with_pid_key(self, monkeypatch):
+        monkeypatch.setattr(
+            "sys.stdin",
+            io.StringIO("observation_id\tlat\nESP_1\t1\nESP_2\t2\n"),
+        )
+        assert read_pids_file("-", pid_key="observation_id") == ["ESP_1", "ESP_2"]
+
+    def test_comma_csv_unaffected_by_tab_detection(self, tmp_path):
+        # Guard: ordinary comma CSV must still parse (no tab → comma).
+        f = tmp_path / "targets.csv"
+        pd.DataFrame({"PRODUCT_ID": ["P_1", "P_2"]}).to_csv(f, index=False)
+        assert read_pids_file(f, index_key="mro.ctx.edr") == ["P_1", "P_2"]
+
+    def test_tsv_suffix_appended(self, tmp_path):
+        f = tmp_path / "obsids.tsv"
+        pd.DataFrame({"observation_id": ["PSP_1", "PSP_2"]}).to_csv(
+            f, sep="\t", index=False)
+        out = read_pids_file(f, pid_key="observation_id", suffix="_RED")
+        assert out == ["PSP_1_RED", "PSP_2_RED"]
