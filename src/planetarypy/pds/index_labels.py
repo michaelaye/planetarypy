@@ -15,8 +15,6 @@ __all__ = [
 # This can be removed once pvl version > 1.3.2 is used
 import warnings
 
-import warnings
-
 import numpy as np
 import pandas as pd
 

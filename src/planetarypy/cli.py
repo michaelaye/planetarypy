@@ -659,7 +659,6 @@ def ctxqv(
     import numpy as np
 
     arr = None
-    full_arr = None
     level = None
     pid = imgid
 
