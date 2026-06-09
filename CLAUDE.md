@@ -23,7 +23,7 @@ pytest tests/test_config.py::test_name -xvs       # one test
 pytest tests/test_config.py -xvs -p no:xdist      # serial (for debugging)
 pytest -m "not slow"                              # skip slow
 
-flake8 src/planetarypy tests                      # lint
+ruff check src/planetarypy tests                  # lint
 ```
 
 Default pytest opts (pyproject): `-xvs --import-mode=importlib --cov=planetarypy -n auto`.
@@ -140,7 +140,7 @@ This is also documented (with a user-facing framing) in `docs/howto/cli.qmd`.
 ## Conventions
 
 ### Code style
-- Line length 88 (Black-compatible); flake8 ignoring E203, E701.
+- Line length 88 (Black-compatible); lint via `ruff` (rules E/W/F, ignoring E203, E701). Config in `pyproject.toml` `[tool.ruff]`.
 - Python ≥ 3.11. Type hints throughout.
 - No f-strings without substitutions (linter rule).
 - Logging: loguru, **disabled by default** (library convention). Enable via `logger.enable("planetarypy")` or `planetarypy.enable_logging("DEBUG")`.
