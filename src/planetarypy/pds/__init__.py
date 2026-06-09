@@ -26,6 +26,7 @@ __all__ = [
     "InventoryIndex",
     "get_index",
     "missing_pids",
+    "resolve_pids",
     "pid_column",
     "print_available_indexes",
     "get_mission_names",
@@ -49,6 +50,7 @@ def get_index(
     *,
     pids: Iterable[str] | None = None,
     columns: Iterable[str] | None = None,
+    prefix: bool = False,
 ) -> DataFrame:
     """Retrieve a specific index file .
 
@@ -72,6 +74,10 @@ def get_index(
         product-id column (resolved via :func:`pid_column`). PIDs that
         don't match any row are silently dropped from the result; use
         :func:`missing_pids` to find them.
+    prefix : bool, keyword-only, default False
+        When True, any ``pids`` entry that has no exact match but is a
+        leading prefix of one or more PRODUCT_IDs expands to all of those
+        rows (see :func:`resolve_pids`). Exact matches are unaffected.
     columns : Iterable[str], keyword-only, optional
         Column names to project the returned DataFrame to, in the order
         given. Exact (case-sensitive) match against the parquet's column
@@ -113,8 +119,12 @@ def get_index(
     df = index.dataframe
     if pids is not None:
         col = pid_column(dotted_index_key, df)
-        pid_set = set(map(str, pids))
-        df = df[df[col].astype(str).isin(pid_set)]
+        if prefix:
+            mapping = resolve_pids(dotted_index_key, pids, df, prefix=True)
+            wanted = {full for ids in mapping.values() for full in ids}
+        else:
+            wanted = set(map(str, pids))
+        df = df[df[col].astype(str).isin(wanted)]
     if columns is not None:
         requested = list(columns)
         missing = [c for c in requested if c not in df.columns]
@@ -315,3 +325,47 @@ def missing_pids(
     col = pid_column(dotted_index_key, df)
     present = set(df[col].astype(str))
     return [p for p in pids if str(p) not in present]
+
+
+def resolve_pids(
+    dotted_index_key: str,
+    pids: Iterable[str],
+    df: DataFrame,
+    *,
+    prefix: bool = False,
+) -> dict[str, list[str]]:
+    """Map each requested PID to the full PRODUCT_IDs it resolves to.
+
+    For each input PID, in order:
+
+    - if it exactly matches a value in the index's product-id column
+      (resolved via :func:`pid_column`), it maps to ``[pid]``;
+    - else if ``prefix`` is True and it is a leading prefix
+      (``str.startswith``) of one or more PRODUCT_IDs, it maps to all of
+      those, sorted;
+    - else it maps to ``[]`` (the PID is missing).
+
+    An exact match always wins over prefix expansion. This is the generic
+    "short product ID" mechanism: a HiRISE obsid handed to a per-CCD index
+    expands to every CCD product, a CTX orbit prefix expands to that orbit's
+    products, etc. — with no instrument-specific logic.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping from input PID to its resolved PRODUCT_IDs. Duplicate input
+        PIDs collapse to a single key.
+    """
+    col = pid_column(dotted_index_key, df)
+    colvals = df[col].astype(str)
+    present = set(colvals)
+    out: dict[str, list[str]] = {}
+    for pid in pids:
+        p = str(pid)
+        if p in present:
+            out[p] = [p]
+        elif prefix:
+            out[p] = sorted(colvals[colvals.str.startswith(p)].tolist())
+        else:
+            out[p] = []
+    return out

@@ -9,7 +9,12 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from planetarypy.pds import get_index, missing_pids, pid_column
+from planetarypy.pds import (
+    get_index,
+    missing_pids,
+    pid_column,
+    resolve_pids,
+)
 
 
 def _df_with_product_id() -> pd.DataFrame:
@@ -17,6 +22,17 @@ def _df_with_product_id() -> pd.DataFrame:
         "PRODUCT_ID": ["P_001", "P_002", "P_003", "P_004", "P_005"],
         "FILE_NAME": [f"file_{i}.IMG" for i in range(1, 6)],
         "START_TIME": [f"2024-{m:02d}-01T00:00:00" for m in range(1, 6)],
+    })
+
+
+def _df_with_obsid_products() -> pd.DataFrame:
+    """Mirrors a per-CCD index: one obsid fans out into many PRODUCT_IDs."""
+    return pd.DataFrame({
+        "PRODUCT_ID": [
+            "OBS_A_RED0", "OBS_A_RED1", "OBS_A_BG0",
+            "OBS_B_RED0", "SOLO",
+        ],
+        "FILE_NAME": [f"f_{i}.IMG" for i in range(5)],
     })
 
 
@@ -189,3 +205,74 @@ class TestMissingPids:
         df = _df_with_product_id()
         out = missing_pids(df, "mro.ctx.edr", ["P_001", "P_003"])
         assert out == []
+
+
+# ── resolve_pids ─────────────────────────────────────────────────────────
+
+
+class TestResolvePids:
+
+    def test_exact_match_maps_to_itself(self):
+        df = _df_with_obsid_products()
+        out = resolve_pids("mro.hirise.edr", ["SOLO"], df, prefix=True)
+        assert out == {"SOLO": ["SOLO"]}
+
+    def test_prefix_expands_to_all_sorted(self):
+        df = _df_with_obsid_products()
+        out = resolve_pids("mro.hirise.edr", ["OBS_A"], df, prefix=True)
+        assert out == {"OBS_A": ["OBS_A_BG0", "OBS_A_RED0", "OBS_A_RED1"]}
+
+    def test_prefix_false_does_not_expand(self):
+        df = _df_with_obsid_products()
+        out = resolve_pids("mro.hirise.edr", ["OBS_A"], df, prefix=False)
+        assert out == {"OBS_A": []}
+
+    def test_exact_wins_over_prefix(self):
+        """A value that is itself complete short-circuits expansion."""
+        df = pd.DataFrame({"PRODUCT_ID": ["OBS_A", "OBS_A_RED0"]})
+        out = resolve_pids("mro.hirise.edr", ["OBS_A"], df, prefix=True)
+        assert out == {"OBS_A": ["OBS_A"]}
+
+    def test_unmatched_pid_maps_to_empty(self):
+        df = _df_with_obsid_products()
+        out = resolve_pids("mro.hirise.edr", ["GHOST"], df, prefix=True)
+        assert out == {"GHOST": []}
+
+    def test_mixed_inputs_preserve_order(self):
+        df = _df_with_obsid_products()
+        out = resolve_pids(
+            "mro.hirise.edr", ["SOLO", "OBS_B", "GHOST"], df, prefix=True,
+        )
+        assert list(out.keys()) == ["SOLO", "OBS_B", "GHOST"]
+        assert out["OBS_B"] == ["OBS_B_RED0"]
+
+
+# ── get_index(prefix=...) ────────────────────────────────────────────────
+
+
+class TestGetIndexPrefixFilter:
+
+    def test_prefix_true_expands_short_pid(self, monkeypatch):
+        df = _df_with_obsid_products()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.hirise.edr", pids=["OBS_A"], prefix=True)
+        assert set(out["PRODUCT_ID"]) == {
+            "OBS_A_RED0", "OBS_A_RED1", "OBS_A_BG0",
+        }
+
+    def test_prefix_false_is_exact_only(self, monkeypatch):
+        df = _df_with_obsid_products()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index("mro.hirise.edr", pids=["OBS_A"], prefix=False)
+        assert len(out) == 0
+
+    def test_prefix_mixes_exact_and_expanded(self, monkeypatch):
+        df = _df_with_obsid_products()
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _StubIndex(df).make())
+        out = get_index(
+            "mro.hirise.edr", pids=["SOLO", "OBS_B"], prefix=True,
+        )
+        assert set(out["PRODUCT_ID"]) == {"SOLO", "OBS_B_RED0"}

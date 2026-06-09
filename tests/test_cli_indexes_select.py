@@ -40,6 +40,54 @@ def _patch_index(df: pd.DataFrame):
     return keys_patch, index_patch
 
 
+def _obsid_df() -> pd.DataFrame:
+    """One obsid (OBS_A) fans out into several PRODUCT_IDs; SOLO is whole."""
+    return pd.DataFrame({
+        "PRODUCT_ID": ["OBS_A_RED0", "OBS_A_RED1", "OBS_A_BG0", "SOLO"],
+        "FILE_NAME": [f"f{i}.IMG" for i in range(4)],
+        "START_TIME": [f"2024-0{i + 1}-01T00:00:00" for i in range(4)],
+    })
+
+
+class TestIndexesSelectPrefixExpansion:
+
+    def test_short_pid_expands_by_prefix(self):
+        keys_p, idx_p = _patch_index(_obsid_df())
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr", "OBS_A"]
+            )
+        assert result.exit_code == 0
+        assert "OBS_A_RED0" in result.stdout
+        assert "OBS_A_BG0" in result.stdout
+        assert "SOLO" not in result.stdout
+        assert "by prefix" in result.stderr
+
+    def test_exact_pid_does_not_expand(self):
+        keys_p, idx_p = _patch_index(_obsid_df())
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr", "OBS_A_RED0"]
+            )
+        assert result.exit_code == 0
+        assert "by prefix" not in result.stderr
+        assert "all found" in result.stderr
+
+    def test_genuine_miss_does_not_dump_schema(self):
+        """Regression: a 0-match must NOT print the transposed schema
+        (all field names, no values) — that read like a broken result."""
+        keys_p, idx_p = _patch_index(_obsid_df())
+        with keys_p, idx_p:
+            result = runner.invoke(
+                app, ["indexes", "select", "mro.ctx.edr", "GHOST"]
+            )
+        assert result.exit_code == 1
+        # No field-name column dumped to stdout.
+        assert "FILE_NAME" not in result.stdout
+        assert "0 rows" in result.stderr
+        assert "1 not found" in result.stderr
+
+
 class TestIndexesSelectInputHandling:
 
     def test_bare_invocation_shows_help_and_exits_zero(self):

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+import pandas as pd
 from typer.testing import CliRunner
 
 import planetarypy.catalog as catalog_mod
@@ -346,3 +347,63 @@ class TestFetchOfflinePreflight:
         assert result.exit_code == 1
         assert called["n"] == 0
         assert "No internet connection" in result.stderr
+
+
+def _stub_index(df: pd.DataFrame):
+    class _I:
+        def __init__(self, *a, **kw): pass
+        def ensure_parquet(self, force=False): return False
+        @property
+        def update_available(self): return False
+        @property
+        def dataframe(self): return df
+    return _I
+
+
+class TestFetchPrefixExpansion:
+
+    def _obsid_df(self) -> pd.DataFrame:
+        return pd.DataFrame({
+            "PRODUCT_ID": ["OBS_A_RED0", "OBS_A_RED1", "OBS_A_BG0", "SOLO"],
+        })
+
+    def test_prefix_expands_obsid_to_products(self, monkeypatch):
+        import planetarypy.utils as utils_mod
+        monkeypatch.setattr(utils_mod, "have_internet", lambda: True)
+        captured = {}
+        def _batch(key, pids, **kw):
+            captured["pids"] = list(pids)
+            return [_fake_downloaded(p) for p in pids]
+        monkeypatch.setattr(catalog_mod, "fetch_products", _batch)
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _stub_index(self._obsid_df()))
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.hirise.edr"}):
+            result = runner.invoke(
+                app, ["fetch", "mro.hirise.edr", "OBS_A", "--prefix"]
+            )
+        assert result.exit_code == 0
+        assert set(captured["pids"]) == {
+            "OBS_A_RED0", "OBS_A_RED1", "OBS_A_BG0",
+        }
+        assert "expanded 1 input(s) → 3 product(s)" in result.stderr
+
+    def test_prefix_unregistered_key_errors(self):
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.hirise.edr"}):
+            result = runner.invoke(
+                app, ["fetch", "not.an.index", "OBS_A", "--prefix"]
+            )
+        assert result.exit_code == 2
+        assert "registered PDS index" in result.stderr
+
+    def test_prefix_no_match_errors(self, monkeypatch):
+        monkeypatch.setattr("planetarypy.pds.Index",
+                            _stub_index(self._obsid_df()))
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.hirise.edr"}):
+            result = runner.invoke(
+                app, ["fetch", "mro.hirise.edr", "GHOST", "--prefix"]
+            )
+        assert result.exit_code == 2
+        assert "resolved no products" in result.stderr

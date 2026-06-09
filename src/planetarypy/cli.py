@@ -147,6 +147,14 @@ def fetch(
              "corresponding RED product. Ignored when PIDs are supplied "
              "as positional arguments.",
     ),
+    prefix: bool = typer.Option(
+        False, "--prefix",
+        help="Treat each PID that has no exact PRODUCT_ID match but is a "
+             "leading prefix of real ones as a request for ALL matching "
+             "products (e.g. a HiRISE obsid → every CCD product). Reads "
+             "the index to resolve; requires KEY to be a registered PDS "
+             "index. Off by default to avoid surprise bulk downloads.",
+    ),
     workers: int = typer.Option(
         4, "--workers", "-w",
         help="Parallel download threads in batch mode (default 4).",
@@ -168,6 +176,7 @@ def fetch(
         plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W P03_...    # batch (variadic)
         plp fetch mro.ctx.edr --pids-from my_targets.txt            # batch from file
         plp fetch mro.ctx.edr --pids-from -                          # batch from stdin
+        plp fetch mro.hirise.edr ESP_075205_0930 --prefix   # obsid → all CCDs
         cd (plp fetch --folder mro.ctx.edr P02_001916_2221_XI_42N027W)
     """
     if key is None:
@@ -209,6 +218,38 @@ def fetch(
     if not pids:
         typer.echo("Error: provide at least one PID (positional or --pids-from).", err=True)
         raise typer.Exit(2)
+
+    if prefix:
+        from planetarypy.pds import get_index, resolve_pids
+        from planetarypy.pds.utils import _all_dotted_index_keys
+        if key not in _all_dotted_index_keys():
+            typer.echo(
+                f"Error: --prefix requires {key!r} to be a registered PDS "
+                "index, but it is not. Pass full product IDs instead.",
+                err=True,
+            )
+            raise typer.Exit(2)
+        df = get_index(key, allow_refresh=False)
+        mapping = resolve_pids(key, pids, df, prefix=True)
+        seen: set[str] = set()
+        expanded = [
+            full for p in pids for full in mapping.get(p, [])
+            if not (full in seen or seen.add(full))
+        ]
+        missed = [p for p in pids if not mapping.get(p)]
+        if missed:
+            typer.echo(
+                f"Warning: {len(missed)} input PID(s) matched nothing "
+                f"(exact or prefix): {missed}", err=True,
+            )
+        if not expanded:
+            typer.echo("Error: --prefix resolved no products.", err=True)
+            raise typer.Exit(2)
+        typer.echo(
+            f"--prefix expanded {len(pids)} input(s) → {len(expanded)} "
+            "product(s).", err=True,
+        )
+        pids = expanded
 
     # Single-PID path preserves the existing output contract: URL to stderr,
     # files (or folder) to stdout, so shell composition stays unchanged.
@@ -1488,6 +1529,116 @@ def indexes_last(
                        label=", ".join(label_parts))
 
 
+def _render_value_counts(key: str, column: str, series, *, total: int,
+                         top: int, dropna: bool) -> None:
+    """Print a plain aligned value-frequency table for one column.
+
+    Three columns: value, count (comma-grouped), percent-of-total.
+    ``top <= 0`` shows every distinct value.
+    """
+    vc = series.value_counts(dropna=dropna)
+    n_distinct = series.nunique(dropna=True)
+    shown = vc if top <= 0 else vc.head(top)
+
+    typer.echo(f"{key}.{column} — {total:,} rows, {n_distinct:,} distinct values")
+    if top > 0 and len(vc) > top:
+        typer.echo(f"(showing top {top})")
+    typer.echo("")
+
+    if len(shown) == 0:
+        typer.echo("(no values)")
+        return
+
+    labels = ["NaN" if pd_isna(k) else str(k) for k in shown.index]
+    counts = [int(v) for v in shown.values]
+    wlabel = max(len(s) for s in labels)
+    wcount = max(len(f"{c:,}") for c in counts)
+    for label, c in zip(labels, counts):
+        pct = 100.0 * c / total if total else 0.0
+        typer.echo(f"{label:<{wlabel}}  {c:>{wcount},}  {pct:5.1f}%")
+
+
+@indexes_app.command("counts")
+def indexes_counts(
+    ctx: typer.Context,
+    key: str = typer.Argument(
+        None, help="Dotted index key, e.g. mro.ctx.edr",
+        shell_complete=_shell_complete_index_key,
+    ),
+    column: str = typer.Argument(
+        None, help="Column to tabulate. For several columns use --columns.",
+    ),
+    columns: list[str] = typer.Option(
+        None, "--columns", "-c",
+        help="Tabulate several columns (one block each). Repeatable AND "
+             "comma-separated: '-c TARGET_NAME -c MISSION_PHASE_NAME' is "
+             "equivalent to '--columns TARGET_NAME,MISSION_PHASE_NAME'.",
+    ),
+    top: int = typer.Option(
+        10, "--top", "-t",
+        help="Show the N most frequent values (default 10). Use 0 for all.",
+    ),
+    dropna: bool = typer.Option(
+        False, "--dropna",
+        help="Exclude missing (NaN) values from the counts.",
+    ),
+):
+    """Tabulate value frequencies for one or more index columns.
+
+    A quick ``pandas.value_counts`` view: how many rows carry each distinct
+    value of a column, with percent-of-total. Handy for categorical columns
+    (TARGET_NAME, MISSION_PHASE_NAME, INSTRUMENT_MODE_ID) where you want the
+    lay of the land before filtering.
+
+    Examples:
+        plp indexes counts mro.ctx.edr TARGET_NAME
+        plp indexes counts mro.ctx.edr MISSION_PHASE_NAME --top 0
+        plp indexes counts mro.ctx.edr -c TARGET_NAME,MISSION_PHASE_NAME
+    """
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    from planetarypy.pds import get_index
+    from planetarypy.pds.utils import _all_dotted_index_keys
+
+    if key not in _all_dotted_index_keys():
+        typer.echo(f"Unknown index key: {key!r}.", err=True)
+        raise typer.Exit(1)
+
+    col_list: list[str] = []
+    if column:
+        col_list.append(column)
+    parsed = _parse_columns(columns)
+    if parsed:
+        col_list.extend(parsed)
+    seen: set[str] = set()
+    col_list = [c for c in col_list if not (c in seen or seen.add(c))]
+    if not col_list:
+        typer.echo(
+            "Specify a column (positional) or --columns COL[,COL...].",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    df = get_index(key, allow_refresh=False)
+    missing = [c for c in col_list if c not in df.columns]
+    if missing:
+        typer.echo(
+            f"Error: unknown column(s) {missing!r} in {key!r}. "
+            f"Available: {list(df.columns)!r}",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    total = len(df)
+    for i, col in enumerate(col_list):
+        if i:
+            typer.echo("")
+        _render_value_counts(key, col, df[col], total=total, top=top,
+                             dropna=dropna)
+
+
 @indexes_app.command("select")
 def indexes_select(
     ctx: typer.Context,
@@ -1548,12 +1699,19 @@ def indexes_select(
 
     Built for the "I have a small list of PIDs, show me those rows" case
     — the natural companion to ``plp fetch ... --pids-from``. Output goes
-    to stdout (so it pipes cleanly); missing-PID reporting always goes
-    to stderr regardless of ``--format``.
+    to stdout (so it pipes cleanly); the resolution report (prefix
+    expansions and missing PIDs) always goes to stderr regardless of
+    ``--format``.
+
+    A PID that matches no full PRODUCT_ID exactly but is a leading prefix
+    of real ones expands automatically to all matching products — so a
+    HiRISE obsid handed to the per-CCD EDR index returns every CCD
+    product. An exact match is never expanded.
 
     Examples:
         plp indexes select mro.ctx.edr P02_001916_2221_XI_42N027W
         plp indexes select mro.ctx.edr P_A P_B P_C
+        plp indexes select mro.hirise.edr ESP_075205_0930   # obsid → all CCD products
         plp indexes select mro.ctx.edr --pids-from my_targets.txt
         plp indexes select mro.ctx.edr --pids-from - --format jsonl < pids.txt
     """
@@ -1561,7 +1719,7 @@ def indexes_select(
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
-    from planetarypy.pds import get_index, missing_pids
+    from planetarypy.pds import get_index, pid_column, resolve_pids
     from planetarypy.pds.utils import _all_dotted_index_keys
 
     if key not in _all_dotted_index_keys():
@@ -1606,10 +1764,15 @@ def indexes_select(
         raise typer.Exit(2)
 
     full_df = get_index(key, allow_refresh=False)
-    filtered = get_index(key, allow_refresh=False, pids=pids)
-    # missing_pids needs the PID column on `filtered`, so compute the
-    # diff BEFORE we project columns away.
-    missing = missing_pids(filtered, key, pids)
+    pcol = pid_column(key, full_df)
+    # Resolve each requested PID against the index: an exact PRODUCT_ID
+    # wins; otherwise a leading-prefix PID (e.g. a HiRISE obsid) expands
+    # to every product it prefixes. resolve_pids is the generic mechanism.
+    mapping = resolve_pids(key, pids, full_df, prefix=True)
+    wanted = {full for ids in mapping.values() for full in ids}
+    filtered = full_df[full_df[pcol].astype(str).isin(wanted)]
+    expanded = {p: ids for p, ids in mapping.items() if ids and ids != [p]}
+    missing = [p for p, ids in mapping.items() if not ids]
 
     # Column projection: validate against the unprojected `filtered`
     # (which still has every column) and apply to the display copy.
@@ -1639,31 +1802,40 @@ def indexes_select(
         )
         raise typer.Exit(2)
 
-    if effective == "table":
-        _render_index_rows(
-            key, filtered,
-            total_rows=len(full_df), total_cols=len(full_df.columns),
-            label=f"{len(filtered)} of {len(pids)} requested",
-        )
-    elif effective == "csv":
-        import csv
-        import sys
-        writer = csv.writer(sys.stdout)
-        writer.writerow(list(filtered.columns))
-        for _, row in filtered.iterrows():
-            writer.writerow([
-                "" if pd_isna(v) else str(v) for v in row.tolist()
-            ])
-    elif effective == "jsonl":
-        import json
-        for _, row in filtered.iterrows():
-            obj = {
-                col: (None if pd_isna(row[col]) else _jsonable(row[col]))
-                for col in filtered.columns
-            }
-            typer.echo(json.dumps(obj))
+    # Skip emitting on an empty result: a 0-row transposed table would
+    # dump the schema (all field names, no values) and read like a bug.
+    # The stderr summary below explains the empty result instead.
+    if len(filtered):
+        if effective == "table":
+            _render_index_rows(
+                key, filtered,
+                total_rows=len(full_df), total_cols=len(full_df.columns),
+                label=f"{len(filtered)} of {len(pids)} requested",
+            )
+        elif effective == "csv":
+            import csv
+            import sys
+            writer = csv.writer(sys.stdout)
+            writer.writerow(list(filtered.columns))
+            for _, row in filtered.iterrows():
+                writer.writerow([
+                    "" if pd_isna(v) else str(v) for v in row.tolist()
+                ])
+        elif effective == "jsonl":
+            import json
+            for _, row in filtered.iterrows():
+                obj = {
+                    col: (None if pd_isna(row[col]) else _jsonable(row[col]))
+                    for col in filtered.columns
+                }
+                typer.echo(json.dumps(obj))
 
-    # Missing-PID report (always on stderr; format-independent).
+    # Resolution report (always on stderr; format-independent). Prefix
+    # expansions are noted first so the user sees a short ID fanned out.
+    for p, ids in expanded.items():
+        typer.echo(f"  {p!r} → {len(ids)} products by prefix", err=True)
+
+    # Missing-PID report.
     if report == "errors-only":
         if missing:
             typer.echo(

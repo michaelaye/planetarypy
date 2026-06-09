@@ -64,6 +64,12 @@ class TestIndexesHelpOnMissing:
         assert "Usage:" in result.stdout
         assert "Show config + cache status" in result.stdout
 
+    def test_counts_bare_invocation_shows_help(self):
+        result = runner.invoke(app, ["indexes", "counts"])
+        assert result.exit_code == 0
+        assert "Usage:" in result.stdout
+        assert "Tabulate value frequencies" in result.stdout
+
 
 class TestIndexesInfoFreshness:
     """`plp indexes info KEY` surfaces when the parquet was last
@@ -150,6 +156,95 @@ class TestIndexesInfoFreshness:
         assert result.exit_code == 0
         assert "Usage:" in result.stdout
         assert "Refresh upstream index config" in result.stdout
+
+
+# ── plp indexes counts ──────────────────────────────────────────────────
+
+
+def _fake_counts_df() -> pd.DataFrame:
+    """10-row frame with two categorical columns of differing cardinality."""
+    return pd.DataFrame(
+        {
+            "TARGET_NAME": ["MARS"] * 7 + ["PHOBOS"] * 2 + ["DEIMOS"],
+            "MODE": ["A", "B", "A", "B", "A", "A", "B", "A", "A", "B"],
+        }
+    )
+
+
+class TestIndexesCounts:
+
+    def test_unknown_key_exits_with_error(self):
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}):
+            result = runner.invoke(
+                app, ["indexes", "counts", "no.such.key", "TARGET_NAME"]
+            )
+        assert result.exit_code == 1
+        assert "Unknown index key" in result.output
+
+    def test_positional_column_tabulates_frequencies(self):
+        df = _fake_counts_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            result = runner.invoke(
+                app, ["indexes", "counts", "mro.ctx.edr", "TARGET_NAME"]
+            )
+        assert result.exit_code == 0
+        # Header carries total rows and distinct count.
+        assert "10 rows, 3 distinct values" in result.output
+        # Most frequent value first, with count and percent-of-total.
+        assert "MARS" in result.output
+        assert "7" in result.output
+        assert "70.0%" in result.output
+
+    def test_no_column_specified_errors(self):
+        df = _fake_counts_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            result = runner.invoke(app, ["indexes", "counts", "mro.ctx.edr"])
+        assert result.exit_code == 2
+        assert "Specify a column" in result.output
+
+    def test_unknown_column_errors(self):
+        df = _fake_counts_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            result = runner.invoke(
+                app, ["indexes", "counts", "mro.ctx.edr", "NOPE"]
+            )
+        assert result.exit_code == 2
+        assert "unknown column(s)" in result.output
+
+    def test_top_truncates_and_notes(self):
+        df = _fake_counts_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            result = runner.invoke(
+                app,
+                ["indexes", "counts", "mro.ctx.edr", "TARGET_NAME", "--top", "1"],
+            )
+        assert result.exit_code == 0
+        assert "(showing top 1)" in result.output
+        assert "MARS" in result.output
+        # The less-frequent values are truncated away.
+        assert "DEIMOS" not in result.output
+
+    def test_columns_flag_renders_one_block_per_column(self):
+        df = _fake_counts_df()
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            result = runner.invoke(
+                app,
+                ["indexes", "counts", "mro.ctx.edr", "-c", "TARGET_NAME,MODE"],
+            )
+        assert result.exit_code == 0
+        assert "mro.ctx.edr.TARGET_NAME" in result.output
+        assert "mro.ctx.edr.MODE" in result.output
 
 
 # ── plp indexes last ────────────────────────────────────────────────────
