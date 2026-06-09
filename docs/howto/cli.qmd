@@ -295,13 +295,15 @@ positional PIDs:
 
 | Option | Description |
 |--------|-------------|
-| `--pids-from PATH \| -` | Read PIDs from a file or stdin (`-`). Plain text → one PID per line (blank lines and `#`-comments ignored). `.csv` → parsed, PID column auto-detected from the index registry (or set `--pid-key`). Mutually exclusive with positional PIDs. |
+| `--pids-from PATH \| -` | Read PIDs from a file or stdin (`-`). Plain text → one PID per line (blank lines and `#`-comments ignored). `.csv` / `.tsv` / `.tab` → parsed as a table (comma vs tab **auto-detected** from the header), PID column auto-detected from the index registry (or set `--pid-key`). Mutually exclusive with positional PIDs. |
 | `--pid-key NAME` | Column name to read PIDs from when `--pids-from` is a CSV; also forces CSV parsing of a `.txt`/stdin source. |
 | `--pid-suffix STR` | String appended to every PID read from `--pids-from` (e.g. `--pid-suffix _RED` turns a HiRISE obsid into its RED product). **Not** applied to positional PIDs — hand-typed PIDs are passed through verbatim. |
 
-CSV is auto-detected when the source has a `.csv` extension, when `--pid-key`
-is given, or when stdin's first non-blank line contains a comma. Otherwise
-the source is read as plain text.
+Tabular mode is auto-detected when the source has a `.csv` / `.tsv` / `.tab`
+extension, when `--pid-key` is given, or when stdin's first non-blank line
+contains a comma or a tab. The delimiter itself (comma vs tab) is then
+sniffed from the header, so tab-separated exports work without any flag.
+Otherwise the source is read as plain text.
 
 ```bash
 # plain-text list, one PID per line
