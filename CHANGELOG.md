@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.69.0] - 2026-06-09
+
+A `plp indexes` release: a new `counts` verb and a generic "short product ID" mechanism that expands a leading-prefix PID to all the products it matches — so a HiRISE obsid handed to the per-CCD EDR index returns every CCD product, with no instrument-specific code.
+
+### Added
+
+- **`plp indexes counts KEY [COLUMN] [--columns ...] [--top N] [--dropna]`** — a `pandas.value_counts` view of one or more index columns, with percent-of-total. Built for categorical columns (`TARGET_NAME`, `MISSION_PHASE_NAME`, `INSTRUMENT_MODE_ID`) where you want the lay of the land before filtering. `--columns/-c` is dual-idiom (comma-separated and/or repeated); `--top 0` shows every distinct value.
+- **`planetarypy.pds.resolve_pids(key, pids, df, *, prefix=False)`** — maps each requested PID to the full PRODUCT_IDs it resolves to: exact match wins; otherwise (when `prefix=True`) a leading-prefix PID expands to all matching products, sorted; otherwise empty. The generic mechanism behind the new prefix behavior — no per-instrument logic.
+- **`prefix=` keyword on `planetarypy.pds.get_index`** — routes the `pids=` filter through `resolve_pids`, so library callers and notebooks get the same expansion.
+- **`plp fetch ... --prefix`** — opt-in prefix expansion for downloads (e.g. a HiRISE obsid → every CCD product). Off by default to avoid surprise bulk downloads; requires `KEY` to be a registered PDS index and errors clearly when it isn't or when nothing resolves.
+- **Full `plp indexes` section in `docs/howto/cli.qmd`** (list/peek/last/counts/select/info/refresh) plus a shared "Batch PID input" section documenting the `--pids-from` / `--pid-key` / `--pid-suffix` family, and the `plp fetch` batch flags that were previously undocumented.
+
+### Changed
+
+- **`plp indexes select` expands short PIDs automatically.** A PID with no exact `PRODUCT_ID` match that is a leading prefix of real ones now returns all matching rows, with the expansion noted on stderr (`'ESP_075205_0930' → 26 products by prefix`). Exact matches are never expanded. This makes `plp indexes select mro.hirise.edr ESP_075205_0930` (an obsid) return that observation's full set of CCD products instead of nothing.
+
+### Fixed
+
+- **`plp indexes select` no longer dumps the schema on an empty result.** A 0-row match used to render the transposed table with every field name and no values, which read like a broken result. It now leaves stdout empty (pipe-clean) and explains the empty match on stderr (`0 rows / N requested, … not found`).
+
 ## [0.68.3] - 2026-06-09
 
 A one-bug patch. `plp spice missions` and `plp spice info` crashed for real users on a schedule — and the test suite couldn't see it because the cache was laundering the bug.
