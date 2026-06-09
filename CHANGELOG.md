@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.70.0] - 2026-06-09
+
+A small input-handling release: `--pids-from` now understands tab-separated files, not just comma CSV.
+
+### Added
+
+- **`read_pids_file` (the `--pids-from` backend for `plp fetch` and `plp indexes select`) now accepts tab-separated input.** `.csv` / `.tsv` / `.tab` files route to tabular mode, stdin routes to tabular mode on a comma *or* a tab in the first line, and the delimiter (comma vs tab) is auto-detected from the header before parsing. Previously a tab-separated file — e.g. a spreadsheet "download as TSV" export, even one named `.csv` — collapsed its entire header into a single column, so `--pid-key COLUMN` failed with "is not a column". Now it parses into real columns regardless of the filename. PDS product IDs contain neither commas nor tabs, so plain-text input stays reliably distinguishable. Verified end-to-end on a real 3739-row HiRISE seasonal-observations TSV export.
+
 ## [0.69.0] - 2026-06-09
 
 A `plp indexes` release: a new `counts` verb and a generic "short product ID" mechanism that expands a leading-prefix PID to all the products it matches — so a HiRISE obsid handed to the per-CCD EDR index returns every CCD product, with no instrument-specific code.
