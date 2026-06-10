@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.71.0] - 2026-06-10
+
+Adds GDAL-native projected-raster geometry to `geo.py`, removes a broken unused module, and migrates linting to ruff.
+
+### Added
+
+- **Projected-raster geometry helpers in `planetarypy.geo`** — format-agnostic and ISIS-free, reading CRS/footprint/overlaps straight from the raster via rasterio, so they work on ISIS `.cub` today and GeoTIFF after ISIS v10's move to native GDAL formats:
+  - `is_projected(source)` — projected vs geographic CRS.
+  - `raster_footprint(source, *, simplify=None)` — valid-data outline (built from the dataset mask, so nodata borders are excluded — the actual data shape, not the bounding box) as a shapely (Multi)Polygon in the raster CRS.
+  - `footprints_to_gdf(sources, *, id_fn=None, simplify=None)` — footprints of many rasters in one GeoDataFrame. The `id` column defaults to the file name (with extension — lossless and collision-safe across format conversions); `id_fn` injects a domain key (e.g. a PDS product id) so `geo.py` stays instrument-agnostic. Raises on duplicate ids. Requires geopandas (`[isis]` extra).
+  - `overlaps(gdf)` — pairwise positive-area intersections between footprints.
+
+### Removed
+
+- **`planetarypy.isis.projected`** — an unfinished, unimported module that would `NameError`/`AttributeError` on nearly any call (undefined `download_pid`/`calibrate_pid`/`do_footprintinit` and `self.pids`/`calpaths`/`mappaths`/`calibs`; a duplicate `process_parallel`). It was a half-generalized clone of `ctx_calib.CTXCollection`; its genuinely-generic ideas (footprints, overlaps, footprints→GeoDataFrame) now live in `geo.py` as the GDAL-native helpers above. Nothing imported it, so there is no user-facing breakage.
+
+### Internal
+
+- **Linting migrated from flake8 to ruff.** flake8 was unenforced and its `[tool.flake8]` config was dead (no `flake8-pyproject` installed). Replaced with a working `[tool.ruff]` (line-length 88, rules E/W/F, ignore E203/E701 — faithful parity), `ruff` declared in the `[dev]` extra, Makefile/CLAUDE.md updated. Removed the unused, stale `tox.ini` (CI runs pytest directly) and its Makefile references. Fixed two dead-code findings ruff surfaced (an unused local in `cli.py`, a duplicate `import warnings` in `pds/index_labels.py`).
+
 ## [0.70.0] - 2026-06-09
 
 A small input-handling release: `--pids-from` now understands tab-separated files, not just comma CSV.
