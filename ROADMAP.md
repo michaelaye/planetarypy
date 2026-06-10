@@ -27,10 +27,6 @@ Development priorities as of v0.52.1.
 - **HiRISE EXTRAS**: more product types (IRB, NOMAP, anaglyphs, DTM hillshade).
 - **Uranus system**: no small satellite SPK available from NAIF currently.
 
-## Known Issues / Technical Debt
-
-- **`isis/projected.py` undefined names** (surfaced by ruff `F821` during the flake8→ruff migration): `download_collection` / `calibrate_collection` / `footprint_init` call `download_pid` / `calibrate_pid` / `do_footprintinit`, which are never imported in the module — any call raises `NameError`. The functions exist in `instruments/mro/ctx/ctx_calib.py`; the likely fix is an import, but confirm they're the intended targets before wiring in (this module is flagged debt — it also carries a duplicate `process_parallel`). Tracked here because GitHub Issues are disabled on the repo.
-
 ## Recently Completed (v0.50–0.52)
 
 - PDS Catalog with 65 missions, 2042 product types, direct data access for 58 types
