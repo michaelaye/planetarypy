@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.73.1] - 2026-06-10
+
+### Fixed
+
+- **Removed the non-functional `year` parameter from `planetarypy.crs`** (`body_crs`, `local_crs`, `get_crs`). PROJ ships only the `IAU_2015` CRS authority — there is no `IAU_2009`/`IAU_2006`/… — so any `year` other than 2015 always raised. (The multi-edition "time travel" in `planetarypy.constants` is a separate, PCK-based feature; the CRS `year` param was a mistaken mirror of it.) The functions now build against `IAU_2015` directly; callers using the old default `year=2015` are unaffected.
+
 ## [0.73.0] - 2026-06-10
 
 Lighter SPICE defaults and a leaner, more robust CI.
@@ -25,7 +31,7 @@ A planetary-CRS module plus anti-meridian geometry — planetarypy now owns shar
 ### Added
 
 - **`planetarypy.crs`** — IAU planetary coordinate reference systems via `pyproj`, adapted from Christian Tai Udovicic's craterpy `crs.py`:
-  - `body_crs(body, system="ocentric", year=2015)` — a body's geographic CRS from the IAU authority. `body` is a name (resolved via `planetarypy.constants`) or a NAIF id. The ellipsoid/radii come from the IAU code itself — nothing looked up or hardcoded.
+  - `body_crs(body, system="ocentric")` — a body's geographic CRS from the IAU 2015 authority. `body` is a name (resolved via `planetarypy.constants`) or a NAIF id. The ellipsoid/radii come from the IAU code itself — nothing looked up or hardcoded.
   - `local_crs(lon, lat, body)` — Azimuthal-Equidistant CRS centered on a point (built on the body's IAU geodetic CRS), for feature-centered / distance-true work like crater annuli.
   - `get_crs(body, system="default")` — craterpy-compatible alias.
   - Generative (any IAU body) rather than a static registry; drops craterpy's exception-driven dispatch and proj4 string-surgery for planetographic.
