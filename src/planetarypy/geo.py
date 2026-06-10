@@ -16,6 +16,9 @@ Functions for direct use:
 Projected-raster geometry (GDAL-native, ISIS-free, format-agnostic):
     is_projected, raster_footprint, footprints_to_gdf, overlaps
 
+Anti-meridian (±180° longitude) handling:
+    split_at_antimeridian, normalise_lon_bounds
+
 Point class:
     Combines lon/lat, pixel, and projected coordinates in one object
     with CRS awareness. Handles transforms, bounds checking, azimuths,
@@ -631,3 +634,120 @@ def overlaps(gdf):
             )
     return gpd.GeoDataFrame(rows, columns=["id_1", "id_2", "geometry", "area"],
                             crs=gdf.crs)
+
+
+# ── Anti-meridian (±180° longitude) handling ────────────────────────────
+#
+# Ported from the ganymede project. Planetary footprints that cross the
+# ±180° meridian or contain a pole break naive shapely polygons; these
+# helpers split/normalize them so downstream geometry (footprints_to_gdf,
+# overlaps, bbox filtering) behaves.
+
+
+def normalise_lon_bounds(lon_min, lon_max):
+    """Normalise a longitude bbox to ``[-180, 180]``, picking the short arc.
+
+    Distinguishes two wrap geometries that a raw ``[0, 360]`` bbox conflates:
+
+    - **Antimeridian wrap** (e.g. raw ``(170, 190)``): raw width < 180°. The
+      ``[-180, 180]`` form has ``lon_min > lon_max``; the interior is
+      ``(lon >= lon_min) OR (lon <= lon_max)``.
+    - **Prime-meridian wrap** (e.g. raw ``(8, 359)`` for a narrow feature
+      near 0°): raw width > 180°, so the vertices encode the *long* way; the
+      real (short) interior is the single interval ``(raw_max - 360, raw_min)``.
+
+    Returns
+    -------
+    (lon_min, lon_max, crosses) : tuple[float, float, bool]
+        Bounds in ``[-180, 180]`` and whether the interior crosses ±180°
+        (i.e. callers must use OR rather than AND on the longitude test).
+    """
+    raw_min = float(lon_min)
+    raw_max = float(lon_max)
+    if raw_max - raw_min > 180:
+        return raw_max - 360.0, raw_min, False
+    lo = raw_min - 360.0 if raw_min > 180 else raw_min
+    hi = raw_max - 360.0 if raw_max > 180 else raw_max
+    return lo, hi, lo > hi
+
+
+def split_at_antimeridian(corners):
+    """Build (possibly split) shapely polygon(s) from lon/lat corners.
+
+    Three cases:
+
+    1. **No crossing** (lon-span < 180°): one polygon, constructed directly.
+    2. **Antimeridian crossing** (span >= 180°, but < 180° after shifting
+       negative-lon corners by +360°): shift, split at lon=180, shift the
+       over-180° piece back — returns the two hemisphere halves.
+    3. **Pole-containing** (still spans >= 180° after the shift): delegate to
+       :func:`antimeridian.fix_polygon`, forcing the pole by the mean-latitude
+       sign — returns one polar-cap polygon.
+
+    Parameters
+    ----------
+    corners : list[tuple[float, float]]
+        ``(lon, lat)`` vertices in degrees.
+
+    Returns
+    -------
+    list[shapely.Polygon]
+        One polygon (no-crossing or polar cap), two (antimeridian crossing),
+        or empty for degenerate input (< 3 corners / invalid geometry).
+    """
+    from shapely.geometry import LineString
+    from shapely.geometry import Polygon as _Polygon
+    from shapely.ops import split as _split
+
+    if len(corners) < 3:
+        return []
+
+    lons = [c[0] for c in corners]
+    if max(lons) - min(lons) < 180.0:
+        poly = _Polygon(corners)
+        return [poly] if poly.is_valid and not poly.is_empty else []
+
+    # Shift negative-lon corners by +360 → polygon in extended longitude.
+    shifted = [(c[0] + 360.0 if c[0] < 0 else c[0], c[1]) for c in corners]
+    if max(c[0] for c in shifted) - min(c[0] for c in shifted) >= 180.0:
+        # Pole-containing — winding alone is ambiguous; pick the pole by
+        # mean latitude and let the antimeridian package fix it.
+        import antimeridian
+
+        mean_lat = sum(c[1] for c in corners) / len(corners)
+        north = mean_lat > 0
+        try:
+            fixed = antimeridian.fix_polygon(
+                _Polygon(corners),
+                fix_winding=True,
+                force_north_pole=north,
+                force_south_pole=not north,
+            )
+        except Exception:
+            return []
+        if not fixed.is_valid or fixed.is_empty:
+            return []
+        if fixed.geom_type == "MultiPolygon":
+            return [g for g in fixed.geoms if g.is_valid and not g.is_empty]
+        return [fixed]
+
+    shifted_poly = _Polygon(shifted)
+    if not shifted_poly.is_valid or shifted_poly.is_empty:
+        return []
+
+    splitter = LineString([(180.0, -90.0), (180.0, 90.0)])
+    try:
+        parts = _split(shifted_poly, splitter)
+    except Exception:
+        return []
+
+    result = []
+    for part in parts.geoms:
+        coords = list(part.exterior.coords)[:-1]  # drop closing duplicate
+        # Pieces in the over-180 hemisphere get shifted back by -360.
+        if any(c[0] > 180 for c in coords):
+            coords = [(c[0] - 360.0, c[1]) for c in coords]
+        new_poly = _Polygon(coords)
+        if new_poly.is_valid and not new_poly.is_empty:
+            result.append(new_poly)
+    return result

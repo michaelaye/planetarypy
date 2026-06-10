@@ -45,6 +45,7 @@ dependencies = [
     "matplotlib",      # For planetarypy.plotting + plp visualize verbs
     "rich",            # For Rich tables/console used by cli.py and hirise.py
     "shapely",         # For Point.to_shapely() in geo.py
+    "antimeridian",    # ±180° polygon splitting/fixing in geo.split_at_antimeridian
 ]
 
 [project.urls]
