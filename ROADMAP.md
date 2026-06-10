@@ -14,7 +14,7 @@ Development priorities as of v0.52.1.
 
 ## Medium Priority
 
-- **Christian Tai Udovicic CRS module**: planned integration for easy access to all major solar system CRSs via IAU codes.
+- **CRS module ↔ craterpy adoption**: `planetarypy.crs` now exists (`body_crs`, `local_crs`, `get_crs` over IAU codes — adapted from Christian Tai Udovicic's craterpy `crs.py`). Remaining: have craterpy depend on `planetarypy.crs` and drop its own copy (see the integration cheat sheet).
 - **Automatic sun indicator from index**: `imshow_with_sun` should accept a product ID and auto-fetch the solar azimuth from the PDS index, handling the convention conversion internally.
 - **CTX sun indicator**: verify and document CTX `SUB_SOLAR_AZIMUTH` convention.
 - **Manifest-based URL resolution**: if pdr-tests manifest parquets become available, build compressed lookup tables for non-indexed product types (currently only ~58 of 2042 product types support direct download).

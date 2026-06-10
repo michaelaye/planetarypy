@@ -1,0 +1,8 @@
+# Applies to every document in docs/tutorials/.
+# Also emit each tutorial as .ipynb so the rendered HTML page offers an
+# "Other Formats → ipynb" download of its own source notebook (Quarto
+# built-in). Per-page and automatic — no per-notebook frontmatter, no
+# title->filename mapping. html keeps the project-level theme/toc.
+format:
+  html: default
+  ipynb: default

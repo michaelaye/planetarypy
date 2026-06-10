@@ -43,6 +43,7 @@ website:
         - tutorials/pds_indexes_examples.ipynb
         - tutorials/pds_catalog_tutorial.ipynb
         - tutorials/geospatial_tutorial.ipynb
+        - tutorials/planetary_crs_tutorial.ipynb
         - tutorials/spicer_tutorial.ipynb
         - tutorials/spice_kernel_examples.ipynb
     - title: "How-To"
@@ -117,6 +118,7 @@ quartodoc:
         - config
         - cli
         - geo
+        - crs
         - plotting
         - datetime_format_converters
         - utils

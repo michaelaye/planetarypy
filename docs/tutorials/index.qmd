@@ -12,3 +12,5 @@ page-layout: article
 Welcome to the Tutorials section. Pick a tutorial below to get started.
 
 This page automatically lists all notebooks and documents in this folder, so you can just drop new `.qmd` or `.ipynb` files here and they’ll appear below.
+
+Each tutorial page offers its source as a downloadable Jupyter notebook — see the **Other Formats** links in the page's right-hand table of contents.

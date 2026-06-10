@@ -43,7 +43,8 @@ Top-level under `src/planetarypy/`:
 | `instruments/` | Mission-specific handlers (mro/, go/) |
 | `constants/` | IAU 2009/2015 rotation/shape constants + NSSDC fact sheets |
 | `isis/` | ISIS3 helpers (autoseed, projected) |
-| `geo.py` | Coordinate transforms, `Point` class, IAU CRS resolution |
+| `geo.py` | Coordinate transforms, `Point` class, footprints/overlaps, anti-meridian handling |
+| `crs.py` | Planetary CRS construction from IAU codes (`body_crs`, `local_crs`); pyproj-only |
 | `plotting.py` | `imshow_gray`, `add_sun_indicator`, `imshow_with_sun` |
 | `cli.py` | Unified `plp` Typer CLI |
 | `datetime_format_converters.py`, `utils.py` | Shared helpers |
@@ -146,7 +147,8 @@ This is also documented (with a user-facing framing) in `docs/howto/cli.qmd`.
 - Logging: loguru, **disabled by default** (library convention). Enable via `logger.enable("planetarypy")` or `planetarypy.enable_logging("DEBUG")`.
 
 ### Domain conventions
-- **IAU 2015 CRS codes** preferred over raw proj4 strings.
+- **IAU 2015 CRS codes** preferred over raw proj4 strings. Build them with `planetarypy.crs.body_crs(body, system)` / `local_crs(lon, lat, body)` — radii come from the IAU code itself (never looked up); body names resolve via `planetarypy.constants`. IAU code = `naif_id*100 + offset` (0 = ocentric, present for every body; 1 = ographic, only some).
+- **Anti-meridian (±180° longitude)**: footprints crossing the dateline or containing a pole break naive shapely polygons. Use `planetarypy.geo.split_at_antimeridian(corners)` (no-cross → 1 poly; crossing → 2 hemisphere polys; pole → cap via the `antimeridian` pkg) and `normalise_lon_bounds` for bbox filtering. Ported from the ganymede project.
 - **HiRISE azimuths** (`SUB_SOLAR_AZIMUTH`, `NORTH_AZIMUTH`) are CW from 3 o'clock. Convert to CW-from-top with `(az + 90) % 360`.
 - **SPICE azimuth convention**: `Spicer.solar_azimuth_at` returns CW-from-north (geographic). The plotting helper `add_sun_indicator` expects CW-from-top (PDS unprojected convention).
 
