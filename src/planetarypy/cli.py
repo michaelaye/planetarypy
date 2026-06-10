@@ -734,6 +734,41 @@ def ctxqv(
         plt.show()
 
 
+@app.command("open", rich_help_panel=_PANEL_INSPECT)
+def open_cmd(
+    ctx: typer.Context,
+    path: Path = typer.Argument(
+        None, help="Path to a local data product (PDS3 .LBL/.IMG, FITS, GeoTIFF, .cub)."
+    ),
+    show: bool = typer.Option(
+        False, "--show", help="Display the default image object in a viewer window."
+    ),
+):
+    """Open a data product and report what's inside.
+
+    Examples:
+        plp open P02_001916_2221_XI_42N027W.LBL
+        plp open mycube.tif --show
+    """
+    if path is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    import planetarypy
+
+    d = planetarypy.open(path)
+    keys = getattr(d, "keys", None)
+    if callable(keys):
+        typer.echo(f"Opened {path.name} — objects: {list(d.keys())}")
+    else:
+        # Projected raster → xarray DataArray.
+        typer.echo(
+            f"Opened {path.name} — shape: {tuple(d.shape)}, dims: {tuple(d.dims)}"
+        )
+    if show and hasattr(d, "show"):
+        d.show()
+
+
 # ── catalog ──────────────────────────────────────────────────────────
 
 catalog_app = typer.Typer(help="PDS catalog management.", no_args_is_help=True)

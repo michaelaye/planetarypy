@@ -1,0 +1,86 @@
+---
+title: "HOWTO open planetary data products"
+---
+
+planetarypy can **open** a planetary data product into memory with a single
+call — no need to know the product's format or hand-roll a reader.
+
+```python
+import planetarypy
+
+d = planetarypy.open("P02_001916_2221_XI_42N027W.LBL")
+```
+
+The right thing happens automatically based on what the file is.
+
+## One call to open anything
+
+For most products (PDS3 `.IMG`/`.LBL`, PDS4, FITS, …) `open` returns a
+dict-like handle. You reach the contained objects by key, and the label
+metadata via `metaget`:
+
+```python
+d.keys()                 # e.g. ['LABEL', 'IMAGE']
+arr = d["IMAGE"]         # a numpy array
+df  = d["INDEX_TABLE"]   # a pandas DataFrame (for TABLE objects)
+d.metaget("LINES")       # read a value from the label
+```
+
+For **detached-label** PDS3 products, pass the label (`.LBL`) — it is the
+correct entry point and tells the reader where the data file lives.
+
+## Download and open in one step
+
+If you are fetching from the catalog, you don't need an intermediate path
+variable. Either call `.open()` on the result, or pass `open=True`:
+
+```python
+from planetarypy.catalog import fetch_product
+
+# Option A — open the result:
+d = fetch_product("mro.ctx.edr", "P02_001916_2221_XI_42N027W").open()
+
+# Option B — fetch and open in one call:
+d = fetch_product("mro.ctx.edr", "P02_001916_2221_XI_42N027W", open=True)
+```
+
+`.open()` opens the label when one was downloaded, otherwise the single
+downloaded data file. If a product wrote several data files, it raises and
+asks you to call `planetarypy.open(path)` on the specific file you want.
+
+## Projected rasters come back georeferenced
+
+GeoTIFFs and ISIS `.cub` files are already map-projected, so `open` returns a
+**georeferenced `xarray.DataArray`** (via `rioxarray`) instead of the generic
+handle — you keep the CRS and coordinates:
+
+```python
+da = planetarypy.open("mosaic.tif")   # xarray.DataArray with x/y coords
+da.rio.crs
+```
+
+You can override the routing with the `projected` keyword when the suffix
+isn't a reliable signal:
+
+```python
+planetarypy.open("weird.dat", projected=False)   # force the generic reader
+planetarypy.open("scene.raw", projected=True)     # force the raster reader
+```
+
+## From the command line
+
+```bash
+plp open P02_001916_2221_XI_42N027W.LBL   # prints the contained objects
+plp open mosaic.tif --show                # display the default image
+```
+
+---
+
+::: {.callout-note collapse="true"}
+## Under the hood (for contributors)
+
+The generic reader is [MillionConcepts' `pdr`](https://github.com/MillionConcepts/pdr)
+(Planetary Data Reader), shipped as a core dependency so `planetarypy.open`
+works out of the box. Projected rasters are routed to `rioxarray` instead.
+End users never need to install or import `pdr` directly.
+:::

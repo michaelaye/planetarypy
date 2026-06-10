@@ -140,10 +140,11 @@ jobs:
             BatchFetchResult, OfflineError,
         )
         from planetarypy.constants import Mars, Earth, Moon
-        from planetarypy import geo, utils
+        from planetarypy import geo, utils, io
         from planetarypy.instruments.mro import hirise
         from planetarypy.instruments.mro.ctx import ctx_edr, ctx_calib
         from planetarypy.instruments.go import ssi
+        assert callable(planetarypy.open) and callable(planetarypy.read)
         print('All public imports OK')
         "
 
@@ -155,4 +156,5 @@ jobs:
         plp indexes --help > /dev/null
         plp spice --help > /dev/null
         plp fetch --help > /dev/null
+        plp open --help > /dev/null
         plp indexes select --help > /dev/null

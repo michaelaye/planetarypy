@@ -43,6 +43,8 @@ requirements:
     - rich
     - shapely
     - antimeridian
+    - pdr
+    - pillow
 
 test:
   imports:

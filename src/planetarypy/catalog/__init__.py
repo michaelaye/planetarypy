@@ -522,6 +522,7 @@ def fetch_product(
     label_only: bool = False,
     force: bool = False,
     local_dir: Path | None = None,
+    open: bool = False,
 ) -> DownloadedProduct:
     """Download a PDS product and return where it landed plus what was written.
 
@@ -553,6 +554,10 @@ def fetch_product(
         Override the storage location. When ``None`` (default), the
         catalog's per-instrument layout is used
         (``{storage_root}/{mission}/{instrument}/{product_type}/{pid}/``).
+    open : bool
+        If ``True``, open the downloaded product in memory and return that
+        object (as :func:`planetarypy.open`) instead of the
+        ``DownloadedProduct``. Convenience for download-and-open in one call.
 
     Returns
     -------
@@ -560,7 +565,8 @@ def fetch_product(
         Bundle containing ``local_dir`` (folder), ``files`` (absolute paths
         of every file written by this call), ``label_file`` (convenience
         pointer to the PDS label, if any), and ``product_id`` (the
-        canonical identifier the resolver matched).
+        canonical identifier the resolver matched). When ``open=True``, the
+        opened in-memory object is returned instead.
 
     Examples
     --------
@@ -603,12 +609,15 @@ def fetch_product(
         if candidate in written:
             label_path = candidate
 
-    return DownloadedProduct(
+    result = DownloadedProduct(
         product_id=resolved.product_id,
         local_dir=local_dir,
         files=written,
         label_file=label_path,
     )
+    if open:
+        return result.open()
+    return result
 
 
 class OfflineError(RuntimeError):

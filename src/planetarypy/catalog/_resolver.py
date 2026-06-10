@@ -108,6 +108,33 @@ class DownloadedProduct:
     """Pointer to the PDS label file (``.LBL`` / ``.XML``) if it was
     downloaded by this call, else ``None``."""
 
+    def open(self, **kwargs):
+        """Open this downloaded product in memory in one step.
+
+        Opens the PDS label when one was downloaded (the label is the correct
+        entry point for detached-label products); otherwise opens the single
+        downloaded data file. Raises when the target is ambiguous — more than
+        one non-label file was written — in which case call
+        :func:`planetarypy.open` on the specific path you want.
+
+        Returns the same object as :func:`planetarypy.open`.
+        """
+        from planetarypy.io import open as _open
+
+        target = self.label_file
+        if target is None:
+            data_files = [
+                p for p in self.files if p.suffix.lower() not in {".lbl", ".xml"}
+            ]
+            if len(data_files) != 1:
+                raise ValueError(
+                    f"open() needs an unambiguous target but this product has "
+                    f"{len(data_files)} data files: {data_files}. Call "
+                    f"planetarypy.open(path) on the specific file instead."
+                )
+            target = data_files[0]
+        return _open(target, **kwargs)
+
 
 # ── Storage resolver registry ─────────────────────────────────────
 #

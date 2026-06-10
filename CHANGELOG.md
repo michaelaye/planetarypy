@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.74.0] - 2026-06-11
+
+### Added
+
+- **`planetarypy.open(path)` — open any planetary data product in one call.** A new top-level opener returns the product in memory: PDS3 (`.IMG`/`.LBL`), PDS4, FITS, and similar come back as a dict-like handle (`d.keys()`, `d["IMAGE"]` → numpy array, `d["INDEX_TABLE"]` → pandas DataFrame, `d.metaget("KEY")` → label metadata); already-projected GeoTIFFs and ISIS `.cub` files come back as a georeferenced `xarray.DataArray`. Routing is automatic from the file type and overridable with `projected=True/False`. `planetarypy.read` is a `pandas.read_*`-style alias. New module `planetarypy.io`.
+- **Download and open in one step.** `DownloadedProduct.open()` opens a fetched product (preferring its PDS label), and `catalog.fetch_product(..., open=True)` returns the opened object directly instead of the `DownloadedProduct`.
+- **`plp open PATH`** — CLI verb that opens a product and prints what's inside (`--show` displays the default image).
+- New how-to: `docs/howto/opening_data.qmd`.
+
+The reader engine is [MillionConcepts' `pdr`](https://github.com/MillionConcepts/pdr), now a core dependency so opening works out of the box — end users never need to install or import it directly. (`pillow` is pulled in alongside for image arrays.)
+
 ## [0.73.2] - 2026-06-11
 
 ### Fixed

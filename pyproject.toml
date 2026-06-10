@@ -46,6 +46,7 @@ dependencies = [
     "rich",            # For Rich tables/console used by cli.py and hirise.py
     "shapely",         # For Point.to_shapely() in geo.py
     "antimeridian",    # ±180° polygon splitting/fixing in geo.split_at_antimeridian
+    "pdr[pillow]",     # Reader engine behind planetarypy.open() (pillow → image arrays)
 ]
 
 [project.urls]

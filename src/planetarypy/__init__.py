@@ -4,7 +4,17 @@ __author__ = """PlanetaryPy Developers"""
 __email__ = "kmichael.aye@gmail.com"
 __version__ = "0.73.2"
 
-__all__ = ["enable_logging"]
+__all__ = ["enable_logging", "open", "read"]
+
+
+def __getattr__(name):
+    # Lazy access to the data reader so `import planetarypy` stays cheap and
+    # doesn't pull in rioxarray/pdr until someone actually opens a product.
+    if name in ("open", "read"):
+        from planetarypy import io
+
+        return getattr(io, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # as advised by logger docs, for library use via `import planetarypy` etc.:
