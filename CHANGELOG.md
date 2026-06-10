@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.0] - 2026-06-10
+
+A planetary-CRS module plus anti-meridian geometry — planetarypy now owns shared coordinate-system handling (the craterpy CRS hand-off).
+
+### Added
+
+- **`planetarypy.crs`** — IAU planetary coordinate reference systems via `pyproj`, adapted from Christian Tai Udovicic's craterpy `crs.py`:
+  - `body_crs(body, system="ocentric", year=2015)` — a body's geographic CRS from the IAU authority. `body` is a name (resolved via `planetarypy.constants`) or a NAIF id. The ellipsoid/radii come from the IAU code itself — nothing looked up or hardcoded.
+  - `local_crs(lon, lat, body)` — Azimuthal-Equidistant CRS centered on a point (built on the body's IAU geodetic CRS), for feature-centered / distance-true work like crater annuli.
+  - `get_crs(body, system="default")` — craterpy-compatible alias.
+  - Generative (any IAU body) rather than a static registry; drops craterpy's exception-driven dispatch and proj4 string-surgery for planetographic.
+- **Anti-meridian helpers in `planetarypy.geo`** (ported from the ganymede project): `split_at_antimeridian(corners)` — no-cross → one polygon, ±180° crossing → two hemisphere polygons, pole-containing → a cap (via the `antimeridian` package); and `normalise_lon_bounds(lon_min, lon_max)` — distinguishes an antimeridian wrap from a prime-meridian wrap for bbox filtering.
+- **`antimeridian`** added to core dependencies (small, pure-Python).
+- **New tutorial** `docs/tutorials/planetary_crs_tutorial.ipynb`. Tutorial pages now also offer their source as a downloadable notebook (Quarto "Other Formats").
+
 ## [0.71.0] - 2026-06-10
 
 Adds GDAL-native projected-raster geometry to `geo.py`, removes a broken unused module, and migrates linting to ruff.
