@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.73.0] - 2026-06-10
+
+Lighter SPICE defaults and a leaner, more robust CI.
+
+### Changed
+
+- **Default planetary ephemeris is now `de432s` instead of `de430`.** The generic SPICE kernel set (fetched by `Spicer` and `download_generic_kernels`) uses **de432s** (~10 MB) rather than de430 (~120 MB). ⚠️ **This narrows the default valid date range from 1550–2650 to 1950–2050** — ample for modern spacecraft-era geometry, at a ~12× smaller download. Need the wider range? Fetch the full de430 on demand: `download_generic_kernel("de430")` then `spiceypy.furnsh` it (the `"de430"` alias is retained). The spice tutorials note this.
+
+### Internal
+
+- **Release-gate CI downloads cut from ~330 MB to ~20 MB and hardened.** `test_spicer.TestSolarAzimuth` now validates against embedded, immutable HiRISE reference rows instead of downloading the ~200 MB RDR cumulative index, so the RDR prefetch step is removed; the (now ~20 MB, de432s) kernel prefetch got exponential-backoff retries so a transient NAIF blip no longer false-reds a release.
+- **New PDS-node availability canary.** A scheduled `PDS download smoke` workflow fetches a small index from several PDS nodes (geosciences ~0.2 MB, ring-moon ~10 MB, HiRISE ~7 MB) so an outage or download/parse regression surfaces. The smokes are `slow`-marked (excluded from the release gate), so the canary alerts without blocking releases.
+
 ## [0.72.0] - 2026-06-10
 
 A planetary-CRS module plus anti-meridian geometry — planetarypy now owns shared coordinate-system handling (the craterpy CRS hand-off).
