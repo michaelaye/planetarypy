@@ -13,6 +13,9 @@ Functions for direct use:
     xy_to_lonlat, lonlat_to_xy, is_within, image_azimuth,
     image_azimuth_cw_from_right, pixel_resolution
 
+Projected-raster geometry (GDAL-native, ISIS-free, format-agnostic):
+    is_projected, raster_footprint, footprints_to_gdf, overlaps
+
 Point class:
     Combines lon/lat, pixel, and projected coordinates in one object
     with CRS awareness. Handles transforms, bounds checking, azimuths,
@@ -28,6 +31,8 @@ True
 >>> p.to_shapely()
 <POINT (137.85 -5.08)>
 """
+
+from contextlib import contextmanager
 
 import numpy as np
 from rasterio.transform import AffineTransformer
@@ -466,3 +471,148 @@ def _get_transform_and_crs(source):
     raise TypeError(
         f"Expected a rioxarray DataArray or rasterio DatasetReader, got {type(source)}"
     )
+
+
+# ── Projected-raster geometry (GDAL-native, format-agnostic) ────────────
+#
+# These read CRS/footprint/overlaps straight from the raster via rasterio,
+# so they work on any GDAL-readable file — ISIS .cub today, GeoTIFF after
+# ISIS v10's move to native GDAL formats — with no ISIS dependency.
+
+
+@contextmanager
+def _as_rasterio_dataset(source):
+    """Yield a rasterio dataset from a file path or an already-open dataset.
+
+    Closes the dataset on exit only when this function opened it.
+    """
+    import os
+
+    import rasterio
+
+    if hasattr(source, "read") and hasattr(source, "dataset_mask"):
+        yield source  # already an open rasterio DatasetReader
+    elif hasattr(source, "rio"):
+        raise TypeError(
+            "Pass a file path or rasterio dataset, not a rioxarray DataArray "
+            "(footprint extraction reads the data mask from the file)."
+        )
+    else:
+        with rasterio.open(os.fspath(source)) as ds:
+            yield ds
+
+
+def is_projected(source) -> bool:
+    """Return True if the raster's CRS is projected (not geographic).
+
+    Accepts a file path, an open rasterio dataset, or a rioxarray DataArray.
+    Format-agnostic (ISIS ``.cub``, GeoTIFF, …).
+    """
+    if hasattr(source, "rio") or (
+        hasattr(source, "transform") and hasattr(source, "crs")
+    ):
+        _, crs = _get_transform_and_crs(source)
+    else:
+        with _as_rasterio_dataset(source) as ds:
+            crs = ds.crs
+    if crs is None:
+        raise ValueError("Raster has no CRS; cannot determine projection.")
+    return bool(crs.is_projected)
+
+
+def raster_footprint(source, *, simplify=None):
+    """Valid-data footprint of a raster as a shapely (Multi)Polygon.
+
+    Built from the dataset mask, so nodata borders — common on
+    map-projected products — are excluded: the result is the actual data
+    outline, not the bounding box. The polygon is in the raster's own CRS.
+    Returns ``None`` for an all-nodata raster.
+
+    Parameters
+    ----------
+    source : path | rasterio dataset
+    simplify : float, optional
+        Douglas-Peucker tolerance (CRS units) to thin the outline.
+    """
+    from rasterio.features import shapes
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+
+    with _as_rasterio_dataset(source) as ds:
+        mask = ds.dataset_mask()
+        geoms = [
+            shape(geom)
+            for geom, val in shapes(mask, mask=mask > 0, transform=ds.transform)
+            if val > 0
+        ]
+    if not geoms:
+        return None
+    footprint = unary_union(geoms)
+    if simplify:
+        footprint = footprint.simplify(simplify)
+    return footprint
+
+
+def footprints_to_gdf(sources, *, id_fn=None, simplify=None):
+    """Assemble valid-data footprints of many rasters into a GeoDataFrame.
+
+    One row per source with an ``id`` and a ``geometry`` column. All sources
+    must share a single CRS (raises otherwise); the GeoDataFrame carries it.
+
+    ``id_fn`` maps a source to its identifier. The default uses the file
+    stem (e.g. ``ESP_075205_0930_RED5_0`` from ``…/ESP_075205_0930_RED5_0.cub``)
+    — generic and instrument-free. Domain callers that know a cleaner key
+    (e.g. a PDS product id) pass their own, keeping this function agnostic.
+
+    Requires geopandas (the ``[isis]`` extra).
+    """
+    import os
+
+    import geopandas as gpd
+    import rasterio
+
+    if id_fn is None:
+        def id_fn(s):
+            from pathlib import Path
+            return Path(os.fspath(s)).stem
+
+    ids, geoms, crs = [], [], None
+    for src in sources:
+        with rasterio.open(os.fspath(src)) as ds:
+            if crs is None:
+                crs = ds.crs
+            elif ds.crs != crs:
+                raise ValueError(
+                    "footprints_to_gdf requires all rasters in one CRS; got "
+                    f"{ds.crs} vs {crs}. Reproject before assembling."
+                )
+            geoms.append(raster_footprint(ds, simplify=simplify))
+        ids.append(id_fn(src))
+    return gpd.GeoDataFrame({"id": ids, "geometry": geoms}, crs=crs)
+
+
+def overlaps(gdf):
+    """Pairwise overlaps (positive area) between footprints in ``gdf``.
+
+    Takes a GeoDataFrame with ``id`` + ``geometry`` (as built by
+    :func:`footprints_to_gdf`) and returns one with ``id_1``, ``id_2``,
+    ``geometry`` (the intersection) and ``area`` (CRS units) per unordered
+    intersecting pair. Edge-only touches (zero area) are dropped.
+
+    Requires geopandas (the ``[isis]`` extra).
+    """
+    import geopandas as gpd
+
+    joined = gpd.sjoin(gdf, gdf, predicate="intersects")
+    pairs = joined[joined["id_left"] < joined["id_right"]]
+    by_id = dict(zip(gdf["id"], gdf["geometry"]))
+    rows = []
+    for left, right in zip(pairs["id_left"], pairs["id_right"]):
+        inter = by_id[left].intersection(by_id[right])
+        if inter.area > 0:
+            rows.append(
+                {"id_1": left, "id_2": right,
+                 "geometry": inter, "area": inter.area}
+            )
+    return gpd.GeoDataFrame(rows, columns=["id_1", "id_2", "geometry", "area"],
+                            crs=gdf.crs)
