@@ -63,12 +63,39 @@ Ready to contribute? Here's how to set up `planetarypy` for local development.
 
 9. Submit a pull request through the GitHub website.
 
+## Documentation
+
+The docs are a [Quarto](https://quarto.org) site under `docs/`, with
+hand-written narrative pages in `tutorials/`, `howto/`, and `explanation/`.
+
+The **API reference is auto-generated from docstrings** by
+[quartodoc](https://machow.github.io/quartodoc/) — the pages under
+`docs/reference/` are **git-ignored and built in CI only**. The
+`Documentation` GitHub Action runs `quartodoc build` + `quarto render` and
+deploys to GitHub Pages on every push to `main` that touches `src/**` or
+`docs/**`. Consequences for contributors:
+
+- **Never hand-write or commit anything under `docs/reference/`** — it is
+  regenerated on every build and would just be overwritten.
+- To document a new public function or class, give it a numpy-style
+  docstring; quartodoc discovers it automatically. Modules are listed once
+  in `docs/_quarto.yml` under `quartodoc.sections` — there is no
+  per-function list to maintain.
+- To preview the rendered site (including the API reference) locally:
+  ```bash
+  cd docs
+  quartodoc build      # regenerate reference/ from docstrings
+  quarto preview       # or: quarto render
+  ```
+
 ## Pull Request Guidelines
 
 Before you submit a pull request, check that it meets these guidelines:
 
 1. The pull request should include tests covering the changes.
-2. If the pull request adds functionality, the docs should be updated.
+2. If the pull request adds functionality, update the docs — a numpy-style
+   docstring (the API reference picks it up automatically; see
+   Documentation above) plus any relevant narrative page.
 3. The pull request should work for Python 3.11+.
 
 The action protocol, specifically timeline and reviews for pull requests as described in
