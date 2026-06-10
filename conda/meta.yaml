@@ -1,4 +1,4 @@
-{% set version = "0.71.0" %}
+{% set version = "0.72.0" %}
 
 package:
   name: planetarypy
@@ -6,7 +6,7 @@ package:
 
 source:
   url: https://pypi.org/packages/source/p/planetarypy/planetarypy-{{ version }}.tar.gz
-  sha256: ca59e112245fbd8beb1747ca536247c4371cd1d539be674ed63cfa9ec11e8b5d
+  sha256: a46d9df2a161084f237004f90e524fd5c9e7079dda14d7b21ba173c61ed995e7
 
 build:
   entry_points:
@@ -42,6 +42,7 @@ requirements:
     - matplotlib-base
     - rich
     - shapely
+    - antimeridian
 
 test:
   imports:
