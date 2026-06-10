@@ -66,14 +66,30 @@ class TestRasterFootprint:
 
 
 class TestFootprintsToGdf:
-    def test_one_row_per_source_keyed_by_stem(self, tmp_path):
+    def test_one_row_per_source_keyed_by_name(self, tmp_path):
         gpd = pytest.importorskip("geopandas")
         a = _write(tmp_path / "AAA.tif", np.ones((4, 4), "uint8"))
         b = _write(tmp_path / "BBB.tif", np.ones((4, 4), "uint8"))
         gdf = footprints_to_gdf([a, b])
         assert isinstance(gdf, gpd.GeoDataFrame)
-        assert list(gdf["id"]) == ["AAA", "BBB"]
+        # default id keeps the extension (lossless / format-distinguishing)
+        assert list(gdf["id"]) == ["AAA.tif", "BBB.tif"]
         assert gdf.crs == rasterio.crs.CRS.from_string("EPSG:3857")
+
+    def test_duplicate_ids_raise(self, tmp_path):
+        pytest.importorskip("geopandas")
+        # same filename in two dirs → default .name collides → guard fires
+        d1 = tmp_path / "d1"
+        d2 = tmp_path / "d2"
+        d1.mkdir()
+        d2.mkdir()
+        a = _write(d1 / "x.tif", np.ones((4, 4), "uint8"))
+        b = _write(d2 / "x.tif", np.ones((4, 4), "uint8"))
+        with pytest.raises(ValueError, match="duplicate ids"):
+            footprints_to_gdf([a, b])
+        # disambiguating via id_fn=str (full path) succeeds
+        gdf = footprints_to_gdf([a, b], id_fn=str)
+        assert len(gdf) == 2
 
     def test_custom_id_fn(self, tmp_path):
         pytest.importorskip("geopandas")
@@ -98,7 +114,7 @@ class TestOverlaps:
         gdf = footprints_to_gdf([a, b])
         ov = overlaps(gdf)
         assert len(ov) == 1
-        assert set(ov.iloc[0][["id_1", "id_2"]]) == {"a", "b"}
+        assert set(ov.iloc[0][["id_1", "id_2"]]) == {"a.tif", "b.tif"}
         assert ov.iloc[0]["area"] == pytest.approx(50.0)  # 5 wide × 10 tall
 
     def test_disjoint_pair_empty(self, tmp_path):

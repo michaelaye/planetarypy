@@ -560,13 +560,20 @@ def footprints_to_gdf(sources, *, id_fn=None, simplify=None):
     must share a single CRS (raises otherwise); the GeoDataFrame carries it.
 
     ``id_fn`` maps a source to its identifier. The default uses the file
-    stem (e.g. ``ESP_075205_0930_RED5_0`` from ``…/ESP_075205_0930_RED5_0.cub``)
-    — generic and instrument-free. Domain callers that know a cleaner key
-    (e.g. a PDS product id) pass their own, keeping this function agnostic.
+    name *with extension* (e.g. ``ESP_075205_0930_RED5_0.cub``) — generic,
+    instrument-free, and lossless: keeping the extension distinguishes the
+    same product in different formats (e.g. a ``.cub`` and its ``.tif``
+    conversion, whose footprints may differ). Note that neither the name nor
+    its stem is the PDS *product id* (filenames carry processing suffixes);
+    pass your own ``id_fn`` for a domain key, or ``id_fn=str`` for full paths.
+
+    Raises if the resulting ids aren't unique — duplicate ids would silently
+    corrupt downstream id-keyed operations like :func:`overlaps`.
 
     Requires geopandas (the ``[isis]`` extra).
     """
     import os
+    from collections import Counter
 
     import geopandas as gpd
     import rasterio
@@ -574,7 +581,7 @@ def footprints_to_gdf(sources, *, id_fn=None, simplify=None):
     if id_fn is None:
         def id_fn(s):
             from pathlib import Path
-            return Path(os.fspath(s)).stem
+            return Path(os.fspath(s)).name
 
     ids, geoms, crs = [], [], None
     for src in sources:
@@ -588,6 +595,13 @@ def footprints_to_gdf(sources, *, id_fn=None, simplify=None):
                 )
             geoms.append(raster_footprint(ds, simplify=simplify))
         ids.append(id_fn(src))
+
+    dupes = sorted(i for i, n in Counter(ids).items() if n > 1)
+    if dupes:
+        raise ValueError(
+            f"footprints_to_gdf produced duplicate ids {dupes}. Pass id_fn "
+            "to disambiguate (e.g. id_fn=str for full paths)."
+        )
     return gpd.GeoDataFrame({"id": ids, "geometry": geoms}, crs=crs)
 
 
@@ -595,7 +609,8 @@ def overlaps(gdf):
     """Pairwise overlaps (positive area) between footprints in ``gdf``.
 
     Takes a GeoDataFrame with ``id`` + ``geometry`` (as built by
-    :func:`footprints_to_gdf`) and returns one with ``id_1``, ``id_2``,
+    :func:`footprints_to_gdf`, whose ``id`` values must be unique) and
+    returns one with ``id_1``, ``id_2``,
     ``geometry`` (the intersection) and ``area`` (CRS units) per unordered
     intersecting pair. Edge-only touches (zero area) are dropped.
 
