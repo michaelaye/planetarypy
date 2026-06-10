@@ -32,7 +32,10 @@ generic_kernel_names = [
     "lsk/naif0012.tls",
     "pck/pck00010.tpc",
     "pck/de-403-masses.tpc",
-    "spk/planets/de430.bsp",
+    # de432s: short-span planetary ephemeris (~10 MB, 1950-2050) — keeps the
+    # default download small. Need a wider range? Fetch the full de430
+    # (~120 MB, 1550-2650) via download_generic_kernel("de430") + furnsh.
+    "spk/planets/de432s.bsp",
     "spk/satellites/mar099s.bsp",
 ]
 generic_kernel_paths = [GENERIC_STORAGE.joinpath(i) for i in generic_kernel_names]
@@ -45,7 +48,8 @@ GENERIC_KERNEL_ALIASES: dict[str, str] = {
     "lsk":     "lsk/naif0012.tls",
     "pck":     "pck/pck00010.tpc",
     "masses":  "pck/de-403-masses.tpc",
-    "de430":   "spk/planets/de430.bsp",
+    "de432s":  "spk/planets/de432s.bsp",   # default (small, 1950-2050)
+    "de430":   "spk/planets/de430.bsp",    # full range (large, on demand)
     "mar099s": "spk/satellites/mar099s.bsp",
 }
 
@@ -110,7 +114,8 @@ def download_generic_kernel(name: str, overwrite: bool = False) -> Path:
       - ``"lsk"``      — leapseconds (naif0012.tls)
       - ``"pck"``      — planetary constants (pck00010.tpc)
       - ``"masses"``   — DE-403 mass values (de-403-masses.tpc)
-      - ``"de430"``    — JPL DE430 planetary ephemeris (large, ~120 MB)
+      - ``"de432s"``   — JPL DE432s planetary ephemeris (default, ~10 MB, 1950-2050)
+      - ``"de430"``    — JPL DE430 planetary ephemeris (full range, ~120 MB, 1550-2650)
       - ``"mar099s"``  — Mars satellite ephemeris
 
     Full kernel paths (relative to NAIF's ``generic_kernels/`` URL) are

@@ -2509,7 +2509,7 @@ def spice_generic(
     ctx: typer.Context,
     name: str = typer.Argument(
         None,
-        help="Short alias (lsk/pck/masses/de430/mar099s) or a full "
+        help="Short alias (lsk/pck/masses/de432s/de430/mar099s) or a full "
              "path-fragment relative to NAIF's generic_kernels/ URL.",
         autocompletion=_complete_generic_alias,
     ),
@@ -2530,7 +2530,8 @@ def spice_generic(
         lsk      naif0012.tls          (leapseconds)
         pck      pck00010.tpc          (planetary constants)
         masses   de-403-masses.tpc     (DE-403 body masses)
-        de430    de430.bsp             (JPL DE430 planetary ephemeris)
+        de432s   de432s.bsp            (JPL DE432s ephemeris, default ~10 MB, 1950-2050)
+        de430    de430.bsp             (JPL DE430 ephemeris, full range ~120 MB)
         mar099s  mar099s.bsp           (Mars satellite ephemeris)
 
     Pass a full path-fragment for unlisted kernels (e.g.
