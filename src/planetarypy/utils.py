@@ -338,8 +338,12 @@ def url_retrieve(
     )
     if tqdm_position is not None:
         tqdm_kwargs["position"] = tqdm_position
-    with tqdm.wrapattr(
-        open(part_file, "wb"),
+    # Open the scratch file in its own context so its handle is closed
+    # before the rename below. tqdm.wrapattr closes only the progress bar
+    # on exit, not the wrapped stream — a leaked handle is harmless on
+    # POSIX but blocks the rename on Windows (PermissionError WinError 32).
+    with open(part_file, "wb") as raw_fd, tqdm.wrapattr(
+        raw_fd,
         "write",
         **tqdm_kwargs,
     ) as fd:

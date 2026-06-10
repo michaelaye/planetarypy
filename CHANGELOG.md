@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.73.2] - 2026-06-11
+
+### Fixed
+
+- **`url_retrieve` no longer fails on Windows when finalizing a download.** The downloader wrote to a temporary `.part` file via `tqdm.wrapattr(open(...), ...)`, whose context manager closes the progress bar but not the wrapped file handle. On POSIX the rename-into-place tolerated the lingering handle, but on Windows it raised `PermissionError: [WinError 32] The process cannot access the file because it is being used by another process`. The scratch file is now opened in its own context so its handle is released before the rename. This surfaced as a `win_64` build failure when importing `planetarypy.constants` (which lazy-downloads the NSSDC archive at import time), but affected any download on Windows.
+
 ## [0.73.1] - 2026-06-10
 
 ### Fixed
