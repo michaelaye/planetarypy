@@ -67,38 +67,22 @@ jobs:
 
     - name: Prefetch SPICE generic kernels
       shell: bash -l {0}
-      # Idempotent after a cache hit: download_generic_kernels() skips
-      # any file that already exists.  On a fresh cache this serially
-      # seeds the kernels so parallel pytest-xdist workers don't race.
-      # Retries on transient NAIF timeouts so a flaky network on the
-      # runner doesn't fail an otherwise-green release.
+      # Seeds the small generic kernel set (~20 MB: lsk + pck + de432s +
+      # mar099s) for the in-gate Spicer tests. Idempotent after a cache hit.
+      # Retries with exponential backoff so a transient NAIF timeout on a
+      # cold cache doesn't false-red a release. (The HiRISE RDR prefetch was
+      # removed — TestSolarAzimuth now uses embedded reference values instead
+      # of the ~200 MB index.)
       run: |
-        attempt=0
+        attempt=1; max=5; delay=15
         until python -c "from planetarypy.spice.generic_kernels import download_generic_kernels; download_generic_kernels()"; do
-          attempt=$((attempt + 1))
-          if [ $attempt -ge 3 ]; then
-            echo "::error::NAIF prefetch failed after 3 attempts."
+          if [ "$attempt" -ge "$max" ]; then
+            echo "::error::NAIF prefetch failed after $max attempts."
             exit 1
           fi
-          echo "::warning::NAIF prefetch attempt $attempt failed; retrying after 20s..."
-          sleep 20
-        done
-
-    - name: Prefetch HiRISE RDR cumulative index
-      shell: bash -l {0}
-      # Same idempotency + retry story as the SPICE prefetch: first
-      # run seeds the parquet cache; subsequent runs hit the cache hit.
-      # Covers test_spicer.TestSolarAzimuth which queries the RDR index.
-      run: |
-        attempt=0
-        until python -c "from planetarypy.pds import get_index; get_index('mro.hirise.rdr')"; do
-          attempt=$((attempt + 1))
-          if [ $attempt -ge 3 ]; then
-            echo "::error::HiRISE RDR prefetch failed after 3 attempts."
-            exit 1
-          fi
-          echo "::warning::HiRISE RDR prefetch attempt $attempt failed; retrying after 20s..."
-          sleep 20
+          echo "::warning::NAIF prefetch attempt $attempt failed; retrying in ${delay}s..."
+          sleep "$delay"
+          attempt=$((attempt + 1)); delay=$((delay * 2))
         done
 
     - name: Run tests

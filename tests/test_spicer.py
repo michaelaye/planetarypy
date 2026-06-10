@@ -82,40 +82,37 @@ class TestIllumination:
 
 
 class TestSolarAzimuth:
-    """Validate SPICE solar azimuth against HiRISE RDR index values."""
+    """Validate SPICE solar azimuth against recorded HiRISE RDR values.
+
+    The reference rows are immutable historical values captured once from the
+    HiRISE RDR cumulative index — image-center lon/lat (mean of the four
+    corners), START_TIME, and SUB_SOLAR_AZIMUTH — embedded here so the test
+    needs no ~200 MB index download. SUB_SOLAR_AZIMUTH is HiRISE
+    CW-from-3-o'clock; ``+ 90`` converts to CW-from-north (geographic).
+    """
+
+    # pid, center_lon, center_lat, start_time, sub_solar_azimuth
+    REFS = [
+        ("ESP_013807_2035_RED", 41.0046, 23.383150, "2009-07-07 08:39:01", 129.324),
+        ("PSP_001414_2165_RED", 351.1485, 36.104525, "2006-11-14 15:51:49", 171.569),
+        ("PSP_003630_1715_RED", 345.837, -8.607100, "2007-05-06 07:12:58", 161.684),
+    ]
 
     @pytest.fixture()
     def mars(self):
         return Spicer("MARS")
 
-    @pytest.fixture()
-    def rdr_index(self):
-        from planetarypy.pds import get_index
-        return get_index("mro.hirise.rdr", allow_refresh=False)
-
-    def _compare(self, mars, rdr_index, pid, max_diff=5.0):
-        obs = rdr_index[rdr_index["PRODUCT_ID"] == pid].squeeze()
-        center_lat = np.mean([obs[f"CORNER{i}_LATITUDE"] for i in range(1, 5)])
-        center_lon = np.mean([obs[f"CORNER{i}_LONGITUDE"] for i in range(1, 5)])
-        obs_time = str(obs["START_TIME"])
-
-        spice_az = mars.solar_azimuth_at(center_lon, center_lat, time=obs_time)
-        hirise_geographic = (obs["SUB_SOLAR_AZIMUTH"] + 90) % 360
+    @pytest.mark.parametrize("pid,lon,lat,start_time,sub_solar_az", REFS)
+    def test_matches_rdr_index(self, mars, pid, lon, lat, start_time, sub_solar_az):
+        spice_az = mars.solar_azimuth_at(lon, lat, time=start_time)
+        hirise_geographic = (sub_solar_az + 90) % 360
         diff = abs(spice_az - hirise_geographic)
         if diff > 180:
             diff = 360 - diff
-        assert diff < max_diff, (
-            f"{pid}: SPICE={spice_az:.1f}° vs index={hirise_geographic:.1f}°, Δ={diff:.1f}°"
+        assert diff < 5.0, (
+            f"{pid}: SPICE={spice_az:.1f}° vs index={hirise_geographic:.1f}°, "
+            f"Δ={diff:.1f}°"
         )
-
-    def test_northern_hemisphere(self, mars, rdr_index):
-        self._compare(mars, rdr_index, "ESP_013807_2035_RED")
-
-    def test_northern_different_lon(self, mars, rdr_index):
-        self._compare(mars, rdr_index, "PSP_001414_2165_RED")
-
-    def test_southern_hemisphere(self, mars, rdr_index):
-        self._compare(mars, rdr_index, "PSP_003630_1715_RED")
 
 
 class TestRotateVector:
