@@ -1,0 +1,82 @@
+---
+title: "Image footprints & overlaps"
+---
+
+Compute the on-surface **footprint** of each (map-)projected raster and find
+where a set of images **overlap** — for coverage maps, mosaic planning, or
+picking overlapping/stereo pairs. These helpers live in `planetarypy.geo`,
+read everything straight from the rasters via `rasterio`, and work on any
+GDAL-readable format (ISIS `.cub`, GeoTIFF, …) — including the GDAL formats
+ISIS v10 is moving to.
+
+::: callout-note
+`footprints_to_gdf` and `overlaps` return GeoDataFrames and need
+**geopandas**, installed with the `[isis]` extra:
+`pip install "planetarypy[isis]"`.
+:::
+
+## One image → footprint
+
+`raster_footprint` returns the **valid-data outline** as a shapely polygon
+in the raster's CRS. It's built from the dataset mask, so nodata borders
+(common on map-projected products) are excluded — you get the actual data
+shape, not the bounding box:
+
+```python
+from planetarypy.geo import raster_footprint
+
+poly = raster_footprint("ESP_075205_0930_RED5_0.cub")
+poly.area            # in CRS units²
+```
+
+## Many images → a GeoDataFrame of footprints
+
+```python
+from pathlib import Path
+from planetarypy.geo import footprints_to_gdf
+
+cubes = sorted(Path("mosaic/").glob("*.cub"))
+gdf = footprints_to_gdf(cubes)
+gdf.head()           # columns: id, geometry
+```
+
+All inputs must share one CRS (it's carried on the GeoDataFrame). By default
+each row's `id` is the **file name with extension** — lossless and
+collision-safe, so the same product in two formats (a `.cub` and its `.tif`
+conversion, whose footprints may differ) stays distinct. Pass `id_fn` to key
+rows by a domain identifier instead:
+
+```python
+# key by the product id (here: file stem, i.e. name without extension)
+gdf = footprints_to_gdf(cubes, id_fn=lambda p: Path(p).stem)
+```
+
+`footprints_to_gdf` raises if the resulting ids aren't unique — duplicate
+ids would silently corrupt the id-keyed `overlaps` below. Use `id_fn=str`
+(full paths) if you need guaranteed uniqueness across directories.
+
+## Find overlaps
+
+`overlaps` returns one row per unordered intersecting pair, with the
+intersection geometry and its area (edge-only touches are dropped):
+
+```python
+from planetarypy.geo import overlaps
+
+ov = overlaps(gdf)
+ov.sort_values("area", ascending=False).head()   # id_1, id_2, geometry, area
+```
+
+From there it's ordinary geopandas — save the coverage, or plot the
+footprints with their overlaps highlighted:
+
+```python
+gdf.to_file("footprints.gpkg")
+ax = gdf.boundary.plot(color="black")
+ov.plot(ax=ax, color="red", alpha=0.4)
+```
+
+## See also
+
+- The [geospatial tutorial](../tutorials/geospatial_tutorial.ipynb) for
+  pixel ↔ lon/lat transforms, the `Point` class, and `is_projected`.
