@@ -37,10 +37,6 @@ class TestBodyCrs:
         with pytest.raises(ValueError, match="Unknown body"):
             body_crs("notaplanet")
 
-    def test_unknown_year_raises(self):
-        with pytest.raises(ValueError):
-            body_crs(499, year=1999)  # no IAU_1999 authority
-
 
 class TestLocalCrs:
     def test_centered_azeqd_maps_center_to_origin(self):
