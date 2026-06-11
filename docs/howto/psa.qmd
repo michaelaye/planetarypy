@@ -24,17 +24,19 @@ paths = psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01")
 # -> [.../IMA_..._ACCS01.LBL, .../IMA_..._ACCS01.CSV, ...]
 ```
 
-The downloaded files open with `planetarypy.open()`. By default files land under
-`{storage_root}/psa/<product_id>/`. To use planetarypy's standard
-`{storage_root}/{mission}/{instrument}/{product_type}/<id>/` layout, pass the
-catalog `key`:
+The downloaded files open with `planetarypy.open()`. By default files are grouped
+by their PSA dataset — `{storage_root}/psa/<DATA_SET_ID>/<product_id>/` — derived
+automatically from the product, so **no key is needed**. Optionally pass a catalog
+`key` to use planetarypy's standard layout instead, or `dest=` for an explicit
+directory (`extract=False` keeps the raw zip):
 
 ```python
-psa.fetch_psa_product("HF530_0001_...", key="mex.hrsc.refdr3")
-# -> {storage_root}/mex/hrsc/refdr3/HF530_0001_.../...
-```
+psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01")
+# -> {storage_root}/psa/MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0/IMA_AZ.../...
 
-Pass `dest=` for an explicit directory, or `extract=False` to keep the raw zip.
+psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01", key="mex.aspera.ima")
+# -> {storage_root}/mex/aspera/ima/IMA_AZ.../...
+```
 
 If a product id matches several granules (e.g. across processing levels), inspect
 them all:
@@ -117,7 +119,8 @@ plp psa examples mex.aspera.els_edr_high -n 5
 plp psa resolve IMA_AZ1120140041730C_ACCS01
 plp psa resolve IMA_AZ1120140041730C_ACCS01 --all
 
-# Download and unpack the product (--key uses the standard mission/instr/type layout):
+# Download and unpack (default groups by PSA dataset; --key uses mission/instr/type):
+plp psa fetch IMA_AZ1120140041730C_ACCS01
 plp psa fetch IMA_AZ1120140041730C_ACCS01 --key mex.aspera.ima
 plp psa fetch IMA_AZ1120140041730C_ACCS01 --dest ./here --no-extract
 ```

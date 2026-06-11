@@ -236,7 +236,8 @@ def fetch_psa_product(
     - ``key`` given (the catalog ``mission.instrument.product_type``) → the
       standard catalog layout ``{storage_root}/{mission}/{instrument}/
       {product_type}/<product_id>/`` (same as ``plp fetch``).
-    - neither → ``{storage_root}/psa/<product_id>/``.
+    - neither → ``{storage_root}/psa/<DATA_SET_ID>/<product_id>/``, grouped by the
+      product's PSA dataset (derived from its granule identifier). No key needed.
     """
     from planetarypy.catalog import OfflineError
     from planetarypy.utils import have_internet, url_retrieve
@@ -246,9 +247,11 @@ def fetch_psa_product(
             "No internet connection detected — cannot reach the ESA PSA. "
             "Pass skip_online_check=True to override."
         )
-    url = resolve(product_id)
-    if url is None:
+    matches = resolve_all(product_id, limit=1)
+    if not matches:
         raise ValueError(f"No PSA product found for {product_id!r}")
+    url = matches[0]["access_url"]
+    dataset_id = matches[0]["granule_uid"].split(":")[0]
 
     safe = product_id.replace(":", "_").replace("/", "_")
     if dest is None:
@@ -260,7 +263,8 @@ def fetch_psa_product(
             mission, instrument, product_type = key.split(".", 2)
             dest = default_product_dir(mission, instrument, product_type, product_id)
         else:
-            dest = Path(config.storage_root) / "psa" / safe
+            dataset_dir = dataset_id.replace("/", "_") or "unknown"
+            dest = Path(config.storage_root) / "psa" / dataset_dir / safe
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
 

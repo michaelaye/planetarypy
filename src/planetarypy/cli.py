@@ -924,8 +924,8 @@ def psa_fetch_cmd(
     ),
     key: str = typer.Option(
         None, "--key",
-        help="Catalog key 'mission.instrument.product_type' for the standard "
-             "storage layout (else files land under {storage_root}/psa/).",
+        help="Optional catalog key 'mission.instrument.product_type' to use the "
+             "standard storage layout (default groups by PSA dataset).",
     ),
     dest: Path = typer.Option(None, "--dest", help="Destination directory."),
     no_extract: bool = typer.Option(

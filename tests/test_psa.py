@@ -206,7 +206,11 @@ def test_examples_empty_when_key_unknown(monkeypatch):
 def test_fetch_downloads_and_extracts(tmp_path, monkeypatch):
     import planetarypy.utils as utils
 
-    monkeypatch.setattr(psa, "resolve", lambda pid: "https://x/product")
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"DS-1:DATA:{pid}::1.0",
+                           "access_url": "https://x/product"}],
+    )
     monkeypatch.setattr(utils, "have_internet", lambda: True)
 
     def fake_retrieve(url, outfile):
@@ -224,7 +228,11 @@ def test_fetch_with_key_uses_catalog_layout(tmp_path, monkeypatch):
     import planetarypy.catalog as cat
     import planetarypy.utils as utils
 
-    monkeypatch.setattr(psa, "resolve", lambda pid: "https://x/product")
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"DS-1:DATA:{pid}::1.0",
+                           "access_url": "https://x/product"}],
+    )
     monkeypatch.setattr(utils, "have_internet", lambda: True)
     monkeypatch.setattr(
         utils, "url_retrieve",
@@ -245,7 +253,11 @@ def test_fetch_with_key_uses_catalog_layout(tmp_path, monkeypatch):
 def test_fetch_no_extract_returns_zip(tmp_path, monkeypatch):
     import planetarypy.utils as utils
 
-    monkeypatch.setattr(psa, "resolve", lambda pid: "https://x/product")
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"DS-1:DATA:{pid}::1.0",
+                           "access_url": "https://x/product"}],
+    )
     monkeypatch.setattr(utils, "have_internet", lambda: True)
     monkeypatch.setattr(
         utils, "url_retrieve",
@@ -259,9 +271,28 @@ def test_fetch_not_found_raises(tmp_path, monkeypatch):
     import planetarypy.utils as utils
 
     monkeypatch.setattr(utils, "have_internet", lambda: True)
-    monkeypatch.setattr(psa, "resolve", lambda pid: None)
+    monkeypatch.setattr(psa, "resolve_all", lambda pid, **k: [])
     with pytest.raises(ValueError, match="No PSA product"):
         psa.fetch_psa_product("PROD", dest=tmp_path)
+
+
+def test_fetch_default_path_groups_by_dataset(tmp_path, monkeypatch):
+    from planetarypy.config import config
+    import planetarypy.utils as utils
+
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": "MEX-DS-1:DATA:PROD::1.0",
+                           "access_url": "u"}],
+    )
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(config, "storage_root", tmp_path)
+    monkeypatch.setattr(
+        utils, "url_retrieve",
+        lambda url, outfile: zipfile.ZipFile(outfile, "w").close(),
+    )
+    psa.fetch_psa_product("PROD", extract=False)  # no dest, no key
+    assert (tmp_path / "psa" / "MEX-DS-1" / "PROD").is_dir()
 
 
 def test_fetch_offline_raises(monkeypatch):
