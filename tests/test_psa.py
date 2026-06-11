@@ -381,6 +381,104 @@ def test_fetch_offline_raises(monkeypatch):
         psa.fetch_psa_product("PROD")
 
 
+# ── direct FTP fetch (label_url) ─────────────────────────────────────
+
+
+def test_label_data_pointers_parses_quoted_only():
+    text = (
+        '^SPREADSHEET = "PROD.CSV"\n'
+        '^IMAGE       = 13\n'            # attached: record offset, not a file
+        '^LABEL       = "PROD.LBL"\n'    # self-reference, skipped
+        '^TABLE       = ("PROD.TAB", 1)\n'
+    )
+    assert psa._label_data_pointers(text) == ["PROD.CSV", "PROD.TAB"]
+
+
+def test_ftp_relpath_strips_mission_instrument():
+    url = ("https://archives.esac.esa.int/psa/ftp/MARS-EXPRESS/HRSC/"
+           "MEX-M-HRSC-3-RDR-V4.0/DATA/0010/H0010_0000_GR3.IMG")
+    assert (psa._ftp_relpath(url, "MEX-M-HRSC-3-RDR-V4.0")
+            == "MEX-M-HRSC-3-RDR-V4.0/DATA/0010/H0010_0000_GR3.IMG")
+
+
+def _file_writer(record):
+    from pathlib import Path
+
+    def fake(url, outfile):
+        record.append(url.rsplit("/", 1)[-1])
+        p = Path(outfile)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("bytes")
+
+    return fake
+
+
+def test_fetch_direct_attached_label(tmp_path, monkeypatch):
+    import planetarypy.utils as utils
+
+    lbl = ("https://archives.esac.esa.int/psa/ftp/MARS-EXPRESS/HRSC/"
+           "MEX-DS-1/DATA/0010/PROD.IMG")
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"MEX-DS-1:DATA:{pid}::1.0",
+                           "access_url": "zip://x", "label_url": lbl}],
+    )
+    seen = []
+    monkeypatch.setattr(utils, "url_retrieve", _file_writer(seen))
+
+    paths = psa.fetch_psa_product("PROD.IMG", dest=tmp_path)
+    # attached label = self-contained: one direct file, no zip, no .LBL probe.
+    assert seen == ["PROD.IMG"]
+    assert paths == [tmp_path / "MEX-DS-1" / "DATA" / "0010" / "PROD.IMG"]
+    assert not list(tmp_path.glob("**/*.zip"))
+
+
+def test_fetch_direct_detached_label(tmp_path, monkeypatch):
+    import planetarypy.utils as utils
+
+    lbl = ("https://archives.esac.esa.int/psa/ftp/MARS-EXPRESS/ASPERA-3/"
+           "MEX-DS-1/DATA/D1/PROD.LBL")
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"MEX-DS-1:DATA:{pid}::1.0",
+                           "access_url": "zip://x", "label_url": lbl}],
+    )
+
+    class Resp:
+        text = '^SPREADSHEET = "PROD.CSV"\n^LABEL = "PROD.LBL"\n'
+
+    monkeypatch.setattr(psa.requests, "get", lambda url, **k: Resp())
+    seen = []
+    monkeypatch.setattr(utils, "url_retrieve", _file_writer(seen))
+
+    paths = psa.fetch_psa_product("PROD", dest=tmp_path)
+    # detached label: the .LBL plus the co-located data file it points at.
+    assert {p.name for p in paths} == {"PROD.LBL", "PROD.CSV"}
+    assert seen == ["PROD.LBL", "PROD.CSV"]
+    assert (tmp_path / "MEX-DS-1" / "DATA" / "D1" / "PROD.CSV").is_file()
+
+
+def test_fetch_direct_false_forces_zip(tmp_path, monkeypatch):
+    import planetarypy.utils as utils
+
+    lbl = ("https://archives.esac.esa.int/psa/ftp/M/I/"
+           "MEX-DS-1/DATA/0010/PROD.IMG")
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"MEX-DS-1:DATA:{pid}::1.0",
+                           "access_url": "zip://x", "label_url": lbl}],
+    )
+    monkeypatch.setattr(utils, "url_retrieve", _psa_zip_writer())
+
+    psa.fetch_psa_product("PROD.IMG", dest=tmp_path, direct=False)
+    # direct=False ignores label_url and unpacks the zip bundle.
+    assert (tmp_path / "MEX-DS-1" / "DATA" / "0010" / "PROD.IMG").is_file()
+    assert (tmp_path / "MEX-DS-1" / "VOLDESC.CAT").is_file()
+
+
 # ── live ─────────────────────────────────────────────────────────────
 
 

@@ -937,19 +937,29 @@ def psa_fetch_cmd(
         None, help="PDS product id to download from the PSA."
     ),
     dest: Path = typer.Option(
-        None, "--dest", help="Extraction root (default: {storage_root}/psa)."
+        None, "--dest", help="Storage root (default: {storage_root}/psa)."
+    ),
+    zip_bundle: bool = typer.Option(
+        False, "--zip",
+        help="Fetch the PSA product zip bundle instead of the direct file(s).",
     ),
     no_extract: bool = typer.Option(
-        False, "--no-extract", help="Keep the zip; don't unpack."
+        False, "--no-extract", help="With --zip: keep the zip; don't unpack."
     ),
 ):
-    """Download an ESA PSA product by id (unpacks the product zip by default)."""
+    """Download an ESA PSA product by id.
+
+    By default fetches the product's file(s) directly from the PSA FTP archive
+    (no zip, no redundant volume manifest). Use --zip for the bundled zip.
+    """
     if product_id is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
     from planetarypy.psa import fetch_psa_product
 
-    paths = fetch_psa_product(product_id, dest=dest, extract=not no_extract)
+    paths = fetch_psa_product(
+        product_id, dest=dest, direct=not zip_bundle, extract=not no_extract
+    )
     for path in paths:
         typer.echo(str(path))
 

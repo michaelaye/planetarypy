@@ -16,36 +16,42 @@ id → download URL. No extra dependency is needed (it uses `requests`).
 ```python
 from planetarypy import psa
 
-# Resolve a product id to its direct PSA download URL:
+# Resolve a product id to its PSA download URL:
 url = psa.resolve("IMA_AZ1120140041730C_ACCS01")
 
-# Download it (the PSA serves a zip of label + data; it is unpacked by default):
+# Download it (by default, the file(s) directly from the PSA FTP archive):
 paths = psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01")
-# -> [.../IMA_..._ACCS01.LBL, .../IMA_..._ACCS01.CSV, ...]
+# -> [.../IMA_..._ACCS01.LBL, .../IMA_..._ACCS01.CSV]
 ```
 
-The downloaded files open with `planetarypy.open()`. The PSA serves each product
-as a small zip mirroring the dataset's native PDS tree, and planetarypy unpacks it
-**faithfully** under `{storage_root}/psa/`:
+The downloaded files open with `planetarypy.open()`. By default
+`fetch_psa_product` pulls the product's own file(s) **directly from the PSA FTP
+archive** — no zip, and none of the redundant ~10 MB per-product volume manifest
+the zip bundle carries. For an *attached-label* product (e.g. HRSC `.IMG`) that's
+a single self-contained file; for a *detached-label* product (e.g. ASPERA) it's
+the `.LBL` plus the co-located data file its `^POINTER` names. Either way the
+result lands in the dataset's native PDS tree under `{storage_root}/psa/`:
 
 ```
 {storage_root}/psa/<DATA_SET_ID>/DATA/<volume>/<product files>
-                                 /BROWSE/<volume>/...
-                                 /VOLDESC.CAT, AAREADME.TXT   (dataset docs)
 ```
 
 So the dataset folder *is* the real `DATA_SET_ID`, the archive's volume sharding
 (e.g. `0010`) is preserved, and products of the same dataset accumulate side by
-side in one tree — **no key is needed**. Dataset-level docs are written once; the
-zip's own `inventory.txt` manifest is dropped; a per-product marker under
+side in one tree — **no key is needed**. A per-product marker under
 `psa/.fetched/` makes a repeat fetch return the local paths without
-re-downloading. Pass `dest=` to extract into a different root, or
-`extract=False` to keep the raw zip:
+re-downloading. Pass `dest=` to use a different root.
 
 ```python
 psa.fetch_psa_product("H0010_0000_GR3.IMG")
 # -> {storage_root}/psa/MEX-M-HRSC-3-RDR-V4.0/DATA/0010/H0010_0000_GR3.IMG
 ```
+
+Use `direct=False` to fetch the **zip bundle** instead (needed for PDS4 missions
+like BepiColombo/Juice, which have no FTP `label_url`; it is also the automatic
+fallback when a granule lacks one). The zip mirrors the same tree and adds the
+dataset docs (`VOLDESC.CAT`/`AAREADME.TXT`, written once); `extract=False` keeps
+the raw zip.
 
 If a product id matches several granules (e.g. across processing levels), inspect
 them all:
@@ -132,9 +138,12 @@ plp psa examples mex.aspera.els_edr_high -n 5
 plp psa resolve IMA_AZ1120140041730C_ACCS01
 plp psa resolve IMA_AZ1120140041730C_ACCS01 --all
 
-# Download and unpack faithfully under {storage_root}/psa/<DATA_SET_ID>/...:
+# Download the product's file(s) directly into {storage_root}/psa/<DATA_SET_ID>/...:
 plp psa fetch IMA_AZ1120140041730C_ACCS01
-plp psa fetch IMA_AZ1120140041730C_ACCS01 --dest ./here --no-extract
+
+# Force the zip bundle instead (PDS4 missions; or keep the raw zip):
+plp psa fetch IMA_AZ1120140041730C_ACCS01 --zip
+plp psa fetch IMA_AZ1120140041730C_ACCS01 --zip --no-extract --dest ./here
 ```
 
 ## Scope
