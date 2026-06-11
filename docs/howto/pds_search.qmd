@@ -1,0 +1,92 @@
+---
+title: "HOWTO search the PDS for products"
+---
+
+planetarypy can query NASA's **PDS Registry** — a single search index over
+80M+ products across all NASA missions — and download anything it finds. This
+is complementary to the `catalog` / `indexes` subsystems: it reaches products
+those can't resolve (much of Cassini, Voyager, Magellan, …), straight from the
+authoritative registry.
+
+## Install
+
+PDS registry search needs the optional `[search]` extra:
+
+```bash
+pip install "planetarypy[search]"
+# or, with conda:
+conda install -c conda-forge pds.api-client
+```
+
+This installs NASA's `pds.api-client` (the PDS Engineering Node's REST client).
+It's light and works with any modern pandas/Python.
+
+## Search
+
+```python
+import planetarypy
+
+df = planetarypy.search_products(
+    instrument_host="urn:nasa:pds:context:instrument_host:spacecraft.co",
+    processing_level="raw",
+    limit=20,
+)
+```
+
+`search_products` returns a `pandas.DataFrame` — one row per product, indexed by
+LIDVID, columns are registry property names. Available filters: `target`,
+`instrument`, `instrument_host`, `investigation`, `processing_level`, `before`,
+`after`, `observationals`, `lidvid`, and a raw `query` escape hatch:
+
+```python
+# Anything the keyword filters don't cover — raw PDS API query syntax:
+df = planetarypy.search_products(
+    query='lid like "urn:nasa:pds:cassini_iss_saturn*"', limit=5
+)
+```
+
+Restrict the returned columns with `fields=[...]` for faster, narrower results.
+
+## Download
+
+Fetch every file (data + label) for a product by LIDVID:
+
+```python
+paths = planetarypy.fetch_pds_product(
+    "urn:nasa:pds:cassini_iss_saturn:data_raw:1717602192n::1.0"
+)
+```
+
+Files land under `{storage_root}/pds_search/<lidvid>/`. The downloaded products
+open directly with `planetarypy.open()`.
+
+## From the command line
+
+```bash
+plp search products -q 'lid like "urn:nasa:pds:cassini_iss_saturn*"' -n 5
+plp search get   urn:nasa:pds:cassini_iss_saturn:data_raw:1717602192n::1.0
+plp search fetch urn:nasa:pds:cassini_iss_saturn:data_raw:1717602192n::1.0
+```
+
+## Scope and limits
+
+::: {.callout-important}
+This searches the **NASA** PDS registry. It covers NASA-archived data —
+including PDS4 re-archives of Cassini, Voyager, Magellan, and instruments like
+Chandrayaan-1's (NASA) M3. It does **not** cover non-NASA national archives:
+**Chang'e** (CNSA) and **Chandrayaan-2/3** (ISRO) data live in their own
+archives and are not in the NASA registry. Those are exactly the products
+planetarypy's catalog marks unfetchable — the registry can't help with them.
+:::
+
+Very large result sets are returned up to `limit` in a single request;
+automatic pagination over millions of hits is a planned follow-up.
+
+::: {.callout-note collapse="true"}
+## Under the hood (for contributors)
+
+The engine is NASA's `pds.api-client` (the PDS Engineering Node's generated REST
+client). planetarypy adds a thin query-builder and its own DataFrame assembly.
+We deliberately wrap the client directly rather than `pds.peppi`, which pins
+`pandas~=2.2.3` and requires Python ≥3.12.
+:::

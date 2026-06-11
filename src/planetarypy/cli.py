@@ -769,6 +769,115 @@ def open_cmd(
         d.show()
 
 
+# ── search (PDS registry) ────────────────────────────────────────────
+
+search_app = typer.Typer(
+    help="PDS-wide product discovery via the NASA registry (optional 'search' extra).",
+    no_args_is_help=True,
+)
+app.add_typer(search_app, name="search", rich_help_panel=_PANEL_DISCOVERY)
+
+
+@search_app.command("products")
+def search_products_cmd(
+    ctx: typer.Context,
+    target: str = typer.Option(None, "--target", help="Target LID, e.g. a planet."),
+    instrument: str = typer.Option(None, "--instrument", help="Instrument LID."),
+    instrument_host: str = typer.Option(
+        None, "--instrument-host", help="Mission/host LID."
+    ),
+    processing_level: str = typer.Option(
+        None, "--processing-level",
+        help="raw | calibrated | derived | partially-processed | telemetry.",
+    ),
+    after: str = typer.Option(
+        None, "--after", help="Observation ends after this ISO date."
+    ),
+    before: str = typer.Option(
+        None, "--before", help="Observation starts before this ISO date."
+    ),
+    observationals: bool = typer.Option(
+        False, "--observationals", help="Only observational products."
+    ),
+    query: str = typer.Option(None, "--query", "-q", help="Raw PDS API query clause."),
+    fields: list[str] = typer.Option(
+        None, "--fields", "-f", help="Registry property columns to show."
+    ),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max products to return."),
+):
+    """Search the NASA PDS registry and print matching products.
+
+    Examples:
+        plp search products -q 'lid like "urn:nasa:pds:cassini_iss_saturn*"'
+        plp search products --processing-level raw --observationals -n 5
+    """
+    if not any([target, instrument, instrument_host, processing_level,
+                after, before, observationals, query]):
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.search import search_products
+
+    flds = _parse_columns(fields) if fields else [
+        "pds:Identification_Area.pds:title"
+    ]
+    df = search_products(
+        target=target, instrument=instrument, instrument_host=instrument_host,
+        processing_level=processing_level, after=after, before=before,
+        observationals=observationals, query=query, fields=flds, limit=limit,
+    )
+    if df.empty:
+        typer.echo("No products matched.")
+        return
+    table = Table(
+        title=f"PDS registry: {len(df)} products",
+        header_style="bold magenta", pad_edge=False,
+    )
+    table.add_column("lidvid", overflow="fold")
+    for col in df.columns:
+        table.add_column(str(col), overflow="fold")
+    for lidvid, row in df.iterrows():
+        table.add_row(str(lidvid), *[str(v) if v is not None else "" for v in row])
+    Console().print(table)
+
+
+@search_app.command("get")
+def search_get_cmd(
+    ctx: typer.Context,
+    lidvid: str = typer.Argument(None, help="Product LIDVID (or LID)."),
+):
+    """Show a single product's registry properties by LIDVID."""
+    if lidvid is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    from planetarypy.search import get_product, product_file_urls
+
+    props = get_product(lidvid)
+    typer.echo(f"{lidvid}")
+    for url in product_file_urls(props):
+        typer.echo(f"  file: {url}")
+    typer.echo(f"  ({len(props)} properties)")
+
+
+@search_app.command("fetch", rich_help_panel=_PANEL_FETCH)
+def search_fetch_cmd(
+    ctx: typer.Context,
+    lidvid: str = typer.Argument(None, help="Product LIDVID to download."),
+    dest: Path = typer.Option(None, "--dest", help="Destination directory."),
+):
+    """Download all files (data + label) for a product by LIDVID."""
+    if lidvid is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    from planetarypy.search import fetch_pds_product
+
+    for path in fetch_pds_product(lidvid, dest=dest):
+        typer.echo(str(path))
+
+
 # ── catalog ──────────────────────────────────────────────────────────
 
 catalog_app = typer.Typer(help="PDS catalog management.", no_args_is_help=True)

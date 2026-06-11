@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.75.0] - 2026-06-11
+
+### Added
+
+- **`planetarypy.search_products(...)` — search the NASA PDS Registry.** A new `planetarypy.search` module queries the PDS Engineering Node's registry-wide search API (80M+ products across all NASA missions) and returns a `pandas.DataFrame` (one row per product, indexed by LIDVID). Filters: `target`, `instrument`, `instrument_host`, `investigation`, `processing_level`, `before`, `after`, `observationals`, `lidvid`, plus a raw `query` escape hatch. This reaches products the `catalog`/`indexes` subsystems can't resolve — much of Cassini, Voyager, Magellan, etc.
+- **`planetarypy.fetch_pds_product(lidvid)`** — download a registry product's files (data + label) by LIDVID into `{storage_root}/pds_search/`; the files open directly with `planetarypy.open()`. Plus `get_product(lidvid)` and `product_file_urls(...)` helpers.
+- **`plp search`** CLI sub-app: `plp search products`, `plp search get LIDVID`, `plp search fetch LIDVID`.
+- **New optional `[search]` extra** (`pip install "planetarypy[search]"`) providing NASA's `pds.api-client`. Kept out of core; core stays Python ≥3.11. New how-to: `docs/howto/pds_search.qmd`.
+
+  We wrap `pds.api-client` directly rather than `pds.peppi`, which requires Python ≥3.12, hard-pins `pandas~=2.2.3` (blocking pandas 3.x), and pulls `fastmcp`. The search covers the **NASA** registry only — not non-NASA national archives such as Chang'e (CNSA) or Chandrayaan-2/3 (ISRO).
+
 ## [0.74.0] - 2026-06-11
 
 ### Added

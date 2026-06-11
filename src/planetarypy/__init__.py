@@ -4,16 +4,27 @@ __author__ = """PlanetaryPy Developers"""
 __email__ = "kmichael.aye@gmail.com"
 __version__ = "0.73.2"
 
-__all__ = ["enable_logging", "open", "read"]
+__all__ = [
+    "enable_logging",
+    "open",
+    "read",
+    "search_products",
+    "fetch_pds_product",
+]
 
 
 def __getattr__(name):
-    # Lazy access to the data reader so `import planetarypy` stays cheap and
-    # doesn't pull in rioxarray/pdr until someone actually opens a product.
+    # Lazy access to heavier subsystems so `import planetarypy` stays cheap:
+    # the reader (rioxarray/pdr) and the registry search client (pds.api-client)
+    # are imported only when these attributes are actually used.
     if name in ("open", "read"):
         from planetarypy import io
 
         return getattr(io, name)
+    if name in ("search_products", "fetch_pds_product"):
+        from planetarypy import search
+
+        return getattr(search, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

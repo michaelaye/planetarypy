@@ -70,6 +70,14 @@ isis = [
     "geopandas",      # Footprint shapefiles → GeoDataFrames
     "hvplot",         # Interactive rasterized image display via .hvplot accessor
 ]
+# Optional dependencies for PDS-wide product discovery (planetarypy.search).
+# pds.api-client is the NASA PDS Engineering Node's REST client for the
+# registry-wide search API. Kept optional (not core) even though it's light
+# — most users don't need registry search. We wrap the client directly
+# rather than pds.peppi (which pins pandas~=2.2.3 and requires Python >=3.12).
+search = [
+    "pds.api-client>=1.7,<2",
+]
 # Development dependencies
 dev = [
     "pytest",
@@ -155,6 +163,8 @@ extend_exclude = ["docs", "notebooks", "scripts", "build", "dist"]
 # Map pip-distribution names to their import names where they differ.
 [tool.deptry.package_module_name_map]
 python-dateutil = "dateutil"
+# pds.api-client (the [search] extra) ships under the `pds` namespace package.
+pds-api-client = "pds"
 
 [tool.deptry.per_rule_ignores]
 # DEP001 = "imported module is not declared as a dependency"
