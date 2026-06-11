@@ -95,7 +95,7 @@ def test_instruments_filtered(monkeypatch):
     )
     df = psa.instruments("Mars Express")
     assert list(df.columns) == ["mission", "instrument", "products"]
-    assert "LIKE '%Mars Express%'" in captured["adql"]
+    assert "UPPER(instrument_host_name) LIKE UPPER('%Mars Express%')" in captured["adql"]
 
 
 def test_instruments_unfiltered_has_no_where(monkeypatch):
@@ -124,8 +124,8 @@ def test_product_types(monkeypatch):
     df = psa.product_types("Mars Express", "ASPERA")
     assert list(df.columns) == ["dataset_id", "products"]
     assert df.iloc[0]["dataset_id"] == "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0"
-    assert "instrument_host_name LIKE '%Mars Express%'" in captured["adql"]
-    assert "instrument_name LIKE '%ASPERA%'" in captured["adql"]
+    assert "UPPER(instrument_host_name) LIKE UPPER('%Mars Express%')" in captured["adql"]
+    assert "UPPER(instrument_name) LIKE UPPER('%ASPERA%')" in captured["adql"]
     assert "GROUP BY granule_gid" in captured["adql"]
 
 

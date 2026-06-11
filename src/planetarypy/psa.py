@@ -50,6 +50,12 @@ def query(adql: str, *, timeout: int = 60) -> list[dict]:
     return [dict(zip(cols, row)) for row in payload.get("data", [])]
 
 
+def _ci_like(column: str, value: str) -> str:
+    """Case-insensitive ADQL substring match: ``UPPER(col) LIKE UPPER('%value%')``."""
+    esc = value.replace("'", "''")
+    return f"UPPER({column}) LIKE UPPER('%{esc}%')"
+
+
 def missions() -> "pd.DataFrame":
     """List the PSA missions (instrument hosts) with their product counts.
 
@@ -83,15 +89,14 @@ def instruments(mission: Optional[str] = None) -> "pd.DataFrame":
     """List PSA instruments with their product counts, optionally for one mission.
 
     ``products`` is the number of downloadable data products. ``mission`` is
-    matched as a case-sensitive substring of the instrument host name (e.g.
-    ``"Mars Express"``, ``"Rosetta"``).
+    matched as a case-insensitive substring of the instrument host name (e.g.
+    ``"Mars Express"``, ``"rosetta"``).
     """
     import pandas as pd
 
     where = ""
     if mission:
-        m = mission.replace("'", "''")
-        where = f"WHERE instrument_host_name LIKE '%{m}%' "
+        where = "WHERE " + _ci_like("instrument_host_name", mission) + " "
     rows = query(
         "SELECT instrument_host_name AS mission, instrument_name AS instrument, "
         f"COUNT(*) AS products FROM psa.epn_core {where}"
@@ -106,16 +111,16 @@ def product_types(mission: str, instrument: Optional[str] = None) -> "pd.DataFra
 
     Each row is a ``dataset_id`` (e.g. ``MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0``) with
     its product count, busiest first. ``mission`` and ``instrument`` are matched as
-    case-sensitive substrings of the PSA host/instrument names exactly as listed by
+    case-insensitive substrings of the PSA host/instrument names listed by
     :func:`missions` / :func:`instruments`. A returned ``dataset_id`` can be handed
     straight to :func:`examples` — so the PSA browse chain stays entirely in PSA's
     own vocabulary, no catalog key needed.
     """
     import pandas as pd
 
-    clauses = ["instrument_host_name LIKE '%" + mission.replace("'", "''") + "%'"]
+    clauses = [_ci_like("instrument_host_name", mission)]
     if instrument:
-        clauses.append("instrument_name LIKE '%" + instrument.replace("'", "''") + "%'")
+        clauses.append(_ci_like("instrument_name", instrument))
     where = " AND ".join(clauses)
     rows = query(
         "SELECT granule_gid, COUNT(*) AS products FROM psa.epn_core "
