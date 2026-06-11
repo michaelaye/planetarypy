@@ -600,6 +600,19 @@ def list_indexed_products() -> list[tuple[str, str, str, str]]:
     ]
 
 
+def register_index(
+    mission: str, instrument: str, product_key: str, config: IndexConfig
+) -> None:
+    """Register a PDS index config for a catalog product type.
+
+    Public extension hook for instrument packages: add your product type's
+    :class:`IndexConfig` so the catalog's index-resolver tier can build
+    download URLs for it. Overwrites any existing entry for the same
+    ``(mission, instrument, product_key)``.
+    """
+    INDEX_REGISTRY[(mission, instrument, product_key)] = config
+
+
 def resolve_from_index(
     mission: str,
     instrument: str,

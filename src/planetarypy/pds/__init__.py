@@ -8,6 +8,7 @@ from pandas import DataFrame
 from typing import Iterable
 
 from planetarypy.pds.index_main import Index, InventoryIndex
+from planetarypy.pds.meta_display import register_meta_handler
 from planetarypy.pds.utils import (
     complete_pid,
     get_example_pid,
@@ -38,6 +39,7 @@ __all__ = [
     "read_pids_file",
     "complete_pid",
     "rebuild_pid_cache",
+    "register_meta_handler",
 ]
 
 

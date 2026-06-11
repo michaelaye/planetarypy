@@ -151,6 +151,11 @@ _STORAGE_RESOLVERS: dict[str, callable] = {}
 def register_storage_resolver(key: str, resolver: callable):
     """Register an instrument-specific storage path resolver.
 
+    Public extension hook: instrument packages call this (typically on import)
+    to override where ``plp fetch`` stores a mission/instrument's products,
+    reading the package's own config. The resolver has the final say for its
+    key, overriding the default layout.
+
     Parameters
     ----------
     key : str
@@ -160,6 +165,19 @@ def register_storage_resolver(key: str, resolver: callable):
         returning the local directory for a product.
     """
     _STORAGE_RESOLVERS[key] = resolver
+
+
+def default_product_dir(
+    mission: str, instrument: str, product_type: str, product_id: str,
+) -> Path:
+    """Core's default local layout for a product, ignoring any custom resolver.
+
+    ``{storage_root}/{mission}/{instrument}/{product_type}/{product_id}/``.
+    Exposed so a package's storage resolver can delegate to the default and
+    then tweak it, rather than reimplementing the layout.
+    """
+    safe_pid = product_id.replace("/", "_").replace("\\", "_")
+    return config.storage_root / mission / instrument / product_type / safe_pid
 
 
 # Lazy-loaded resolver paths: maps key → (module, function_name)
@@ -198,10 +216,7 @@ def _local_product_dir(
             pass
 
     # Default layout
-    safe_pid = product_id.replace("/", "_").replace("\\", "_")
-    return (
-        config.storage_root / mission / instrument / product_type / safe_pid
-    )
+    return default_product_dir(mission, instrument, product_type, product_id)
 
 
 def resolve_product(

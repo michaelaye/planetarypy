@@ -25,7 +25,15 @@ from pathlib import Path
 import pandas as pd
 
 from planetarypy.catalog._objects import Mission, Instrument  # noqa: F401
-from planetarypy.catalog._resolver import DownloadedProduct  # noqa: F401
+from planetarypy.catalog._resolver import (  # noqa: F401
+    DownloadedProduct,
+    register_storage_resolver,
+    default_product_dir,
+)
+from planetarypy.catalog._index_resolver import (  # noqa: F401
+    IndexConfig,
+    register_index,
+)
 from loguru import logger
 
 from planetarypy.config import config
