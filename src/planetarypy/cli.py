@@ -993,7 +993,11 @@ def psa_examples_cmd(
 
     df = examples(key, n=n)
     if df.empty:
-        typer.echo(f"No PSA examples found for {key!r}.", err=True)
+        typer.echo(
+            f"No PSA examples for {key!r}. Browse catalog keys with "
+            "`plp catalog list <mission>` (mission codes shown by `plp psa missions`).",
+            err=True,
+        )
         return
     _render_df(df[["product_id", "access_url"]], f"PSA examples — {key}")
 

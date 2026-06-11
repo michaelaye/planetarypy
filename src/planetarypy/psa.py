@@ -54,14 +54,28 @@ def missions() -> "pd.DataFrame":
 
     Busiest first. ``products`` is the number of individually downloadable data
     products the PSA holds for that mission (one PSA "granule" = one product).
+    The ``catalog`` column is a **best-effort** hint: the planetarypy catalog
+    mission code (the prefix of a ``mission.instrument.product_type`` key, e.g.
+    ``mex``), found by matching the PSA host name against the curated
+    ``MISSION_FULL_NAMES`` display strings. It is blank when the PSA name doesn't
+    match (different spelling, or the mission isn't in the catalog) — the match
+    is coincidental, not contractual. The reliable way to find a key is
+    catalog-first: ``plp catalog list`` → ``plp catalog list <mission>`` →
+    ``plp catalog list <mission>.<instrument>``. The fetch/examples paths do not
+    depend on this column.
     """
     import pandas as pd
 
+    from planetarypy.catalog._mission_map import MISSION_FULL_NAMES
+
+    code = {full: short for short, full in MISSION_FULL_NAMES.items()}
     rows = query(
         "SELECT instrument_host_name AS mission, COUNT(*) AS products "
         "FROM psa.epn_core GROUP BY instrument_host_name ORDER BY products DESC"
     )
-    return pd.DataFrame(rows, columns=["mission", "products"])
+    for r in rows:
+        r["catalog"] = code.get(r["mission"], "")
+    return pd.DataFrame(rows, columns=["mission", "catalog", "products"])
 
 
 def instruments(mission: Optional[str] = None) -> "pd.DataFrame":

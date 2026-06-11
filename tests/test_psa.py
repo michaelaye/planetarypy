@@ -79,8 +79,10 @@ def test_missions_builds_dataframe(monkeypatch):
 
     monkeypatch.setattr(psa, "query", fake_query)
     df = psa.missions()
-    assert list(df.columns) == ["mission", "products"]
+    assert list(df.columns) == ["mission", "catalog", "products"]
     assert df.iloc[0]["mission"] == "Rosetta"
+    # best-effort name bridge: PSA "Rosetta" -> catalog code "rosetta"
+    assert df.iloc[0]["catalog"] == "rosetta"
     assert "GROUP BY instrument_host_name" in captured["adql"]
 
 

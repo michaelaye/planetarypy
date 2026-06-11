@@ -69,6 +69,22 @@ psa.instruments("Mars Express") # instruments for one mission
 psa.examples("mex.aspera.els_edr_high", n=5)   # -> product_id + access_url
 ```
 
+### Finding a catalog key
+
+`examples` and `fetch --key` want a `mission.instrument.product_type` key. The
+reliable, authoritative way to find one is the catalog itself — drill down:
+
+```bash
+plp catalog list              # all missions (mex, rosetta, …)
+plp catalog list mex          # that mission's instruments
+plp catalog list mex.aspera   # the product-type keys
+```
+
+`plp psa missions` also shows a best-effort **`catalog`** column (the mission
+code, e.g. `mex` for "Mars Express"), but it only matches missions whose PSA name
+equals planetarypy's display name — treat it as a hint, and use `plp catalog
+list` as the source of truth.
+
 The `products` column is the number of individually downloadable data products
 (in EPN-TAP terms, "granules") the PSA holds.
 
