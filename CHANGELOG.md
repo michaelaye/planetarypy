@@ -5,27 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.75.0] - 2026-06-11
-
-### Added
-
-- **`planetarypy.search_products(...)` — search the NASA PDS Registry.** A new `planetarypy.search` module queries the PDS Engineering Node's registry-wide search API (80M+ products across all NASA missions) and returns a `pandas.DataFrame` (one row per product, indexed by LIDVID). Filters: `target`, `instrument`, `instrument_host`, `investigation`, `processing_level`, `before`, `after`, `observationals`, `lidvid`, plus a raw `query` escape hatch. This reaches products the `catalog`/`indexes` subsystems can't resolve — much of Cassini, Voyager, Magellan, etc.
-- **`planetarypy.fetch_pds_product(lidvid)`** — download a registry product's files (data + label) by LIDVID into `{storage_root}/pds_search/`; the files open directly with `planetarypy.open()`. Plus `get_product(lidvid)` and `product_file_urls(...)` helpers.
-- **`plp search`** CLI sub-app: `plp search products`, `plp search get LIDVID`, `plp search fetch LIDVID`.
-- **New optional `[search]` extra** (`pip install "planetarypy[search]"`) providing NASA's `pds.api-client`. Kept out of core; core stays Python ≥3.11. New how-to: `docs/howto/pds_search.qmd`.
-
-  We wrap `pds.api-client` directly rather than `pds.peppi`, which requires Python ≥3.12, hard-pins `pandas~=2.2.3` (blocking pandas 3.x), and pulls `fastmcp`. The search covers the **NASA** registry only — not non-NASA national archives such as Chang'e (CNSA) or Chandrayaan-2/3 (ISRO).
-
 ## [0.74.0] - 2026-06-11
 
+Three additions: open any product in one call, search the whole NASA PDS, and a new extension seam so instrument-specific code can live in its own packages.
+
 ### Added
+
+#### Open any product — `planetarypy.open()`
 
 - **`planetarypy.open(path)` — open any planetary data product in one call.** A new top-level opener returns the product in memory: PDS3 (`.IMG`/`.LBL`), PDS4, FITS, and similar come back as a dict-like handle (`d.keys()`, `d["IMAGE"]` → numpy array, `d["INDEX_TABLE"]` → pandas DataFrame, `d.metaget("KEY")` → label metadata); already-projected GeoTIFFs and ISIS `.cub` files come back as a georeferenced `xarray.DataArray`. Routing is automatic from the file type and overridable with `projected=True/False`. `planetarypy.read` is a `pandas.read_*`-style alias. New module `planetarypy.io`.
 - **Download and open in one step.** `DownloadedProduct.open()` opens a fetched product (preferring its PDS label), and `catalog.fetch_product(..., open=True)` returns the opened object directly instead of the `DownloadedProduct`.
-- **`plp open PATH`** — CLI verb that opens a product and prints what's inside (`--show` displays the default image).
-- New how-to: `docs/howto/opening_data.qmd`.
+- **`plp open PATH`** — CLI verb that opens a product and prints what's inside (`--show` displays the default image). New how-to: `docs/howto/opening_data.qmd`.
 
-The reader engine is [MillionConcepts' `pdr`](https://github.com/MillionConcepts/pdr), now a core dependency so opening works out of the box — end users never need to install or import it directly. (`pillow` is pulled in alongside for image arrays.)
+  The reader engine is [MillionConcepts' `pdr`](https://github.com/MillionConcepts/pdr), now a core dependency so opening works out of the box — end users never need to install or import it directly. (`pillow` is pulled in alongside for image arrays.)
+
+#### Search the NASA PDS Registry — `planetarypy.search`
+
+- **`planetarypy.search_products(...)`** queries the PDS Engineering Node's registry-wide search API (80M+ products across all NASA missions) and returns a `pandas.DataFrame` (one row per product, indexed by LIDVID). Filters: `target`, `instrument`, `instrument_host`, `investigation`, `processing_level`, `before`, `after`, `observationals`, `lidvid`, plus a raw `query` escape hatch. This reaches products the `catalog`/`indexes` subsystems can't resolve — much of Cassini, Voyager, Magellan, etc.
+- **`planetarypy.fetch_pds_product(lidvid)`** — download a registry product's files (data + label) by LIDVID into `{storage_root}/pds_search/`; the files open directly with `planetarypy.open()`. Plus `get_product(lidvid)` and `product_file_urls(...)` helpers.
+- **`plp search`** CLI sub-app: `plp search products`, `plp search get LIDVID`, `plp search fetch LIDVID`.
+- **New optional `[search]` extra** (`pip install "planetarypy[search]"`) providing NASA's `pds.api-client`. Kept out of core; core stays Python ≥3.11. New how-to: `docs/howto/pds_search.qmd`. We wrap `pds.api-client` directly rather than `pds.peppi`, which requires Python ≥3.12, hard-pins `pandas~=2.2.3` (blocking pandas 3.x), and pulls `fastmcp`. The search covers the **NASA** registry only — not non-NASA national archives such as Chang'e (CNSA) or Chandrayaan-2/3 (ISRO).
+
+#### Instrument-extension seams
+
+The first phase of moving instrument-specific code (HiRISE, CTX, Galileo SSI) out of core into standalone packages: core now exposes a stable contract those packages plug into, while staying general. No behavior change in this release.
+
+- **Registration hooks:** `catalog.register_index(mission, instrument, product_key, IndexConfig)`, `catalog.register_storage_resolver(key, fn)` (promoted to public), `catalog.default_product_dir(...)`, and `pds.register_meta_handler(index_key, fn)` — so a package can register its index config, storage layout, and `plp meta` rendering at import.
+- **CLI plugin seam:** `plp` now discovers `planetarypy.cli_plugins` entry points at startup and registers each package's Typer sub-app, so instrument verbs appear under the unified `plp` when their package is installed. A failing plugin is skipped with a warning.
+- **`planetarypy.io.read_image`** — the projected-raster reader is now public in `planetarypy.io` (it was `instruments.utils.read_image`, kept as a back-compat re-export).
+- New contributor guide: `docs/explanation/instrument_packages.qmd`.
 
 ## [0.73.2] - 2026-06-11
 
