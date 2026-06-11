@@ -145,7 +145,7 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-line-length = 88
+line-length = 100
 extend-exclude = ["docs"]
 
 [tool.ruff.lint]
