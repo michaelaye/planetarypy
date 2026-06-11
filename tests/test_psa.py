@@ -67,6 +67,44 @@ def test_resolve_all_returns_rows(monkeypatch):
     assert psa.resolve_all("x") == rows
 
 
+# ── missions / instruments ───────────────────────────────────────────
+
+
+def test_missions_builds_dataframe(monkeypatch):
+    captured = {}
+
+    def fake_query(adql, **k):
+        captured["adql"] = adql
+        return [{"mission": "Rosetta", "products": 10}, {"mission": "MEX", "products": 5}]
+
+    monkeypatch.setattr(psa, "query", fake_query)
+    df = psa.missions()
+    assert list(df.columns) == ["mission", "products"]
+    assert df.iloc[0]["mission"] == "Rosetta"
+    assert "GROUP BY instrument_host_name" in captured["adql"]
+
+
+def test_instruments_filtered(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        psa, "query",
+        lambda adql, **k: captured.update(adql=adql)
+        or [{"mission": "Mars Express", "instrument": "HRSC", "products": 3}],
+    )
+    df = psa.instruments("Mars Express")
+    assert list(df.columns) == ["mission", "instrument", "products"]
+    assert "LIKE '%Mars Express%'" in captured["adql"]
+
+
+def test_instruments_unfiltered_has_no_where(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        psa, "query", lambda adql, **k: captured.update(adql=adql) or []
+    )
+    psa.instruments()
+    assert "WHERE" not in captured["adql"]
+
+
 # ── fetch_psa_product ────────────────────────────────────────────────
 
 

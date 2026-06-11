@@ -14,11 +14,22 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import requests
 
-__all__ = ["query", "resolve", "resolve_all", "fetch_psa_product", "PSA_TAP_SYNC"]
+if TYPE_CHECKING:
+    import pandas as pd
+
+__all__ = [
+    "query",
+    "missions",
+    "instruments",
+    "resolve",
+    "resolve_all",
+    "fetch_psa_product",
+    "PSA_TAP_SYNC",
+]
 
 # ESA PSA EPN-TAP synchronous query endpoint.
 PSA_TAP_SYNC = "https://psa.esa.int/psa-tap/tap/sync"
@@ -35,6 +46,43 @@ def query(adql: str, *, timeout: int = 60) -> list[dict]:
     payload = resp.json()
     cols = [c["name"] for c in payload.get("metadata", [])]
     return [dict(zip(cols, row)) for row in payload.get("data", [])]
+
+
+def missions() -> "pd.DataFrame":
+    """List the PSA missions (instrument hosts) with their product counts.
+
+    Busiest first. ``products`` is the number of individually downloadable data
+    products the PSA holds for that mission (one PSA "granule" = one product).
+    """
+    import pandas as pd
+
+    rows = query(
+        "SELECT instrument_host_name AS mission, COUNT(*) AS products "
+        "FROM psa.epn_core GROUP BY instrument_host_name ORDER BY products DESC"
+    )
+    return pd.DataFrame(rows, columns=["mission", "products"])
+
+
+def instruments(mission: Optional[str] = None) -> "pd.DataFrame":
+    """List PSA instruments with their product counts, optionally for one mission.
+
+    ``products`` is the number of downloadable data products. ``mission`` is
+    matched as a case-sensitive substring of the instrument host name (e.g.
+    ``"Mars Express"``, ``"Rosetta"``).
+    """
+    import pandas as pd
+
+    where = ""
+    if mission:
+        m = mission.replace("'", "''")
+        where = f"WHERE instrument_host_name LIKE '%{m}%' "
+    rows = query(
+        "SELECT instrument_host_name AS mission, instrument_name AS instrument, "
+        f"COUNT(*) AS products FROM psa.epn_core {where}"
+        "GROUP BY instrument_host_name, instrument_name "
+        "ORDER BY mission, products DESC"
+    )
+    return pd.DataFrame(rows, columns=["mission", "instrument", "products"])
 
 
 def resolve_all(product_id: str, *, limit: int = 20) -> list[dict]:

@@ -937,6 +937,40 @@ def psa_fetch_cmd(
         typer.echo(str(path))
 
 
+def _render_df(df, title):
+    from rich.console import Console
+    from rich.table import Table
+
+    table = Table(title=title, header_style="bold magenta", pad_edge=False)
+    for col in df.columns:
+        table.add_column(str(col), overflow="fold")
+    for _, row in df.iterrows():
+        table.add_row(*["" if v is None else str(v) for v in row])
+    Console().print(table)
+
+
+@psa_app.command("missions")
+def psa_missions_cmd():
+    """List the ESA PSA missions with their product counts (downloadable products)."""
+    from planetarypy.psa import missions
+
+    _render_df(missions(), "PSA missions")
+
+
+@psa_app.command("instruments")
+def psa_instruments_cmd(
+    mission: str = typer.Argument(
+        None, help="Optional mission filter, e.g. 'Mars Express' or 'Rosetta'."
+    ),
+):
+    """List ESA PSA instruments (optionally for one mission) with product counts."""
+    from planetarypy.psa import instruments
+
+    df = instruments(mission)
+    title = f"PSA instruments — {mission}" if mission else "PSA instruments"
+    _render_df(df, title)
+
+
 # ── catalog ──────────────────────────────────────────────────────────
 
 catalog_app = typer.Typer(help="PDS catalog management.", no_args_is_help=True)

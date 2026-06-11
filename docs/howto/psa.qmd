@@ -46,9 +46,28 @@ psa.query(
 )
 ```
 
+## Browse what's available
+
+The PSA serves ESA missions (Mars Express, Rosetta, Venus Express, BepiColombo,
+ExoMars TGO, SMART-1, …). List them — and their instruments — straight from the
+service (returns a `pandas.DataFrame`):
+
+```python
+psa.missions()                  # missions with product counts, busiest first
+psa.instruments()               # all instruments
+psa.instruments("Mars Express") # instruments for one mission
+```
+
+The `products` column is the number of individually downloadable data products
+(in EPN-TAP terms, "granules") the PSA holds.
+
 ## From the command line
 
 ```bash
+# Browse available missions and instruments:
+plp psa missions
+plp psa instruments "Rosetta"
+
 # Print the download URL for a product id:
 plp psa resolve IMA_AZ1120140041730C_ACCS01
 
