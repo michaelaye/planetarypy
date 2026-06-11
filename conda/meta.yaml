@@ -13,7 +13,7 @@ build:
     - plp = planetarypy.cli:main
   noarch: python
   script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
-  number: 0
+  number: 1
 
 requirements:
   host:
@@ -45,6 +45,10 @@ requirements:
     - antimeridian
     - pdr
     - pillow
+    # SPICE is a flagship feature and conda has no "extras" mechanism, so the
+    # pip [spice] extra (spiceypy + scipy) ships in the conda package directly.
+    - spiceypy
+    - scipy
 
 test:
   imports:
