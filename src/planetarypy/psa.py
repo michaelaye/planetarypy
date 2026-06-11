@@ -25,6 +25,7 @@ __all__ = [
     "query",
     "missions",
     "instruments",
+    "examples",
     "resolve",
     "resolve_all",
     "fetch_psa_product",
@@ -85,6 +86,61 @@ def instruments(mission: Optional[str] = None) -> "pd.DataFrame":
     return pd.DataFrame(rows, columns=["mission", "instrument", "products"])
 
 
+def _granule_product_id(granule_uid: str) -> str:
+    """Extract the PDS product id from a PSA granule_uid.
+
+    ``DATA_SET_ID:DATA:PRODUCT_ID::version`` → ``PRODUCT_ID``.
+    """
+    return granule_uid.rsplit("::", 1)[0].rsplit(":", 1)[-1]
+
+
+def examples(key: str, n: int = 5) -> "pd.DataFrame":
+    """Return up to ``n`` example PSA products for a catalog product type.
+
+    ``key`` is the standard catalog encoding ``mission.instrument.product_type``
+    (e.g. ``"mex.aspera.els_edr_high"``). The catalog maps the key to a seed
+    product; the seed's PSA ``DATA_SET_ID`` is derived from its granule
+    identifier, then products of that dataset are listed — so no mission-name
+    translation is needed (``mex`` vs ``"Mars Express"`` never enters the query).
+
+    Returns a ``DataFrame`` with ``product_id``, ``granule_uid`` and
+    ``access_url``. Empty if the key isn't in the catalog or isn't in the PSA.
+    """
+    import pandas as pd
+
+    from planetarypy.catalog import example_products
+
+    cols = ["product_id", "granule_uid", "access_url"]
+    try:
+        seeds = example_products(key)["product_id"].dropna().tolist()
+    except Exception:
+        return pd.DataFrame(columns=cols)
+
+    dsid = None
+    for pid in seeds:
+        rows = resolve_all(pid, limit=1)
+        if rows:
+            dsid = rows[0]["granule_uid"].split(":")[0]
+            break
+    if dsid is None:
+        return pd.DataFrame(columns=cols)
+
+    esc = dsid.replace("'", "''")
+    rows = query(
+        f"SELECT TOP {int(n)} granule_uid, access_url "
+        f"FROM psa.epn_core WHERE granule_uid LIKE '{esc}:%'"
+    )
+    out = [
+        {
+            "product_id": _granule_product_id(r["granule_uid"]),
+            "granule_uid": r["granule_uid"],
+            "access_url": r["access_url"],
+        }
+        for r in rows
+    ]
+    return pd.DataFrame(out, columns=cols)
+
+
 def resolve_all(product_id: str, *, limit: int = 20) -> list[dict]:
     """Every PSA granule whose ``granule_uid`` contains ``product_id``.
 
@@ -114,15 +170,23 @@ def fetch_psa_product(
     product_id: str,
     dest: Optional[Path] = None,
     *,
+    key: Optional[str] = None,
     extract: bool = True,
     skip_online_check: bool = False,
 ) -> list[Path]:
     """Download an ESA PSA product by id; return the local file paths.
 
-    The PSA returns the product as a zip (label + data). Files land under
-    ``{storage_root}/psa/<product_id>/``. With ``extract=True`` (default) the
-    zip is unpacked and the extracted paths returned; otherwise the zip path is
-    returned. The files open with :func:`planetarypy.open`.
+    The PSA returns the product as a zip (label + data). With ``extract=True``
+    (default) the zip is unpacked and the extracted paths returned; otherwise the
+    zip path is returned. The files open with :func:`planetarypy.open`.
+
+    Storage location:
+
+    - ``dest`` given → used verbatim.
+    - ``key`` given (the catalog ``mission.instrument.product_type``) → the
+      standard catalog layout ``{storage_root}/{mission}/{instrument}/
+      {product_type}/<product_id>/`` (same as ``plp fetch``).
+    - neither → ``{storage_root}/psa/<product_id>/``.
     """
     from planetarypy.catalog import OfflineError
     from planetarypy.utils import have_internet, url_retrieve
@@ -140,7 +204,13 @@ def fetch_psa_product(
     if dest is None:
         from planetarypy.config import config
 
-        dest = Path(config.storage_root) / "psa" / safe
+        if key and key.count(".") >= 2:
+            from planetarypy.catalog import default_product_dir
+
+            mission, instrument, product_type = key.split(".", 2)
+            dest = default_product_dir(mission, instrument, product_type, product_id)
+        else:
+            dest = Path(config.storage_root) / "psa" / safe
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
 

@@ -922,6 +922,11 @@ def psa_fetch_cmd(
     product_id: str = typer.Argument(
         None, help="PDS product id to download from the PSA."
     ),
+    key: str = typer.Option(
+        None, "--key",
+        help="Catalog key 'mission.instrument.product_type' for the standard "
+             "storage layout (else files land under {storage_root}/psa/).",
+    ),
     dest: Path = typer.Option(None, "--dest", help="Destination directory."),
     no_extract: bool = typer.Option(
         False, "--no-extract", help="Keep the zip; don't unpack."
@@ -933,7 +938,8 @@ def psa_fetch_cmd(
         raise typer.Exit()
     from planetarypy.psa import fetch_psa_product
 
-    for path in fetch_psa_product(product_id, dest=dest, extract=not no_extract):
+    paths = fetch_psa_product(product_id, dest=dest, key=key, extract=not no_extract)
+    for path in paths:
         typer.echo(str(path))
 
 
@@ -969,6 +975,27 @@ def psa_instruments_cmd(
     df = instruments(mission)
     title = f"PSA instruments — {mission}" if mission else "PSA instruments"
     _render_df(df, title)
+
+
+@psa_app.command("examples")
+def psa_examples_cmd(
+    ctx: typer.Context,
+    key: str = typer.Argument(
+        None, help="Catalog key 'mission.instrument.product_type', e.g. mex.aspera.els_edr_high."
+    ),
+    n: int = typer.Option(5, "-n", "--number", help="How many examples to show."),
+):
+    """List example PSA products for a catalog product type."""
+    if key is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    from planetarypy.psa import examples
+
+    df = examples(key, n=n)
+    if df.empty:
+        typer.echo(f"No PSA examples found for {key!r}.", err=True)
+        return
+    _render_df(df[["product_id", "access_url"]], f"PSA examples — {key}")
 
 
 # ── catalog ──────────────────────────────────────────────────────────

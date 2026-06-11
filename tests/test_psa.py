@@ -105,6 +105,53 @@ def test_instruments_unfiltered_has_no_where(monkeypatch):
     assert "WHERE" not in captured["adql"]
 
 
+# ── examples (catalog key -> DATA_SET_ID -> N products) ──────────────
+
+
+def test_granule_product_id():
+    assert psa._granule_product_id("DS-1:DATA:ELSSCIH_X::21.0") == "ELSSCIH_X"
+
+
+def test_examples_chains_catalog_to_dataset(monkeypatch):
+    import pandas as pd
+
+    import planetarypy.catalog as cat
+
+    monkeypatch.setattr(
+        cat, "example_products", lambda key: pd.DataFrame({"product_id": ["SEED1"]})
+    )
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": "DS-1:DATA:SEED1::1.0", "access_url": "u"}],
+    )
+    captured = {}
+
+    def fake_query(adql, **k):
+        captured["adql"] = adql
+        return [
+            {"granule_uid": "DS-1:DATA:P1::1.0", "access_url": "https://a"},
+            {"granule_uid": "DS-1:DATA:P2::1.0", "access_url": "https://b"},
+        ]
+
+    monkeypatch.setattr(psa, "query", fake_query)
+    df = psa.examples("mex.aspera.els_edr_high", n=2)
+    assert list(df.columns) == ["product_id", "granule_uid", "access_url"]
+    assert df["product_id"].tolist() == ["P1", "P2"]
+    assert "LIKE 'DS-1:%'" in captured["adql"]  # derived DATA_SET_ID, no mission name
+
+
+def test_examples_empty_when_key_unknown(monkeypatch):
+    import planetarypy.catalog as cat
+
+    def boom(key):
+        raise KeyError("nope")
+
+    monkeypatch.setattr(cat, "example_products", boom)
+    df = psa.examples("x.y.z")
+    assert df.empty
+    assert list(df.columns) == ["product_id", "granule_uid", "access_url"]
+
+
 # ── fetch_psa_product ────────────────────────────────────────────────
 
 
@@ -123,6 +170,28 @@ def test_fetch_downloads_and_extracts(tmp_path, monkeypatch):
     paths = psa.fetch_psa_product("PROD", dest=tmp_path)
     assert {p.name for p in paths} == {"PROD.LBL", "PROD.DAT"}
     assert (tmp_path / "PROD.LBL").read_text() == "label"
+
+
+def test_fetch_with_key_uses_catalog_layout(tmp_path, monkeypatch):
+    import planetarypy.catalog as cat
+    import planetarypy.utils as utils
+
+    monkeypatch.setattr(psa, "resolve", lambda pid: "https://x/product")
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(
+        utils, "url_retrieve",
+        lambda url, outfile: zipfile.ZipFile(outfile, "w").close(),
+    )
+    captured = {}
+
+    def fake_default_dir(mission, instrument, product_type, product_id):
+        captured["args"] = (mission, instrument, product_type, product_id)
+        return tmp_path / mission / instrument / product_type / product_id
+
+    monkeypatch.setattr(cat, "default_product_dir", fake_default_dir)
+    psa.fetch_psa_product("PID", key="mex.hrsc.refdr3", extract=False)
+    assert captured["args"] == ("mex", "hrsc", "refdr3", "PID")
+    assert (tmp_path / "mex" / "hrsc" / "refdr3" / "PID").is_dir()
 
 
 def test_fetch_no_extract_returns_zip(tmp_path, monkeypatch):

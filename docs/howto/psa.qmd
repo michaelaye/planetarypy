@@ -24,9 +24,17 @@ paths = psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01")
 # -> [.../IMA_..._ACCS01.LBL, .../IMA_..._ACCS01.CSV, ...]
 ```
 
-The downloaded files open with `planetarypy.open()`. Files land under
-`{storage_root}/psa/<product_id>/`; pass `dest=` to choose another location, or
-`extract=False` to keep the raw zip.
+The downloaded files open with `planetarypy.open()`. By default files land under
+`{storage_root}/psa/<product_id>/`. To use planetarypy's standard
+`{storage_root}/{mission}/{instrument}/{product_type}/<id>/` layout, pass the
+catalog `key`:
+
+```python
+psa.fetch_psa_product("HF530_0001_...", key="mex.hrsc.refdr3")
+# -> {storage_root}/mex/hrsc/refdr3/HF530_0001_.../...
+```
+
+Pass `dest=` for an explicit directory, or `extract=False` to keep the raw zip.
 
 If a product id matches several granules (e.g. across processing levels), inspect
 them all:
@@ -56,6 +64,9 @@ service (returns a `pandas.DataFrame`):
 psa.missions()                  # missions with product counts, busiest first
 psa.instruments()               # all instruments
 psa.instruments("Mars Express") # instruments for one mission
+
+# Example products for a catalog product type (mission.instrument.product_type):
+psa.examples("mex.aspera.els_edr_high", n=5)   # -> product_id + access_url
 ```
 
 The `products` column is the number of individually downloadable data products
@@ -71,11 +82,14 @@ plp psa instruments "Rosetta"
 # Print the download URL for a product id:
 plp psa resolve IMA_AZ1120140041730C_ACCS01
 
+# Example products for a catalog product type:
+plp psa examples mex.aspera.els_edr_high -n 5
+
 # See every matching granule:
 plp psa resolve IMA_AZ1120140041730C_ACCS01 --all
 
-# Download and unpack the product:
-plp psa fetch IMA_AZ1120140041730C_ACCS01
+# Download and unpack the product (--key uses the standard mission/instr/type layout):
+plp psa fetch IMA_AZ1120140041730C_ACCS01 --key mex.aspera.ima
 plp psa fetch IMA_AZ1120140041730C_ACCS01 --dest ./here --no-extract
 ```
 
