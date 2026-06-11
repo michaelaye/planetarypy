@@ -36,9 +36,7 @@ def test_projected_suffix_routes_to_read_image(tmp_path, monkeypatch):
         called["path"] = p
         return sentinel
 
-    monkeypatch.setattr(
-        "planetarypy.instruments.utils.read_image", fake_read_image
-    )
+    monkeypatch.setattr("planetarypy.io.read_image", fake_read_image)
     result = io.open(tmp_path / "scene.tif")
     assert result is sentinel
     assert called["path"] == tmp_path / "scene.tif"
@@ -49,7 +47,7 @@ def test_projected_false_forces_generic_reader(monkeypatch):
     def boom(p):
         raise AssertionError("read_image must not be called when projected=False")
 
-    monkeypatch.setattr("planetarypy.instruments.utils.read_image", boom)
+    monkeypatch.setattr("planetarypy.io.read_image", boom)
     # Point at the real label but with a forced-generic flag; pdr opens it.
     d = io.open(LABEL, projected=False)
     assert "INDEX_TABLE" in d.keys()

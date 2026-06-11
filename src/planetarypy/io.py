@@ -19,7 +19,7 @@ The routing is automatic but overridable with the ``projected`` keyword.
 
 from pathlib import Path
 
-__all__ = ["open", "read"]
+__all__ = ["open", "read", "read_image"]
 
 # Suffixes routed to the projected-raster reader (rioxarray) rather than the
 # generic reader. These are already-projected products where a CRS-aware
@@ -72,8 +72,6 @@ def open(path, *, projected: bool | None = None, **kwargs):
         else path.suffix.lower() in _PROJECTED_SUFFIXES
     )
     if use_projected:
-        from planetarypy.instruments.utils import read_image
-
         return read_image(path)
     try:
         import pdr
@@ -85,3 +83,19 @@ def open(path, *, projected: bool | None = None, **kwargs):
 def read(path, *, projected: bool | None = None, **kwargs):
     """Alias for :func:`open` (``pandas.read_*`` muscle memory)."""
     return open(path, projected=projected, **kwargs)
+
+
+def read_image(p):
+    """Read a projected raster (GeoTIFF / ISIS cube) as an ``xarray.DataArray``.
+
+    Returns a masked, dask-backed, georeferenced array with ``x``/``y`` axis
+    attributes set (so ``.hvplot`` does the right thing automatically).
+    """
+    import rioxarray as rxr
+
+    da = rxr.open_rasterio(p, mask_and_scale=True, chunks=True).isel(
+        band=0, drop=True
+    )
+    da.x.attrs["axis"] = "X"
+    da.y.attrs["axis"] = "Y"
+    return da

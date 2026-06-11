@@ -1,0 +1,102 @@
+---
+title: "Writing a planetarypy instrument package"
+---
+
+planetarypy is the **general** layer: PDS index handling, the product catalog,
+SPICE, constants, geometry, and a unified `plp` CLI. Instrument-specific
+pipelines (calibration, mosaicking, mission quirks) and their heavy dependencies
+(e.g. ISIS via `kalasiris`) belong in **separate packages** that depend on
+planetarypy and plug into it through stable extension seams.
+
+This page documents that contract: the registration hooks and the CLI plugin
+mechanism an instrument package uses to "connect to plp".
+
+## The registration hooks
+
+Call these on import of your package (typically at the top of your package's
+`__init__.py`), so that importing your package wires it into core.
+
+### Index config — let the catalog resolve your product URLs
+
+```python
+from planetarypy.catalog import register_index, IndexConfig
+
+register_index("mymission", "mycam", "edr", IndexConfig(
+    index_key="mymission.mycam.edr",
+    archive_url="https://example.org/archive",
+))
+```
+
+After this, `plp fetch mymission.mycam.edr <PID>` and the catalog's index
+resolver can build download URLs for your products. `IndexConfig` carries the
+knobs for non-standard archives (column names, SETI volume groups, casing, …).
+
+### Storage resolver — control where products land
+
+By default core stores a product at
+`{storage_root}/{mission}/{instrument}/{product_type}/{pid}/`. To override that
+from **your package's own config**, register a resolver:
+
+```python
+from planetarypy.catalog import register_storage_resolver, default_product_dir
+from planetarypy.config import config
+
+def _my_dir(product_type, product_id):
+    # read YOUR package's config here; build on core's storage_root or a
+    # separate mirror/drive entirely.
+    base = config.storage_root  # the global base the user set in core
+    return base / "mymission" / product_id          # ...or anywhere you like
+
+register_storage_resolver("mymission.mycam", _my_dir)
+```
+
+Storage is **two-level**: core owns the global `storage_root`; your registered
+resolver has the final say for your `mission.instrument` keys. Use
+`default_product_dir(...)` if you want core's default layout and only need to
+tweak it.
+
+### Meta handler — custom `plp meta` output
+
+```python
+from planetarypy.pds import register_meta_handler
+
+register_meta_handler("mymission.mycam.edr", my_format_meta)
+# my_format_meta(index_key, product_id, *, long) -> pandas.Series
+```
+
+## The CLI plugin — appear under `plp`
+
+Rather than shipping a separate console script, register your Typer sub-app so
+your verbs appear under the unified `plp` CLI when your package is installed.
+Declare an entry point in the `planetarypy.cli_plugins` group:
+
+```toml
+# in your package's pyproject.toml
+[project.entry-points."planetarypy.cli_plugins"]
+mycam = "planetarypy_mycam.cli:register"
+```
+
+```python
+# planetarypy_mycam/cli.py
+import typer
+
+mycam_app = typer.Typer(help="MyCam tools.")
+
+@mycam_app.command()
+def calibrate(pid: str):
+    ...
+
+def register(app: typer.Typer) -> None:
+    app.add_typer(mycam_app, name="mycam")
+```
+
+`plp` discovers and loads every such entry point at startup. A plugin that
+fails to import is skipped with a warning — one broken package can't break
+`plp`. When your package isn't installed, its verbs simply aren't there.
+
+## What core guarantees (the public surface you depend on)
+
+`config.storage_root`; `pds.get_index`, `pds.utils.read_index_slice`,
+`reorder_meta_row`; `utils.url_retrieve`, `check_url_exists`, `file_variations`,
+`parallel_map`; `io.open` / `io.read_image`; and the four registration hooks
+above plus `catalog.default_product_dir`.

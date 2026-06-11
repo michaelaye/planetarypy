@@ -2968,5 +2968,34 @@ def constants_cmd(
     Console().print(table)
 
 
+def _load_cli_plugins(target: typer.Typer) -> None:
+    """Discover and register external CLI plugins under ``plp``.
+
+    Any installed package can extend ``plp`` by declaring an entry point in the
+    ``planetarypy.cli_plugins`` group pointing at a ``register(app)`` callable::
+
+        [project.entry-points."planetarypy.cli_plugins"]
+        hirise = "planetarypy_hirise.cli:register"
+
+    The callable receives the root Typer app and adds its sub-app or commands
+    (e.g. ``app.add_typer(hirise_app, name="hirise")``). A plugin that fails to
+    load is skipped with a warning so one broken package can't break ``plp``.
+    """
+    from importlib.metadata import entry_points
+
+    try:
+        eps = entry_points(group="planetarypy.cli_plugins")
+    except TypeError:  # pragma: no cover - importlib.metadata < 3.10 API
+        eps = entry_points().get("planetarypy.cli_plugins", [])
+    for ep in eps:
+        try:
+            ep.load()(target)
+        except Exception as exc:  # never let a plugin break plp
+            typer.echo(
+                f"Warning: failed to load CLI plugin {ep.name!r}: {exc}", err=True
+            )
+
+
 def main():
+    _load_cli_plugins(app)
     app()

@@ -59,6 +59,7 @@ website:
     - title: Explanation
       contents:
         - explanation/index.qmd
+        - explanation/instrument_packages.qmd
         - explanation/config_flow_diagram.qmd
         - explanation/pds_index_config.qmd
         - explanation/pds_index_download_flows.qmd
