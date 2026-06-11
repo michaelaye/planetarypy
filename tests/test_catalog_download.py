@@ -41,7 +41,6 @@ def catalog_con(tmp_path, monkeypatch):
     })
 
     # Patch get_catalog to return our test connection
-    import planetarypy.catalog._resolver as dl_mod
 
     def mock_get_catalog():
         return con

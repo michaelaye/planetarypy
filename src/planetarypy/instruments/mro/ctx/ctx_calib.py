@@ -57,7 +57,9 @@ class Calib:
         pid,  # CTX product_id
         destripe_to_calib=True,  # if to copy destriped files as calib files or leave extra
         prefer_mirror=True,
-        workdir=None,  # override for storage_folder; if set, all derived paths live here (no volume/pid sub-paths applied)
+        # workdir overrides storage_folder; if set, all derived paths live here
+        # (no volume/pid sub-paths applied)
+        workdir=None,
     ):
         self.destripe_to_calib = destripe_to_calib
         self.edr = EDR(pid, prefer_mirror=prefer_mirror)
@@ -197,7 +199,8 @@ class Calib:
                 return True
             else:
                 logger.warning(
-                    f"Footprint is not found in {self.cub_path} Polygon object, but {name} is found."
+                    f"Footprint is not found in {self.cub_path} Polygon object, "
+                    f"but {name} is found."
                 )
                 return False
 

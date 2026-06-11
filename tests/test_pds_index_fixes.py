@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from planetarypy.pds.index_fixes import (
     apply_file_fixer,

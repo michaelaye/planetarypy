@@ -25,8 +25,8 @@ class ConfigHandler(utils.NestedTomlDict):
     Parameters
     ----------
     local_path : str | None
-        If needed, a local path with more indexes could be provided.    
-    
+        If needed, a local path with more indexes could be provided.
+
     """
     FNAME = "planetarypy_index_urls.toml"
     BASE_URL = URL(
@@ -38,42 +38,42 @@ class ConfigHandler(utils.NestedTomlDict):
     def __init__(self, local_path: str | None = None, force_update: bool = False):
         self.path = Path(local_path) if local_path else self.CONFIG_PATH
         self.log = AccessLog("indexes.static.config")
-        
+
         if not self.path.is_file():
             logger.info(f"Downloading fresh static config from {self.CONFIG_URL}.")
             utils.url_retrieve(str(self.CONFIG_URL), self.path, disable_tqdm=True)
             self.log.log_update_time()
         elif force_update or self.should_update:
             self._check_and_update_config()
-            
+
         super().__init__(self.path)
 
     def _check_and_update_config(self):
         """Check for config updates and notify about new entries."""
         result = utils.compare_remote_file(str(self.CONFIG_URL), self.path)
-        
+
         if result["error"]:
             logger.warning(f"Could not check for config updates: {result['error']}")
             return
-            
+
         if result["has_updates"]:
             # Load old and new configs to compare entries
             old_config = utils.NestedTomlDict(self.path)
             new_config = utils.NestedTomlDict(result["remote_tmp_path"])
-            
+
             # Find new entries by comparing the flattened key sets
             old_keys = self._get_all_keys(old_config.to_dict())
             new_keys = self._get_all_keys(new_config.to_dict())
             added_keys = new_keys - old_keys
-            
+
             if added_keys:
                 logger.info(f"New index entries available: {', '.join(sorted(added_keys))}")
-            
+
             # Replace the local config with the updated one
             result["remote_tmp_path"].replace(self.path)
             logger.info(f"Updated static config from {self.CONFIG_URL}")
             self.log.log_update_time()
-            
+
             # Clean up temp file if it still exists
             if result["remote_tmp_path"].exists():
                 result["remote_tmp_path"].unlink()
@@ -100,31 +100,33 @@ class ConfigHandler(utils.NestedTomlDict):
             return True
         time_since = datetime.datetime.now() - last_update
         return time_since > datetime.timedelta(days=1)
-    
+
     def get_url(self, key) -> URL:
         return URL(str(self.get(key)))
-    
+
     def _delete(self):
         """Delete the local configuration file."""
         if self.path.is_file():
             self.path.unlink()
             logger.info(f"Deleted static config file at {self.path}")
         else:
-            logger.warning(f"Static config file at {self.path} does not exist, cannot delete.") 
+            logger.warning(f"Static config file at {self.path} does not exist, cannot delete.")
 
 
 class StaticRemoteHandler:
     """Handler for static remote indexes with fixed URLs from configuration.
 
     This handler deals with all aspects of the status of a remotely stored index file.
-    It is a helper class-based attribute for the Index class, to determine if updates are available and if a remote
-    check should be performed (limited to once per day).
-    This class differs from the DynamicRemoteHandler, as the updates there look for new URLs, not for new files
-    at the same URL.
+    It is a helper class-based attribute for the Index class, to determine if updates are
+    available and if a remote check should be performed (limited to once per day).
+    This class differs from the DynamicRemoteHandler, as the updates there look for new
+    URLs, not for new files at the same URL.
 
-    Note: The "helping" here STOPS after providing the right URL to use for an index key and some logical flags that
-    indicate if there's new data at the remote - this class does NOT handle downloading or caching the index file itself.
-    From the moment of having an URL and a reason to use it, the actual Index class should take over.
+    Note: The "helping" here STOPS after providing the right URL to use for an index key
+    and some logical flags that indicate if there's new data at the remote - this class
+    does NOT handle downloading or caching the index file itself.
+    From the moment of having an URL and a reason to use it, the actual Index class should
+    take over.
     """
 
     def __init__(self, index_key: str, force_config_update: bool = False):
@@ -140,7 +142,7 @@ class StaticRemoteHandler:
     def url(self) -> URL:
         """Get the URL of the static index."""
         return self.config.get_url(self.index_key)
-    
+
     @property
     def should_check(self) -> bool:
         """Determine if an update check should be performed."""
@@ -157,7 +159,7 @@ class StaticRemoteHandler:
             self.log.log_remote_check(tstamp)
             self._remote_timestamp = tstamp
         return tstamp
-    
+
     @property
     def update_available(self) -> bool:
         """Check if an update is available based on remote timestamp.

@@ -24,18 +24,27 @@ paths = psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01")
 # -> [.../IMA_..._ACCS01.LBL, .../IMA_..._ACCS01.CSV, ...]
 ```
 
-The downloaded files open with `planetarypy.open()`. By default files are grouped
-by their PSA dataset — `{storage_root}/psa/<DATA_SET_ID>/<product_id>/` — derived
-automatically from the product, so **no key is needed**. Optionally pass a catalog
-`key` to use planetarypy's standard layout instead, or `dest=` for an explicit
-directory (`extract=False` keeps the raw zip):
+The downloaded files open with `planetarypy.open()`. The PSA serves each product
+as a small zip mirroring the dataset's native PDS tree, and planetarypy unpacks it
+**faithfully** under `{storage_root}/psa/`:
+
+```
+{storage_root}/psa/<DATA_SET_ID>/DATA/<volume>/<product files>
+                                 /BROWSE/<volume>/...
+                                 /VOLDESC.CAT, AAREADME.TXT   (dataset docs)
+```
+
+So the dataset folder *is* the real `DATA_SET_ID`, the archive's volume sharding
+(e.g. `0010`) is preserved, and products of the same dataset accumulate side by
+side in one tree — **no key is needed**. Dataset-level docs are written once; the
+zip's own `inventory.txt` manifest is dropped; a per-product marker under
+`psa/.fetched/` makes a repeat fetch return the local paths without
+re-downloading. Pass `dest=` to extract into a different root, or
+`extract=False` to keep the raw zip:
 
 ```python
-psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01")
-# -> {storage_root}/psa/MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0/IMA_AZ.../...
-
-psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01", key="mex.aspera.ima")
-# -> {storage_root}/mex/aspera/ima/IMA_AZ.../...
+psa.fetch_psa_product("H0010_0000_GR3.IMG")
+# -> {storage_root}/psa/MEX-M-HRSC-3-RDR-V4.0/DATA/0010/H0010_0000_GR3.IMG
 ```
 
 If a product id matches several granules (e.g. across processing levels), inspect
@@ -73,8 +82,9 @@ psa.examples("mex.aspera.els_edr_high", n=5)   # -> product_id + access_url
 
 ### Finding a catalog key
 
-`examples` and `fetch --key` want a `mission.instrument.product_type` key. The
-reliable, authoritative way to find one is the catalog itself — drill down:
+`examples` accepts a `mission.instrument.product_type` key (as well as a PSA
+dataset — see below). The reliable, authoritative way to find a catalog key is the
+catalog itself — drill down:
 
 ```bash
 plp catalog list              # all missions (mex, rosetta, …)
@@ -93,23 +103,26 @@ The `products` column is the number of individually downloadable data products
 ### Browse entirely within the PSA (no catalog key)
 
 The PSA browse chain stays in the PSA's own vocabulary — mission → instrument →
-**product type (dataset)** → example products:
+**dataset** → example products. A *dataset* is the PSA's archival grouping: a PDS3
+**data set** (`DATA_SET_ID`) or a PDS4 **collection** (LID):
 
 ```python
-psa.product_types("Mars Express", "ASPERA")   # PSA datasets for that instrument
-psa.examples("MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0", n=5)   # by dataset id
+psa.datasets("Mars Express", "ASPERA")   # PDS3 data sets for that instrument
+psa.datasets("BepiColombo")              # PDS4 collection LIDs
+psa.examples("MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0", n=5)   # by dataset
 ```
 
-`examples` accepts **either** a PSA dataset id (from `product_types`) **or** a
-catalog `mission.instrument.product_type` key.
+`examples` accepts **either** a PSA dataset (from `datasets`) **or** a catalog
+`mission.instrument.product_type` key. (Planetarypy's catalog "product type" maps
+to a PDS3 data set / PDS4 collection — the same thing the PSA calls a *dataset*.)
 
 ## From the command line
 
 ```bash
-# Browse the PSA: missions -> instruments -> product types -> examples
+# Browse the PSA: missions -> instruments -> datasets -> examples
 plp psa missions
 plp psa instruments "Mars Express"
-plp psa product-types "Mars Express" ASPERA
+plp psa datasets "Mars Express" ASPERA
 plp psa examples MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0 -n 5
 
 # ...or jump in with a catalog key (from `plp catalog list`):
@@ -119,9 +132,8 @@ plp psa examples mex.aspera.els_edr_high -n 5
 plp psa resolve IMA_AZ1120140041730C_ACCS01
 plp psa resolve IMA_AZ1120140041730C_ACCS01 --all
 
-# Download and unpack (default groups by PSA dataset; --key uses mission/instr/type):
+# Download and unpack faithfully under {storage_root}/psa/<DATA_SET_ID>/...:
 plp psa fetch IMA_AZ1120140041730C_ACCS01
-plp psa fetch IMA_AZ1120140041730C_ACCS01 --key mex.aspera.ima
 plp psa fetch IMA_AZ1120140041730C_ACCS01 --dest ./here --no-extract
 ```
 

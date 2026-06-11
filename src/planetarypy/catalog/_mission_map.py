@@ -507,7 +507,9 @@ INSTRUMENT_FULL_NAMES: dict[tuple[str, str], str] = {
     ("ulysses", "epac"): "Energetic Particle Composition",
     ("ulysses", "gas"): "Interstellar Neutral Gas",
     ("ulysses", "grb"): "Gamma-Ray Burst",
-    ("ulysses", "hiscale"): "Heliosphere Instrument for Spectra, Composition, and Anisotropy at Low Energies",
+    ("ulysses", "hiscale"): (
+        "Heliosphere Instrument for Spectra, Composition, and Anisotropy at Low Energies"
+    ),
     ("ulysses", "mag"): "Magnetometer",
     ("ulysses", "sce"): "Solar Corona Experiment",
     ("ulysses", "swoops"): "Solar Wind Observations Over the Poles of the Sun",

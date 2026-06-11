@@ -49,7 +49,9 @@ def replace_in_dataframe(df, old_text, new_text, columns=None, regex=False, inpl
 
     for col in cols:
         try:
-            target_df[col] = target_df[col].astype("string").str.replace(old_text, new_text, regex=regex)
+            target_df[col] = (
+                target_df[col].astype("string").str.replace(old_text, new_text, regex=regex)
+            )
         except Exception as e:
             logger.debug(f"replace_in_dataframe: skipped column {col}: {e}")
             continue
@@ -102,7 +104,9 @@ def fix_mer_rdr_df(df):
 
     tcols = [col for col in df.columns if "TIME" in col]
     for col in tcols:
-        df[col] = df[col].apply(lambda x: x + "Z" if isinstance(x, str) and not x.endswith("Z") else x)
+        df[col] = df[col].apply(
+            lambda x: x + "Z" if isinstance(x, str) and not x.endswith("Z") else x
+        )
 
     if "RELEASE_ID" in df.columns:
         df["RELEASE_ID"] = pd.to_numeric(df["RELEASE_ID"], errors="coerce")
@@ -137,7 +141,9 @@ def fix_lro_lola_rdr_df(df):
     pandas.DataFrame
         Modified DataFrame with ``PRODUCT_CREATION_TIME`` parsed to datetimes.
     """
-    logger.debug("Applying DataFrame-level fix for lro.lola.rdr index PRODUCT_CREATION_TIME column.")
+    logger.debug(
+        "Applying DataFrame-level fix for lro.lola.rdr index PRODUCT_CREATION_TIME column."
+    )
     df = df.copy()
     col = "PRODUCT_CREATION_TIME"
     if col in df.columns:

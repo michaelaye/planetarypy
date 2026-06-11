@@ -43,9 +43,9 @@ class TestPixelToXY:
 class TestXYToPixel:
     def test_roundtrip(self):
         x, y = pixel_to_xy(SIMPLE_TRANSFORM, 15, 25)
-        s, l = xy_to_pixel(SIMPLE_TRANSFORM, x, y)
+        s, ln = xy_to_pixel(SIMPLE_TRANSFORM, x, y)
         assert s == pytest.approx(15, abs=0.5)
-        assert l == pytest.approx(25, abs=0.5)
+        assert ln == pytest.approx(25, abs=0.5)
 
 
 class TestXYToLonLat:
@@ -215,7 +215,7 @@ class TestPoint:
         assert az == pytest.approx(0.0, abs=0.01)  # due north
 
     def test_to_shapely(self):
-        shapely = pytest.importorskip("shapely")
+        pytest.importorskip("shapely")
         from shapely.geometry import Point as ShapelyPoint
         p = Point(lon=45.0, lat=-10.0, crs="IAU_2015:49900")
         sp = p.to_shapely()

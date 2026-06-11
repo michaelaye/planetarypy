@@ -24,7 +24,7 @@ from .static_index import StaticRemoteHandler
 
 class Index:
     """Unified Index class using composition with Remote classes.
-    
+
     This class provides file management operations while delegating URL management
     to appropriate Remote classes based on the index configuration.
 
@@ -38,9 +38,9 @@ class Index:
         Whether to force update of static index configuration.
     """
     def __init__(
-        self, 
-        index_key: str, 
-        local_dir: str | Path | None = None, 
+        self,
+        index_key: str,
+        local_dir: str | Path | None = None,
         force_config_update: bool = False
     ):
         """Initialize Index with composition-based Remote handling.
@@ -60,7 +60,10 @@ class Index:
 
     def _default_local_dir(self) -> Path:
         """Get default local directory for this index."""
-        return Path(config.storage_root) / f"{self.mission}/{self.instrument}/indexes/{self.indexname}"
+        return (
+            Path(config.storage_root)
+            / f"{self.mission}/{self.instrument}/indexes/{self.indexname}"
+        )
 
     @property
     def local_dir(self) -> Path:

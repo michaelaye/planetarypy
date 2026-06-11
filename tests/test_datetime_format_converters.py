@@ -89,7 +89,7 @@ class TestDOY(unittest.TestCase):
         # Test first day of year
         dt = datetime.datetime(2024, 1, 1, 0, 0, 0)
         self.assertEqual(ppydt.doyformat(dt), "2024-001T00:00:00")
-        
+
         # Test last day of year
         dt = datetime.datetime(2024, 12, 31, 23, 59, 59)
         self.assertEqual(ppydt.doyformat(dt), "2024-366T23:59:59")  # 2024 is leap year
@@ -111,9 +111,9 @@ class TestIsoZ(unittest.TestCase):
         self.assertRaises(ValueError, ppydt.isozformat, no_tz)
 
     def test_fromisozformat_with_microseconds(self):
-        dt = datetime.datetime(2022, 10, 1, 13, 20, 0, 123456, 
+        dt = datetime.datetime(2022, 10, 1, 13, 20, 0, 123456,
                               tzinfo=datetime.timezone.utc)
-        self.assertEqual(dt, 
+        self.assertEqual(dt,
                         ppydt.fromisozformat("2022-10-01T13:20:00.123456Z"))
 
     def test_fromisozformat_invalid_formats(self):

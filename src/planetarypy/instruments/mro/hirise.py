@@ -753,12 +753,12 @@ def download_edr(
 #   .IMG → .cub → .cal.cub → .cal.norm.cub → .cal.norm.map.cub
 #       → .cal.norm.map.equ.mos.cub
 
-import subprocess
+import subprocess  # noqa: E402
 
 try:
     from kalasiris import (
         automos, cam2map, catlab, cubenorm, equalizer,
-        getkey, handmos, hical, hi2isis, histitch, spiceinit,
+        hical, hi2isis, histitch, spiceinit,
     )
     _ISIS_AVAILABLE = True
 except (ImportError, KeyError):

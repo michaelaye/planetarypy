@@ -47,7 +47,8 @@ class CTXIndex:
                     )
                 except Exception as backup_error:
                     logger.error(
-                        f"Failed to fetch CTX volumes table from backup URL {self.backup_url}: {backup_error}"
+                        "Failed to fetch CTX volumes table from backup URL "
+                        f"{self.backup_url}: {backup_error}"
                     )
                     raise backup_error
         return self._volumes_table

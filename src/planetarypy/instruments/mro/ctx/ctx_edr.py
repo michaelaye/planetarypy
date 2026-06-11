@@ -1,6 +1,7 @@
 """Module for working with CTX EDR data.
 
-The configuration file `planetarypy_mro_ctx.toml` enables you to configure where EDR is being searched for and where it is being stored.
+The configuration file `planetarypy_mro_ctx.toml` enables you to configure where EDR is
+being searched for and where it is being stored.
 See below for examples and some explanations.
 """
 

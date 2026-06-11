@@ -1,6 +1,5 @@
 """Tests for the catalog mission mapping."""
 
-import pytest
 
 from planetarypy.catalog._mission_map import (
     resolve_mission_instrument,

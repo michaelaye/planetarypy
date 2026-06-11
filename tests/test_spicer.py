@@ -5,7 +5,7 @@ import pytest
 
 spiceypy = pytest.importorskip("spiceypy")
 
-from planetarypy.spice.spicer import Spicer, _rotate_vector
+from planetarypy.spice.spicer import Spicer, _rotate_vector  # noqa: E402
 
 
 class TestSpicerBasics:

@@ -172,9 +172,13 @@ def _make_lamp_tables(volume_folders: list[str]) -> list[pd.DataFrame]:
     """
     rows = [{"Name": "Parent Directory", "Last modified": None, "Size": "-", "Description": None}]
     for folder in volume_folders:
-        rows.append({"Name": folder, "Last modified": "2025-01-01", "Size": "-", "Description": None})
+        rows.append(
+            {"Name": folder, "Last modified": "2025-01-01", "Size": "-", "Description": None}
+        )
         md5_name = folder.rstrip("/") + "_md5.txt"
-        rows.append({"Name": md5_name, "Last modified": "2025-01-01", "Size": "400K", "Description": None})
+        rows.append(
+            {"Name": md5_name, "Last modified": "2025-01-01", "Size": "400K", "Description": None}
+        )
 
     table0 = pd.DataFrame({"0": ["PDS Imaging Node: Data Archive"]})
     table1 = pd.DataFrame(rows)

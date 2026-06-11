@@ -77,7 +77,6 @@ class TestIndexesInfoFreshness:
     checked upstream for a newer one (``last_check``)."""
 
     def _patch_index(self, monkeypatch, *, last_update, last_check):
-        from datetime import datetime
         from unittest.mock import MagicMock
 
         # Stub _all_dotted_index_keys so the existence check passes.
@@ -611,8 +610,8 @@ class TestIndexesColumnsFilter:
         # Display projected: no START_TIME column shown.
         # Look for it as a row label in the transposed table.
         lines = result.output.splitlines()
-        start_time_label_lines = [l for l in lines
-                                  if "│START_TIME" in l or "│ START_TIME" in l]
+        start_time_label_lines = [ln for ln in lines
+                                   if "│START_TIME" in ln or "│ START_TIME" in ln]
         assert not start_time_label_lines
 
     def test_last_unknown_column_exits_with_error(self):

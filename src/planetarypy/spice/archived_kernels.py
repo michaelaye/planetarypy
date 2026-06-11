@@ -182,7 +182,8 @@ def get_datasets():
     ]  # table is at index 6
 
     # The extract_links causes a lot of (<text>, None) tuples.
-    # Normalize link cells: replace (text, None) with plain text; keep (text, href) when a link exists
+    # Normalize link cells: replace (text, None) with plain text; keep (text, href) when
+    # a link exists
     def _normalize_link_cell(v):
         # v can be a string, a (text, href) tuple, or a list of such tuples
         if isinstance(v, list):
@@ -206,7 +207,8 @@ def get_datasets():
     for col in df.columns:
         # If any value in the column is a (text, href) tuple, split it
         if df[col].apply(lambda x: isinstance(x, tuple)).any():
-            # df[col] = df[col].apply(lambda x: urljoin(url, x[1]) if isinstance(x, tuple) and x[1] else None)
+            # df[col] = df[col].apply(
+            #     lambda x: urljoin(url, x[1]) if isinstance(x, tuple) and x[1] else None)
             df[col] = df[col].apply(
                 lambda x: x[1] if isinstance(x, tuple) and x[1] else None
             )
@@ -316,7 +318,8 @@ class Subsetter:
         """
         Initialize the Subsetter object.
 
-        This means that the object at initialization (via internal method below) receives all required
+        This means that the object at initialization (via internal method below) receives
+        all required
         metadata to query infos, but doesn't do downloading automatically.
 
         Parameters
@@ -340,7 +343,8 @@ class Subsetter:
     def _initialize(self):
         "get metadata via self.r and unpack it."
         logger.debug(
-            f"Requesting subset package for mission={self.mission_name} (code={self.mission_code}) start={self.start} stop={self.stop}"
+            f"Requesting subset package for mission={self.mission_name} "
+            f"(code={self.mission_code}) start={self.start} stop={self.stop}"
         )
         r = self.r
         if r.ok:

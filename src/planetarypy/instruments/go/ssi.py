@@ -50,7 +50,8 @@ class EDR:
         elif len(df.columns) > 1:
             logger.warning(
                 f"Multiple images found for frameno {self.frameno}. Using the first one."
-                "Use `EDRSet.from_frameno()` to get all matches and download or process all of them."
+                "Use `EDRSet.from_frameno()` to get all matches and download or process all "
+                "of them."
             )
         self._meta = df.iloc[:, 0]
 

@@ -81,7 +81,8 @@ def validate_urls(
 
             # Construct a test URL
             if label_file and url_stem:
-                test_url = f"{url_stem}/{label_file}" if not url_stem.endswith("/") else f"{url_stem}{label_file}"
+                sep = "" if url_stem.endswith("/") else "/"
+                test_url = f"{url_stem}{sep}{label_file}"
             else:
                 test_url = url_stem
 

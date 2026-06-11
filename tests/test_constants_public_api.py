@@ -16,7 +16,7 @@ import astropy.units as u
 
 import planetarypy.constants as c
 from planetarypy.constants import iau2009, iau2015
-from planetarypy.constants.base import Body, Constant
+from planetarypy.constants.base import Constant
 
 
 # ── Top-level attribute access (default edition = iau2015) ──────────────

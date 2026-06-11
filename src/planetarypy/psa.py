@@ -25,7 +25,7 @@ __all__ = [
     "query",
     "missions",
     "instruments",
-    "product_types",
+    "datasets",
     "examples",
     "resolve",
     "resolve_all",
@@ -106,15 +106,18 @@ def instruments(mission: Optional[str] = None) -> "pd.DataFrame":
     return pd.DataFrame(rows, columns=["mission", "instrument", "products"])
 
 
-def product_types(mission: str, instrument: Optional[str] = None) -> "pd.DataFrame":
-    """List PSA product types (PDS3 datasets) for a mission and optional instrument.
+def datasets(mission: str, instrument: Optional[str] = None) -> "pd.DataFrame":
+    """List PSA datasets for a mission and optional instrument.
 
-    Each row is a ``dataset_id`` (e.g. ``MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0``) with
-    its product count, busiest first. ``mission`` and ``instrument`` are matched as
-    case-insensitive substrings of the PSA host/instrument names listed by
-    :func:`missions` / :func:`instruments`. A returned ``dataset_id`` can be handed
-    straight to :func:`examples` — so the PSA browse chain stays entirely in PSA's
-    own vocabulary, no catalog key needed.
+    A PSA *dataset* is the archival grouping that holds many products — a PDS3
+    **data set** (``DATA_SET_ID``, e.g. ``MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA``)
+    or a PDS4 **collection** (LID, e.g. ``urn:esa:psa:bc_mpo_berm:data_calibrated``).
+    Each row is a ``dataset`` with its product count, busiest first.
+
+    ``mission`` and ``instrument`` are matched as case-insensitive substrings of the
+    PSA host/instrument names listed by :func:`missions` / :func:`instruments`. A
+    returned ``dataset`` can be handed straight to :func:`examples` — so the PSA
+    browse chain stays entirely in PSA's own vocabulary, no catalog key needed.
     """
     import pandas as pd
 
@@ -126,18 +129,21 @@ def product_types(mission: str, instrument: Optional[str] = None) -> "pd.DataFra
         "SELECT granule_gid, COUNT(*) AS products FROM psa.epn_core "
         f"WHERE {where} GROUP BY granule_gid ORDER BY products DESC"
     )
-    out = [
-        {"dataset_id": r["granule_gid"].split(":")[0], "products": r["products"]}
-        for r in rows
-    ]
-    return pd.DataFrame(out, columns=["dataset_id", "products"])
+    out = [{"dataset": r["granule_gid"], "products": r["products"]} for r in rows]
+    return pd.DataFrame(out, columns=["dataset", "products"])
+
+
+def _granule_gid(granule_uid: str) -> str:
+    """The dataset/collection group id from a granule_uid (drop product + version).
+
+    Works for PDS3 (``DATA_SET_ID:DATA:PRODUCT::ver`` → ``DATA_SET_ID:DATA``) and
+    PDS4 (``urn:…:collection:product::ver`` → ``urn:…:collection``).
+    """
+    return granule_uid.rsplit("::", 1)[0].rsplit(":", 1)[0]
 
 
 def _granule_product_id(granule_uid: str) -> str:
-    """Extract the PDS product id from a PSA granule_uid.
-
-    ``DATA_SET_ID:DATA:PRODUCT_ID::version`` → ``PRODUCT_ID``.
-    """
+    """Extract the product id from a PSA granule_uid (the last ``:`` segment)."""
     return granule_uid.rsplit("::", 1)[0].rsplit(":", 1)[-1]
 
 
@@ -146,12 +152,12 @@ def examples(key: str, n: int = 5) -> "pd.DataFrame":
 
     ``key`` may be either:
 
-    - a **PSA dataset id** (e.g. ``"MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0"``, as listed
-      by :func:`product_types`) — used directly, fully within PSA's vocabulary; or
+    - a **PSA dataset** (a PDS3 ``DATA_SET_ID`` or PDS4 collection LID, as listed by
+      :func:`datasets`) — used directly, fully within PSA's vocabulary; or
     - a **catalog key** ``mission.instrument.product_type`` (e.g.
       ``"mex.aspera.els_edr_high"``) — the catalog maps it to a seed product whose
-      granule identifier reveals the PSA dataset id, so no mission-name translation
-      is needed.
+      granule identifier reveals the PSA dataset, so no mission-name translation is
+      needed.
 
     Returns a ``DataFrame`` with ``product_id``, ``granule_uid`` and ``access_url``.
     Empty if the key isn't resolvable to a PSA dataset.
@@ -161,9 +167,9 @@ def examples(key: str, n: int = 5) -> "pd.DataFrame":
     cols = ["product_id", "granule_uid", "access_url"]
 
     if "-" in key or ":" in key:
-        # Already a PSA dataset id (or granule_gid) — catalog keys are dotted and
-        # never contain '-' or ':'.
-        dsid = key.split(":")[0]
+        # Already a PSA dataset (DATA_SET_ID or collection LID) — catalog keys are
+        # dotted and never contain '-' or ':'. Use it whole as a granule_uid prefix.
+        gid = key
     else:
         from planetarypy.catalog import example_products
 
@@ -171,16 +177,16 @@ def examples(key: str, n: int = 5) -> "pd.DataFrame":
             seeds = example_products(key)["product_id"].dropna().tolist()
         except Exception:
             return pd.DataFrame(columns=cols)
-        dsid = None
+        gid = None
         for pid in seeds:
             rows = resolve_all(pid, limit=1)
             if rows:
-                dsid = rows[0]["granule_uid"].split(":")[0]
+                gid = _granule_gid(rows[0]["granule_uid"])
                 break
-        if dsid is None:
+        if gid is None:
             return pd.DataFrame(columns=cols)
 
-    esc = dsid.replace("'", "''")
+    esc = gid.replace("'", "''")
     rows = query(
         f"SELECT TOP {int(n)} granule_uid, access_url "
         f"FROM psa.epn_core WHERE granule_uid LIKE '{esc}:%'"
@@ -201,12 +207,16 @@ def resolve_all(product_id: str, *, limit: int = 20) -> list[dict]:
 
     Each row has at least ``granule_uid`` and ``access_url`` (a direct download
     URL). Returns an empty list when nothing matches. ADQL ``LIKE`` does
-    substring matching, so the bare product id is enough.
+    substring matching, so the bare product id is enough. Results are ordered by
+    ``granule_uid`` so the same id resolves deterministically — a filename can
+    occur in several datasets (e.g. across processing levels), and a stable
+    order makes :func:`resolve` and :func:`fetch_psa_product` reproducible.
     """
     pid = product_id.replace("'", "''")  # ADQL single-quote escape
     return query(
         f"SELECT TOP {int(limit)} granule_uid, access_url, access_format "
-        f"FROM psa.epn_core WHERE granule_uid LIKE '%{pid}%'"
+        f"FROM psa.epn_core WHERE granule_uid LIKE '%{pid}%' "
+        "ORDER BY granule_uid"
     )
 
 
@@ -225,26 +235,34 @@ def fetch_psa_product(
     product_id: str,
     dest: Optional[Path] = None,
     *,
-    key: Optional[str] = None,
     extract: bool = True,
     skip_online_check: bool = False,
 ) -> list[Path]:
     """Download an ESA PSA product by id; return the local file paths.
 
-    The PSA returns the product as a zip (label + data). With ``extract=True``
-    (default) the zip is unpacked and the extracted paths returned; otherwise the
-    zip path is returned. The files open with :func:`planetarypy.open`.
+    The PSA serves each product as a small zip that mirrors the dataset's native
+    PDS tree (``<DATA_SET_ID>/DATA/<volume>/<file>``, ``BROWSE/<volume>/…``, plus
+    dataset-level docs such as ``VOLDESC.CAT``/``AAREADME.TXT``). With
+    ``extract=True`` (default) that tree is unpacked **faithfully** under
+    ``{storage_root}/psa/`` — so the zip's own top folder *is* the
+    ``DATA_SET_ID``, the volume sharding (e.g. ``0010``) is preserved, and
+    products of the same dataset accumulate side by side in one tree:
 
-    Storage location:
+        {storage_root}/psa/<DATA_SET_ID>/DATA/<volume>/<product files>
 
-    - ``dest`` given → used verbatim.
-    - ``key`` given (the catalog ``mission.instrument.product_type``) → the
-      standard catalog layout ``{storage_root}/{mission}/{instrument}/
-      {product_type}/<product_id>/`` (same as ``plp fetch``).
-    - neither → ``{storage_root}/psa/<DATA_SET_ID>/<product_id>/``, grouped by the
-      product's PSA dataset (derived from its granule identifier). No key needed.
+    Dataset-level docs (the files at the dataset-folder root) are written once;
+    re-fetching another product of the same dataset leaves them untouched. The
+    zip's own manifest (``inventory.txt`` at the archive root) is dropped. A
+    per-product marker under ``psa/.fetched/`` records the extracted paths, so a
+    repeat fetch of the same product returns them without re-downloading.
+
+    Pass ``dest`` to extract into a different root; ``extract=False`` keeps the
+    raw zip instead. The extracted files open with :func:`planetarypy.open`.
     """
+    import shutil
+
     from planetarypy.catalog import OfflineError
+    from planetarypy.config import config
     from planetarypy.utils import have_internet, url_retrieve
 
     if not skip_online_check and not have_internet():
@@ -256,29 +274,45 @@ def fetch_psa_product(
     if not matches:
         raise ValueError(f"No PSA product found for {product_id!r}")
     url = matches[0]["access_url"]
-    dataset_id = matches[0]["granule_uid"].split(":")[0]
+    gid = _granule_gid(matches[0]["granule_uid"])
 
-    safe = product_id.replace(":", "_").replace("/", "_")
-    if dest is None:
-        from planetarypy.config import config
+    root = Path(dest) if dest is not None else Path(config.storage_root) / "psa"
+    safe_pid = product_id.replace(":", "_").replace("/", "_")
+    safe_gid = gid.replace(":", "_").replace("/", "_")
+    marker = root / ".fetched" / f"{safe_gid}__{safe_pid}"
 
-        if key and key.count(".") >= 2:
-            from planetarypy.catalog import default_product_dir
+    if extract and marker.exists():
+        cached = [root / line for line in marker.read_text().splitlines() if line]
+        if cached and all(p.exists() for p in cached):
+            return cached
 
-            mission, instrument, product_type = key.split(".", 2)
-            dest = default_product_dir(mission, instrument, product_type, product_id)
-        else:
-            dataset_dir = dataset_id.replace("/", "_") or "unknown"
-            dest = Path(config.storage_root) / "psa" / dataset_dir / safe
-    dest = Path(dest)
-    dest.mkdir(parents=True, exist_ok=True)
-
-    zip_path = dest / f"{safe}.zip"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    zip_path = marker.with_suffix(".zip")
     if not zip_path.exists():
         url_retrieve(url, str(zip_path))
     if not extract:
         return [zip_path]
+
+    extracted: list[Path] = []
     with zipfile.ZipFile(zip_path) as zf:
-        zf.extractall(dest)
-        names = zf.namelist()
-    return [dest / n for n in names if not n.endswith("/")]
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            name = info.filename
+            if "/" not in name:
+                # Loose file at the archive root = the zip's own manifest
+                # (inventory.txt). Not part of the dataset tree — drop it.
+                continue
+            target = root / name
+            is_dataset_doc = name.count("/") == 1  # <DATA_SET_ID>/<FILE>
+            if is_dataset_doc and target.exists():
+                extracted.append(target)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(info) as src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            extracted.append(target)
+
+    marker.write_text("\n".join(str(p.relative_to(root)) for p in extracted))
+    zip_path.unlink(missing_ok=True)
+    return extracted

@@ -191,17 +191,17 @@ def is_within(source, lon, lat):
     bool or np.ndarray of bool
         True if the point(s) are within the image bounds.
     """
-    s, l = lonlat_to_pixel(source, lon, lat)
+    s, ln = lonlat_to_pixel(source, lon, lat)
     # Ensure plain numeric types (not xarray-wrapped)
     s = np.asarray(s)
-    l = np.asarray(l)
+    ln = np.asarray(ln)
 
     if hasattr(source, "rio"):
         ny, nx = source.rio.height, source.rio.width
     else:
         ny, nx = source.height, source.width
 
-    return (0 <= s) & (s < nx) & (0 <= l) & (l < ny)
+    return (0 <= s) & (s < nx) & (0 <= ln) & (ln < ny)
 
 
 def image_azimuth(sample1, line1, sample2, line2):
@@ -464,7 +464,9 @@ def _get_transform_and_crs(source):
         transform = source.rio.transform()
         crs = source.rio.crs
         if crs is None:
-            raise ValueError("DataArray has no CRS. Open with rioxarray or set it via .rio.write_crs()")
+            raise ValueError(
+                "DataArray has no CRS. Open with rioxarray or set it via .rio.write_crs()"
+            )
         return transform, crs
 
     # rasterio DatasetReader

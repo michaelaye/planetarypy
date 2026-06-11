@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 import pytest
-from pathlib import Path
 
 pytest.importorskip("spiceypy")
 

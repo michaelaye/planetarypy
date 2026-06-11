@@ -12,7 +12,7 @@ from planetarypy.utils import NestedTomlDict
 
 class AccessLog(NestedTomlDict):
     """Handler for index log operations.
-    
+
     Parameters
     ----------
     key : str
@@ -78,17 +78,17 @@ class AccessLog(NestedTomlDict):
         yesterday = dt.now() - self.ONEDAY - timedelta(minutes=1)
         self.set(self.key, "last_checked", yesterday.replace(microsecond=0))
         self.save()
-    
+
     @property
     def current_url(self) -> str | None:
         """Get the URL of the currently cached index."""
         return self.get(self.key, "current_url")
-    
+
     @property
     def available_url(self) -> str | None:
         """Get the URL of an available update, if any."""
         return self.get(self.key, "available_url")
-    
+
     def log_update_available(self, available: bool):
         """Log whether an update is available for this key."""
         self.set(self.key, "update_available", available)
@@ -99,7 +99,7 @@ class AccessLog(NestedTomlDict):
     def update_available(self) -> bool | None:
         """Get whether an update is available for this key."""
         return self.get(self.key, "update_available")
-    
+
     @property
     def last_check(self):
         return self.get(self.key, "last_checked")

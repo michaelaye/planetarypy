@@ -1,6 +1,5 @@
 """Tests for the catalog URL rewrite module."""
 
-import pytest
 
 from planetarypy.catalog._url_rewrite import rewrite_usgs_url
 

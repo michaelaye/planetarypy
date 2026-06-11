@@ -165,9 +165,17 @@ def fetch(
              "Single-PID calls ignore this flag.",
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
-    label_only: bool = typer.Option(False, "--label-only", "-l", help="Download only the label file"),
-    here: bool = typer.Option(False, "--here", "-H", help="Download into current directory instead of planetarypy storage"),
-    folder: bool = typer.Option(False, "--folder", "-d", help="Print the local folder instead of file paths (composes with `cd`; single-PID only)"),
+    label_only: bool = typer.Option(
+        False, "--label-only", "-l", help="Download only the label file"
+    ),
+    here: bool = typer.Option(
+        False, "--here", "-H",
+        help="Download into current directory instead of planetarypy storage",
+    ),
+    folder: bool = typer.Option(
+        False, "--folder", "-d",
+        help="Print the local folder instead of file paths (composes with `cd`; single-PID only)",
+    ),
 ):
     """Download one or more PDS products by ID.
 
@@ -453,7 +461,9 @@ def hibrowse(
         help="HiRISE product ID, e.g. PSP_003092_0985_RED or PSP_004238_1135_RED1_1",
         autocompletion=_complete_hirise_obsid_rdr,
     ),
-    annotated: bool = typer.Option(True, "--annotated/--clean", "-a/-c", help="Annotated (default) or clean browse"),
+    annotated: bool = typer.Option(
+        True, "--annotated/--clean", "-a/-c", help="Annotated (default) or clean browse"
+    ),
     here: bool = typer.Option(False, "--here", "-H", help="Download into current directory"),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if cached"),
 ):
@@ -640,9 +650,14 @@ def ctxqv(
     ),
     stride: int = typer.Option(10, "--stride", "-s", help="Downsample factor"),
     save: str = typer.Option(None, "--save", "-o", help="Save to PNG instead of displaying"),
-    stretch: str = typer.Option("1,99", "--stretch", "-p", help="Percentile stretch as 'low,high'. Use 'none' to disable."),
+    stretch: str = typer.Option(
+        "1,99", "--stretch", "-p", help="Percentile stretch as 'low,high'. Use 'none' to disable."
+    ),
     edr: bool = typer.Option(False, "--edr", help="Force raw EDR, skip calibrated files"),
-    center_box: int = typer.Option(None, "--center-box", "-c", help="Show full-res center crop of N pixels (default 500 if flag used)"),
+    center_box: int = typer.Option(
+        None, "--center-box", "-c",
+        help="Show full-res center crop of N pixels (default 500 if flag used)",
+    ),
 ):
     """Show a downsampled quickview of a CTX image.
 
@@ -656,7 +671,6 @@ def ctxqv(
         raise typer.Exit()
 
     import matplotlib.pyplot as plt
-    import numpy as np
 
     arr = None
     level = None
@@ -922,12 +936,9 @@ def psa_fetch_cmd(
     product_id: str = typer.Argument(
         None, help="PDS product id to download from the PSA."
     ),
-    key: str = typer.Option(
-        None, "--key",
-        help="Optional catalog key 'mission.instrument.product_type' to use the "
-             "standard storage layout (default groups by PSA dataset).",
+    dest: Path = typer.Option(
+        None, "--dest", help="Extraction root (default: {storage_root}/psa)."
     ),
-    dest: Path = typer.Option(None, "--dest", help="Destination directory."),
     no_extract: bool = typer.Option(
         False, "--no-extract", help="Keep the zip; don't unpack."
     ),
@@ -938,7 +949,7 @@ def psa_fetch_cmd(
         raise typer.Exit()
     from planetarypy.psa import fetch_psa_product
 
-    paths = fetch_psa_product(product_id, dest=dest, key=key, extract=not no_extract)
+    paths = fetch_psa_product(product_id, dest=dest, extract=not no_extract)
     for path in paths:
         typer.echo(str(path))
 
@@ -977,23 +988,23 @@ def psa_instruments_cmd(
     _render_df(df, title)
 
 
-@psa_app.command("product-types")
-def psa_product_types_cmd(
+@psa_app.command("datasets")
+def psa_datasets_cmd(
     ctx: typer.Context,
     mission: str = typer.Argument(None, help="PSA mission, e.g. 'Mars Express'."),
     instrument: str = typer.Argument(None, help="Optional PSA instrument, e.g. 'ASPERA'."),
 ):
-    """List PSA product types (datasets) for a mission and optional instrument."""
+    """List PSA datasets (PDS3 data sets / PDS4 collections) for a mission."""
     if mission is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
-    from planetarypy.psa import product_types
+    from planetarypy.psa import datasets
 
-    df = product_types(mission, instrument)
+    df = datasets(mission, instrument)
     if df.empty:
-        typer.echo(f"No PSA product types for {mission!r}.", err=True)
+        typer.echo(f"No PSA datasets for {mission!r}.", err=True)
         return
-    title = f"PSA product types — {mission}" + (f" / {instrument}" if instrument else "")
+    title = f"PSA datasets — {mission}" + (f" / {instrument}" if instrument else "")
     _render_df(df, title)
 
 
@@ -1002,12 +1013,12 @@ def psa_examples_cmd(
     ctx: typer.Context,
     key: str = typer.Argument(
         None,
-        help="PSA dataset id (from `psa product-types`) or catalog key "
+        help="PSA dataset (from `psa datasets`) or catalog key "
              "'mission.instrument.product_type'.",
     ),
     n: int = typer.Option(5, "-n", "--number", help="How many examples to show."),
 ):
-    """List example PSA products for a dataset id or catalog product type."""
+    """List example PSA products for a dataset or catalog product type."""
     if key is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
@@ -1017,7 +1028,7 @@ def psa_examples_cmd(
     if df.empty:
         typer.echo(
             f"No PSA examples for {key!r}. List datasets with "
-            "`plp psa product-types <mission> [instrument]`.",
+            "`plp psa datasets <mission> [instrument]`.",
             err=True,
         )
         return
@@ -1033,7 +1044,9 @@ app.add_typer(catalog_app, name="catalog", rich_help_panel=_PANEL_DISCOVERY)
 @catalog_app.command("build")
 def catalog_build(
     force: bool = typer.Option(False, "--force", help="Force rebuild from scratch"),
-    validate_urls: bool = typer.Option(False, "--validate-urls", help="Run URL validation after build"),
+    validate_urls: bool = typer.Option(
+        False, "--validate-urls", help="Run URL validation after build"
+    ),
 ):
     """Build the PDS catalog database from pdr-tests definitions."""
     from planetarypy.catalog import build_catalog
@@ -1046,7 +1059,10 @@ def catalog_build(
         f"{stats.get('products', '?')} products"
     )
     if stats.get("ambiguous"):
-        typer.echo(f"\nAmbiguous mappings ({len(stats['ambiguous'])}): {', '.join(stats['ambiguous'])}")
+        typer.echo(
+            f"\nAmbiguous mappings ({len(stats['ambiguous'])}): "
+            f"{', '.join(stats['ambiguous'])}"
+        )
 
     if validate_urls:
         from planetarypy.catalog._validation import validate_urls as do_validate

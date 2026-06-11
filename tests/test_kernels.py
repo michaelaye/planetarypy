@@ -9,9 +9,8 @@ This separation ensures CI catches URL changes (e.g., kernel version updates at 
 without needing to download gigabytes of data.
 """
 
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import requests
@@ -19,7 +18,7 @@ import requests
 pytest.importorskip("spiceypy")
 
 from planetarypy.spice import generic_kernels
-from planetarypy.spice.archived_kernels import BASE_URL, Subsetter, datasets
+from planetarypy.spice.archived_kernels import Subsetter, datasets
 from planetarypy.spice.config import KERNEL_STORAGE
 from planetarypy.spice.generic_kernels import (
     GENERIC_STORAGE,

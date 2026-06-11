@@ -21,8 +21,12 @@ Usage:
 """
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
+
+if TYPE_CHECKING:
+    import duckdb
 
 from planetarypy.catalog._objects import Mission, Instrument  # noqa: F401
 from planetarypy.catalog._resolver import (  # noqa: F401

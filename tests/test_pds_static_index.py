@@ -53,13 +53,19 @@ class TestConfigHandler:
 
     def test_loads_existing_config(self, config_env):
         """ConfigHandler reads an existing TOML file without downloading."""
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         assert handler.path == config_env["config_path"]
 
     def test_get_url_returns_correct_url(self, config_env):
         """get_url returns a yarl.URL for a dotted key."""
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         url = handler.get_url("mro.ctx.edr")
         assert isinstance(url, URL)
@@ -67,14 +73,20 @@ class TestConfigHandler:
 
     def test_get_url_different_key(self, config_env):
         """get_url works for different dotted keys."""
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         url = handler.get_url("cassini.iss.ring_summary")
         assert str(url) == "https://example.com/cassini/iss/ring_summary.lbl"
 
     def test_get_all_keys_flattens_nested_dict(self, config_env):
         """_get_all_keys returns all leaf dotted keys from a nested dict."""
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         keys = handler._get_all_keys(handler.to_dict())
         assert keys == {
@@ -85,14 +97,20 @@ class TestConfigHandler:
 
     def test_get_all_keys_with_parent_key(self, config_env):
         """_get_all_keys respects the parent_key argument."""
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         keys = handler._get_all_keys({"a": {"b": 1}}, parent_key="root")
         assert keys == {"root.a.b"}
 
     def test_get_all_keys_empty_dict(self, config_env):
         """_get_all_keys returns empty set for empty dict."""
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         assert handler._get_all_keys({}) == set()
 
@@ -147,7 +165,10 @@ class TestConfigHandler:
             lambda *a, **kw: {"has_updates": True, "remote_tmp_path": remote_tmp, "error": None},
         )
 
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
 
         handler._check_and_update_config()
@@ -161,7 +182,10 @@ class TestConfigHandler:
             "planetarypy.pds.static_index.utils.compare_remote_file",
             lambda *a, **kw: {"has_updates": False, "remote_tmp_path": None, "error": None},
         )
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         handler._check_and_update_config()
         # Should have logged a check time
@@ -171,16 +195,24 @@ class TestConfigHandler:
         """_check_and_update_config handles errors gracefully."""
         monkeypatch.setattr(
             "planetarypy.pds.static_index.utils.compare_remote_file",
-            lambda *a, **kw: {"has_updates": False, "remote_tmp_path": None, "error": "Network error"},
+            lambda *a, **kw: {
+                "has_updates": False, "remote_tmp_path": None, "error": "Network error",
+            },
         )
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         # Should not raise
         handler._check_and_update_config()
 
     def test_delete(self, config_env):
         """_delete removes the config file."""
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler()
         assert handler.path.exists()
         handler._delete()
@@ -190,7 +222,10 @@ class TestConfigHandler:
         """ConfigHandler accepts a local_path override."""
         alt_path = tmp_path / "alt_config.toml"
         alt_path.write_text(SAMPLE_TOML, encoding="utf-8")
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = ConfigHandler(local_path=str(alt_path))
         assert handler.path == alt_path
 
@@ -207,7 +242,10 @@ class TestStaticRemoteHandler:
         """Helper to build a StaticRemoteHandler without network calls."""
         # Prevent should_check from triggering get_remote_timestamp during __init__
         monkeypatch.setattr(AccessLog, "should_check", property(lambda self: should_check))
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = StaticRemoteHandler("mro.ctx.edr")
         return handler
 
@@ -220,7 +258,10 @@ class TestStaticRemoteHandler:
     def test_should_check_delegates_to_access_log(self, config_env, monkeypatch):
         """should_check returns whatever AccessLog.should_check says."""
         monkeypatch.setattr(AccessLog, "should_check", property(lambda self: False))
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = StaticRemoteHandler.__new__(StaticRemoteHandler)
             handler.index_key = "mro.ctx.edr"
             handler.config = ConfigHandler()
@@ -256,7 +297,9 @@ class TestStaticRemoteHandler:
         assert result is None
         assert handler._remote_timestamp is None
 
-    def test_get_remote_timestamp_called_during_init_when_should_check(self, config_env, monkeypatch):
+    def test_get_remote_timestamp_called_during_init_when_should_check(
+        self, config_env, monkeypatch
+    ):
         """When should_check is True, __init__ calls get_remote_timestamp."""
         fake_ts = datetime.datetime(2025, 6, 15, 12, 0, 0)
         monkeypatch.setattr(
@@ -264,7 +307,10 @@ class TestStaticRemoteHandler:
             lambda url: fake_ts,
         )
         monkeypatch.setattr(AccessLog, "should_check", property(lambda self: True))
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = StaticRemoteHandler("mro.ctx.edr")
         assert handler._remote_timestamp == fake_ts
 
@@ -312,7 +358,10 @@ class TestStaticRemoteHandler:
     def test_update_available_true_when_remote_newer(self, config_env, monkeypatch):
         """update_available returns True when remote timestamp is newer than last update."""
         monkeypatch.setattr(AccessLog, "should_check", property(lambda self: True))
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = StaticRemoteHandler.__new__(StaticRemoteHandler)
             handler.index_key = "mro.ctx.edr"
             handler.config = ConfigHandler()
@@ -336,7 +385,10 @@ class TestStaticRemoteHandler:
     def test_update_available_false_when_remote_older(self, config_env, monkeypatch):
         """update_available returns False when remote timestamp is older than last update."""
         monkeypatch.setattr(AccessLog, "should_check", property(lambda self: True))
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = StaticRemoteHandler.__new__(StaticRemoteHandler)
             handler.index_key = "mro.ctx.edr"
             handler.config = ConfigHandler()
@@ -359,7 +411,10 @@ class TestStaticRemoteHandler:
     def test_update_available_true_when_never_updated(self, config_env, monkeypatch):
         """update_available returns True when there's no prior update logged."""
         monkeypatch.setattr(AccessLog, "should_check", property(lambda self: True))
-        with patch.object(ConfigHandler, "should_update", new_callable=lambda: property(lambda self: False)):
+        with patch.object(
+            ConfigHandler, "should_update",
+            new_callable=lambda: property(lambda self: False),
+        ):
             handler = StaticRemoteHandler.__new__(StaticRemoteHandler)
             handler.index_key = "mro.ctx.edr"
             handler.config = ConfigHandler()

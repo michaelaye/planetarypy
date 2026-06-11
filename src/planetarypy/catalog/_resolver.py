@@ -19,7 +19,7 @@ Resolution strategy (chain of responsibility):
 """
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger

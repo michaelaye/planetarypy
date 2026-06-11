@@ -52,10 +52,10 @@ __all__ = [
 
 class NestedTomlDict:
     """A wrapper around tomlkit documents that supports dotted key access.
-    
+
     This class automatically creates nested table structures when you use
     dotted keys like "config.indexes.static".
-    
+
     Example:
         >>> doc = NestedTomlDict(Path("config.toml"))
         >>> doc.set("config.indexes.static", "last_updated", "2025-10-20")
@@ -63,10 +63,10 @@ class NestedTomlDict:
         >>> #           last_updated = "2025-10-20"
         >>> doc.save()
     """
-    
+
     def __init__(self, file_path: Path):
         """Initialize with a file path, loading existing content if available.
-        
+
         Args:
             file_path: Path to the TOML file
         """
@@ -76,10 +76,10 @@ class NestedTomlDict:
                 self.doc = tomlkit.load(f)
         except FileNotFoundError:
             self.doc = tomlkit.document()
-    
+
     def set(self, dotted_key: str, field: str, value: Any) -> None:
         """Set a value using a dotted key path.
-        
+
         Args:
             dotted_key: A dot-separated path like "config.indexes.static"
             field: The field name to set in the final nested table
@@ -87,49 +87,49 @@ class NestedTomlDict:
         """
         keys = dotted_key.split(".")
         current = self.doc
-        
+
         # Navigate/create nested structure
         for k in keys:
             if k not in current:
                 current[k] = tomlkit.table()
             current = current[k]
-        
+
         # Set the value on the innermost table
         current[field] = value
-    
+
     def get(self, dotted_key: str, field: str | None = None) -> Any:
         """Get a value using a dotted key path.
-        
+
         Args:
             dotted_key: A dot-separated path like "config.indexes.static"
             field: Optional field name to get from the final nested table.
                    If None, returns the entire nested table.
-        
+
         Returns:
             The value at the specified path, or None if not found
         """
         keys = dotted_key.split(".")
         current = self.doc
-        
+
         # Navigate the nested structure
         for k in keys:
             if k not in current:
                 return None
             current = current[k]
-        
+
         # Return the field value or the entire table
         if field is not None:
             return current.get(field)
         return current
-    
+
     def to_dict(self) -> dict:
         """Convert to a regular Python dict."""
         return dict(self.doc)
-    
+
     def dumps(self) -> str:
         """Dump to TOML string."""
         return tomlkit.dumps(self.doc)
-    
+
     def save(self) -> None:
         """Save to the TOML file."""
         with self.file_path.open("w", encoding="utf-8") as f:
@@ -212,15 +212,15 @@ def compare_remote_file(
         response.raise_for_status()
 
         remote_content = response.text
-        
+
         # Read local content
         try:
             local_content = local_path.read_text(encoding="utf-8")
         except FileNotFoundError:
             local_content = ""
-        
+
         has_updates = remote_content != local_content
-        
+
         # Save remote content to temp file if different
         remote_tmp_path = None
         if has_updates:

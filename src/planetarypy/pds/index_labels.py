@@ -39,7 +39,7 @@ class PVLColumn:
 
     Parameters
     ----------
-    
+
     pvlobj :
     """
 
@@ -247,7 +247,8 @@ def index_to_df(
     # Label object that has both the column names and the columns widths as attributes
     # 'colnames' and 'colspecs'
     label: IndexLabel,
-    # Switch to control if to convert columns with "TIME" in name (unless COUNT is as well in name) to datetime
+    # Switch to control if to convert columns with "TIME" in name (unless COUNT is as
+    # well in name) to datetime
     convert_times: bool = True,
 ):
     """The main reader function for PDS Index files.
@@ -309,13 +310,15 @@ def decode_line(
 def find_mixed_type_cols(
     # Dataframe to be searched for mixed data-types
     df: pd.DataFrame,
-    # Switch to control if NaN values in these problem columns should be replaced by the string 'UNKNOWN'
+    # Switch to control if NaN values in these problem columns should be replaced by the
+    # string 'UNKNOWN'
     fix: bool = True,
 ) -> list:  # List of column names that have data type changes within themselves.
     """For a given dataframe, find the columns that are of mixed type.
 
     Tool to help with the performance warning when trying to save a pandas DataFrame as a HDF.
-    When a column changes datatype somewhere, pickling occurs, slowing down the reading process of the HDF file.
+    When a column changes datatype somewhere, pickling occurs, slowing down the reading
+    process of the HDF file.
     """
     result = []
     for col in df.columns:

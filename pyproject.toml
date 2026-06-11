@@ -155,6 +155,15 @@ select = ["E", "W", "F"]
 # E203 (whitespace before ':') and E701 (compound statements on one line).
 ignore = ["E203", "E701"]
 
+[tool.ruff.lint.per-file-ignores]
+# Generated from NAIF/JPL kernels by scripts/regenerate_constants.py (DO NOT
+# hand-edit). Long lines are inherent to the generated constant tables.
+"src/planetarypy/constants/_gm_jpl.py" = ["E501"]
+"src/planetarypy/constants/iau2009.py" = ["E501"]
+"src/planetarypy/constants/iau2015.py" = ["E501"]
+# Package __init__ modules re-export names to assemble the public API.
+"__init__.py" = ["F401", "F403", "F405"]
+
 [tool.deptry]
 # Limit the audit to actual package + test code. The other paths are
 # exploratory / dev-tooling and have their own implicit dep contexts.

@@ -1,6 +1,5 @@
 """Tests for catalog URL pattern-based resolution."""
 
-import pytest
 
 from planetarypy.catalog._pattern_resolver import (
     _build_file_list,

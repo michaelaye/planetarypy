@@ -6,7 +6,6 @@ and decode_line using both pure unit tests and synthetic PDS fixture files.
 
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 

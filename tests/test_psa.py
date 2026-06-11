@@ -107,53 +107,70 @@ def test_instruments_unfiltered_has_no_where(monkeypatch):
     assert "WHERE" not in captured["adql"]
 
 
-# ── product_types ────────────────────────────────────────────────────
+# ── datasets ──────────────────────────────────────────────────────────
 
 
-def test_product_types(monkeypatch):
+def test_datasets_keeps_full_granule_gid(monkeypatch):
     captured = {}
 
     def fake_query(adql, **k):
         captured["adql"] = adql
         return [
+            # PDS3 data set and a PDS4 collection LID — both kept whole (no split)
             {"granule_gid": "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA", "products": 59040},
-            {"granule_gid": "MEX-M-ASPERA3-4-DDR-IMA-EXT3-V1.0:DATA", "products": 48816},
+            {"granule_gid": "urn:esa:psa:bc_mpo_berm:data_calibrated", "products": 80276},
         ]
 
     monkeypatch.setattr(psa, "query", fake_query)
-    df = psa.product_types("Mars Express", "ASPERA")
-    assert list(df.columns) == ["dataset_id", "products"]
-    assert df.iloc[0]["dataset_id"] == "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0"
-    assert "UPPER(instrument_host_name) LIKE UPPER('%Mars Express%')" in captured["adql"]
-    assert "UPPER(instrument_name) LIKE UPPER('%ASPERA%')" in captured["adql"]
+    df = psa.datasets("BepiColombo")
+    assert list(df.columns) == ["dataset", "products"]
+    assert df.iloc[0]["dataset"] == "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA"
+    # the PDS4 collection LID is preserved (would have become "urn" with split)
+    assert df.iloc[1]["dataset"] == "urn:esa:psa:bc_mpo_berm:data_calibrated"
     assert "GROUP BY granule_gid" in captured["adql"]
 
 
-def test_product_types_no_instrument(monkeypatch):
+def test_datasets_no_instrument(monkeypatch):
     captured = {}
     monkeypatch.setattr(
         psa, "query", lambda adql, **k: captured.update(adql=adql) or []
     )
-    psa.product_types("Rosetta")
+    psa.datasets("Rosetta")
     assert "instrument_name" not in captured["adql"]
+
+
+def test_granule_gid_pds3_and_pds4():
+    assert psa._granule_gid("MEX-X:DATA:PROD::1.0") == "MEX-X:DATA"
+    assert (psa._granule_gid("urn:esa:psa:bc_mpo_berm:data_calibrated:ber::0.1")
+            == "urn:esa:psa:bc_mpo_berm:data_calibrated")
 
 
 # ── examples (catalog key -> DATA_SET_ID -> N products) ──────────────
 
 
-def test_examples_accepts_dataset_id_directly(monkeypatch):
-    # A PSA dataset id (contains '-') must bypass the catalog entirely.
+def test_examples_accepts_dataset_directly(monkeypatch):
+    # A PSA dataset (PDS3 or PDS4) must bypass the catalog and be used whole.
     captured = {}
-
-    def fake_query(adql, **k):
-        captured["adql"] = adql
-        return [{"granule_uid": "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA:P1::1.0",
-                 "access_url": "https://u"}]
-
-    monkeypatch.setattr(psa, "query", fake_query)
+    monkeypatch.setattr(
+        psa, "query",
+        lambda adql, **k: captured.update(adql=adql)
+        or [{"granule_uid": "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA:P1::1.0",
+             "access_url": "https://u"}],
+    )
     df = psa.examples("MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0", n=1)
     assert "LIKE 'MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:%'" in captured["adql"]
     assert df["product_id"].tolist() == ["P1"]
+
+
+def test_examples_accepts_pds4_collection_lid(monkeypatch):
+    # A PDS4 collection LID has internal ':' — it must be used whole, not split.
+    captured = {}
+    monkeypatch.setattr(
+        psa, "query",
+        lambda adql, **k: captured.update(adql=adql) or [],
+    )
+    psa.examples("urn:esa:psa:bc_mpo_berm:data_calibrated", n=3)
+    assert "LIKE 'urn:esa:psa:bc_mpo_berm:data_calibrated:%'" in captured["adql"]
 
 
 def test_granule_product_id():
@@ -185,7 +202,8 @@ def test_examples_chains_catalog_to_dataset(monkeypatch):
     df = psa.examples("mex.aspera.els_edr_high", n=2)
     assert list(df.columns) == ["product_id", "granule_uid", "access_url"]
     assert df["product_id"].tolist() == ["P1", "P2"]
-    assert "LIKE 'DS-1:%'" in captured["adql"]  # derived DATA_SET_ID, no mission name
+    # derived from the seed's granule group, no mission-name translation
+    assert "LIKE 'DS-1:DATA:%'" in captured["adql"]
 
 
 def test_examples_empty_when_key_unknown(monkeypatch):
@@ -203,51 +221,129 @@ def test_examples_empty_when_key_unknown(monkeypatch):
 # ── fetch_psa_product ────────────────────────────────────────────────
 
 
-def test_fetch_downloads_and_extracts(tmp_path, monkeypatch):
-    import planetarypy.utils as utils
+def _psa_zip_writer(dataset="MEX-DS-1", product="PROD.IMG", volume="0010"):
+    """Return a fake url_retrieve that writes a realistic PSA mini-archive.
 
-    monkeypatch.setattr(
-        psa, "resolve_all",
-        lambda pid, **k: [{"granule_uid": f"DS-1:DATA:{pid}::1.0",
-                           "access_url": "https://x/product"}],
-    )
-    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    Mirrors the real structure: a top folder named for the DATA_SET_ID holding
+    a volume-sharded DATA/BROWSE tree and dataset-level docs at its root, plus
+    the zip's own ``inventory.txt`` manifest loose at the archive root.
+    """
+    base = product.rsplit(".", 1)[0]
 
     def fake_retrieve(url, outfile):
         with zipfile.ZipFile(outfile, "w") as zf:
-            zf.writestr("PROD.LBL", "label")
-            zf.writestr("PROD.DAT", "data")
+            zf.writestr(f"{dataset}/DATA/{volume}/{product}", "image")
+            zf.writestr(f"{dataset}/BROWSE/{volume}/{base}.JPG", "browse")
+            zf.writestr(f"{dataset}/VOLDESC.CAT", "voldesc")
+            zf.writestr(f"{dataset}/AAREADME.TXT", "readme")
+            zf.writestr("inventory.txt", "manifest")
 
-    monkeypatch.setattr(utils, "url_retrieve", fake_retrieve)
-    paths = psa.fetch_psa_product("PROD", dest=tmp_path)
-    assert {p.name for p in paths} == {"PROD.LBL", "PROD.DAT"}
-    assert (tmp_path / "PROD.LBL").read_text() == "label"
+    return fake_retrieve
 
 
-def test_fetch_with_key_uses_catalog_layout(tmp_path, monkeypatch):
-    import planetarypy.catalog as cat
+def test_fetch_extracts_faithfully_under_psa_root(tmp_path, monkeypatch):
+    from planetarypy.config import config
     import planetarypy.utils as utils
 
     monkeypatch.setattr(
         psa, "resolve_all",
-        lambda pid, **k: [{"granule_uid": f"DS-1:DATA:{pid}::1.0",
+        lambda pid, **k: [{"granule_uid": f"MEX-DS-1:DATA:{pid}::1.0",
                            "access_url": "https://x/product"}],
     )
     monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(config, "storage_root", tmp_path)
+    monkeypatch.setattr(utils, "url_retrieve", _psa_zip_writer())
+
+    paths = psa.fetch_psa_product("PROD.IMG")
+    psa_root = tmp_path / "psa"
+    # Dataset folder = the zip's own top folder (the real DATA_SET_ID).
+    # Volume sharding (0010) is preserved; the image stays a file.
+    img = psa_root / "MEX-DS-1" / "DATA" / "0010" / "PROD.IMG"
+    assert img.is_file() and img.read_text() == "image"
+    assert (psa_root / "MEX-DS-1" / "BROWSE" / "0010" / "PROD.JPG").is_file()
+    # Dataset-level docs land at the dataset-folder root.
+    assert (psa_root / "MEX-DS-1" / "VOLDESC.CAT").is_file()
+    assert (psa_root / "MEX-DS-1" / "AAREADME.TXT").is_file()
+    # The zip's own manifest is dropped, never written to the tree.
+    assert not (psa_root / "inventory.txt").exists()
+    # No file-named folder, no double-wrapped dataset tree.
+    assert not (psa_root / "PROD.IMG").is_dir()
+    assert img in paths
+
+
+def test_fetch_drops_inventory_manifest(tmp_path, monkeypatch):
+    from planetarypy.config import config
+    import planetarypy.utils as utils
+
     monkeypatch.setattr(
-        utils, "url_retrieve",
-        lambda url, outfile: zipfile.ZipFile(outfile, "w").close(),
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"MEX-DS-1:DATA:{pid}::1.0",
+                           "access_url": "u"}],
     )
-    captured = {}
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(config, "storage_root", tmp_path)
+    monkeypatch.setattr(utils, "url_retrieve", _psa_zip_writer())
 
-    def fake_default_dir(mission, instrument, product_type, product_id):
-        captured["args"] = (mission, instrument, product_type, product_id)
-        return tmp_path / mission / instrument / product_type / product_id
+    paths = psa.fetch_psa_product("PROD.IMG")
+    assert all(p.name != "inventory.txt" for p in paths)
 
-    monkeypatch.setattr(cat, "default_product_dir", fake_default_dir)
-    psa.fetch_psa_product("PID", key="mex.hrsc.refdr3", extract=False)
-    assert captured["args"] == ("mex", "hrsc", "refdr3", "PID")
-    assert (tmp_path / "mex" / "hrsc" / "refdr3" / "PID").is_dir()
+
+def test_fetch_writes_dataset_docs_once(tmp_path, monkeypatch):
+    from planetarypy.config import config
+    import planetarypy.utils as utils
+
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(config, "storage_root", tmp_path)
+
+    # Two products of the same dataset; the second ships an updated VOLDESC,
+    # which must NOT overwrite the one already on disk.
+    def resolve(pid, **k):
+        return [{"granule_uid": f"MEX-DS-1:DATA:{pid}::1.0", "access_url": "u"}]
+
+    monkeypatch.setattr(psa, "resolve_all", resolve)
+
+    monkeypatch.setattr(utils, "url_retrieve", _psa_zip_writer(product="A.IMG"))
+    psa.fetch_psa_product("A.IMG")
+    voldesc = tmp_path / "psa" / "MEX-DS-1" / "VOLDESC.CAT"
+    assert voldesc.read_text() == "voldesc"
+
+    def writer2(url, outfile):
+        with zipfile.ZipFile(outfile, "w") as zf:
+            zf.writestr("MEX-DS-1/DATA/0011/B.IMG", "image-b")
+            zf.writestr("MEX-DS-1/VOLDESC.CAT", "CHANGED")
+
+    monkeypatch.setattr(utils, "url_retrieve", writer2)
+    paths = psa.fetch_psa_product("B.IMG")
+    assert (tmp_path / "psa" / "MEX-DS-1" / "DATA" / "0011" / "B.IMG").is_file()
+    # Doc written once: the original content survives.
+    assert voldesc.read_text() == "voldesc"
+    assert voldesc in paths  # still reported as part of product B
+
+
+def test_fetch_is_idempotent_via_marker(tmp_path, monkeypatch):
+    from planetarypy.config import config
+    import planetarypy.utils as utils
+
+    monkeypatch.setattr(
+        psa, "resolve_all",
+        lambda pid, **k: [{"granule_uid": f"MEX-DS-1:DATA:{pid}::1.0",
+                           "access_url": "u"}],
+    )
+    monkeypatch.setattr(utils, "have_internet", lambda: True)
+    monkeypatch.setattr(config, "storage_root", tmp_path)
+
+    calls = {"n": 0}
+    writer = _psa_zip_writer()
+
+    def counting_writer(url, outfile):
+        calls["n"] += 1
+        writer(url, outfile)
+
+    monkeypatch.setattr(utils, "url_retrieve", counting_writer)
+    first = psa.fetch_psa_product("PROD.IMG")
+    second = psa.fetch_psa_product("PROD.IMG")
+    assert calls["n"] == 1           # second fetch served from the marker
+    assert first == second
 
 
 def test_fetch_no_extract_returns_zip(tmp_path, monkeypatch):
@@ -274,25 +370,6 @@ def test_fetch_not_found_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(psa, "resolve_all", lambda pid, **k: [])
     with pytest.raises(ValueError, match="No PSA product"):
         psa.fetch_psa_product("PROD", dest=tmp_path)
-
-
-def test_fetch_default_path_groups_by_dataset(tmp_path, monkeypatch):
-    from planetarypy.config import config
-    import planetarypy.utils as utils
-
-    monkeypatch.setattr(
-        psa, "resolve_all",
-        lambda pid, **k: [{"granule_uid": "MEX-DS-1:DATA:PROD::1.0",
-                           "access_url": "u"}],
-    )
-    monkeypatch.setattr(utils, "have_internet", lambda: True)
-    monkeypatch.setattr(config, "storage_root", tmp_path)
-    monkeypatch.setattr(
-        utils, "url_retrieve",
-        lambda url, outfile: zipfile.ZipFile(outfile, "w").close(),
-    )
-    psa.fetch_psa_product("PROD", extract=False)  # no dest, no key
-    assert (tmp_path / "psa" / "MEX-DS-1" / "PROD").is_dir()
 
 
 def test_fetch_offline_raises(monkeypatch):

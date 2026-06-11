@@ -17,8 +17,13 @@ __all__ = [
     "pid_column",
 ]
 
+from typing import TYPE_CHECKING
+
 from .static_index import ConfigHandler
 from .dynamic_index import DYNAMIC_URL_HANDLERS
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def _all_dotted_index_keys() -> list[str]:
@@ -63,7 +68,10 @@ def get_mission_names() -> list[str]:
 
 
 def get_instrument_names(mission: str) -> list[str]:
-    """Return a sorted list of all instruments for a given mission (from static and dynamic configs)."""
+    """Return a sorted list of all instruments for a given mission.
+
+    Drawn from both static and dynamic configs.
+    """
     keys = _all_dotted_index_keys()
     instruments = set()
     for k in keys:
@@ -74,7 +82,10 @@ def get_instrument_names(mission: str) -> list[str]:
 
 
 def get_index_names(mission_instrument: str) -> list[str]:
-    """Return a sorted list of all index names for a given mission and instrument (from static and dynamic configs)."""
+    """Return a sorted list of all index names for a given mission and instrument.
+
+    Drawn from both static and dynamic configs.
+    """
     mission, instrument = mission_instrument.split(".")
     keys = _all_dotted_index_keys()
     indexes = set()

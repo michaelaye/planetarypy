@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import namedtuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from math import tau
 
 import dateutil.parser as tparser
@@ -200,7 +200,9 @@ class Spicer:
         On first failure, attempts to download and load the appropriate
         planetary system SPK. These can be large (100 MB to 1+ GB).
         """
-        from .generic_kernels import ensure_system_for_body, _body_to_system, SATELLITE_KERNELS, _loaded_systems
+        from .generic_kernels import (
+            ensure_system_for_body, _body_to_system, SATELLITE_KERNELS, _loaded_systems,
+        )
         system = _body_to_system(self._body)
         if system is not None and system in SATELLITE_KERNELS:
             if system not in _loaded_systems:
@@ -208,7 +210,10 @@ class Spicer:
                 kernel_path = GENERIC_STORAGE / SATELLITE_KERNELS[system]
                 if not kernel_path.exists():
                     size = _SYSTEM_SIZES.get(system, "large")
-                    print(f"Body '{self._body}' needs {system.title()} satellite ephemeris ({size}).")
+                    print(
+                        f"Body '{self._body}' needs {system.title()} "
+                        f"satellite ephemeris ({size})."
+                    )
             ensure_system_for_body(self._body)
         else:
             raise RuntimeError(

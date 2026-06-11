@@ -3,7 +3,6 @@
 from datetime import datetime, timedelta
 
 import pytest
-import tomlkit
 
 from planetarypy.pds.index_logging import AccessLog
 

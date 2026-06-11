@@ -220,7 +220,6 @@ class TestIndexesSelectFormats:
         main config (default 4; user can bump or lower)."""
         df = _fake_df()
         # Stub the config lookup to return a custom threshold.
-        import planetarypy.cli as cli_mod
         class _CfgStub:
             def __getitem__(self, key):
                 return 10 if key == "max_table_rows" else ""
@@ -315,7 +314,7 @@ class TestIndexesSelectColumnsFilter:
                       "--format", "jsonl"]
             )
         assert result.exit_code == 0
-        rows = [json.loads(l) for l in result.stdout.strip().splitlines()]
+        rows = [json.loads(ln) for ln in result.stdout.strip().splitlines()]
         for r in rows:
             assert set(r.keys()) == {"PRODUCT_ID", "START_TIME"}
 
@@ -428,7 +427,6 @@ class TestIndexesSelectMissingReporting:
 
     def test_pid_suffix_appended_to_each_pid(self, tmp_path):
         """--pid-suffix appends the string before filtering the index."""
-        import pandas as pd
         # The fake df has PRODUCT_IDs P_001..P_005. Synth obsids → adding
         # _suffix shouldn't match anything in the df → 0 rows shown,
         # 2 missing — that's the contract we're verifying.

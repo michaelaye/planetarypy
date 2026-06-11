@@ -4,7 +4,6 @@ import datetime as dt
 import json
 from pathlib import Path
 
-from loguru import logger
 
 try:
     import duckdb

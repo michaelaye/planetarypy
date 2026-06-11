@@ -43,7 +43,7 @@ def _make_index(key="go.ssi.raw", monkeypatch=None, url="https://example.com/dat
     mock_remote = MagicMock()
     mock_remote.url = url
 
-    with patch.object(Index, "_determine_remote_type") as det:
+    with patch.object(Index, "_determine_remote_type"):
         idx = Index(key)
         # Manually wire up remote after skipping real detection
         idx._remote = mock_remote

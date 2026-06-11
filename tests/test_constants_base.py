@@ -13,9 +13,7 @@ metadata on view operations.
 
 from __future__ import annotations
 
-import math
 
-import numpy as np
 import pytest
 import astropy.units as u
 

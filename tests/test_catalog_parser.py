@@ -2,7 +2,6 @@
 
 import csv
 import textwrap
-from pathlib import Path
 
 import pytest
 
@@ -53,7 +52,9 @@ def tmp_csv_file(tmp_path):
     """Create a mock test CSV file."""
     p = tmp_path / "edr_test.csv"
     with p.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["label_file", "files", "product_id", "url_stem", "hash"])
+        writer = csv.DictWriter(
+            f, fieldnames=["label_file", "files", "product_id", "url_stem", "hash"]
+        )
         writer.writeheader()
         writer.writerow({
             "label_file": "N1234.LBL",
