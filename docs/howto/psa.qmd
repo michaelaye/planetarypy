@@ -122,6 +122,34 @@ psa.examples("MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0", n=5)   # by dataset
 `mission.instrument.product_type` key. (Planetarypy's catalog "product type" maps
 to a PDS3 data set / PDS4 collection — the same thing the PSA calls a *dataset*.)
 
+## Discover products by geometry
+
+To *find* the products you want — by viewing geometry, illumination or location —
+build a dataset's **geometry index**. Each PSA dataset ships a per-product PDS3
+geometry table (`GEO_*.TAB`) with columns EPN-TAP doesn't expose:
+`INCIDENCE_ANGLE`, `EMISSION_ANGLE`, `PHASE_ANGLE`, `SOLAR_LONGITUDE` (Ls),
+`ORBIT_NUMBER`, `CENTER_LATITUDE/LONGITUDE`, `HORIZONTAL_PIXEL_SCALE`, … —
+`geometry_index` parses and concatenates them into one filterable DataFrame:
+
+```python
+gi = psa.geometry_index("MEX-M-HRSC-3-RDR-V4.0")   # base + EXT1–9, aggregated
+# filter on any column to find product ids, then fetch them:
+sel = gi[(gi.INCIDENCE_ANGLE < 60) & gi.CENTER_LATITUDE.between(-50, -40)]
+for pid in sorted(sel["PRODUCT_ID"].unique()):
+    psa.fetch_psa_product(pid)
+```
+
+A PSA dataset is split into mission-phase volumes (a base `DATA_SET_ID` plus
+`-EXT1…-EXT9`); `geometry_index` unions the whole group by default (pass any
+member id — `dataset_group`/`group_members` expose the grouping). Each member is
+parquet-cached under `{storage_root}/psa/.indexes/`, so the (large) first build
+is paid once. Pass `aggregate=False` for a single dataset, `force=True` to rebuild.
+
+::: {.callout-note}
+The geometry table samples geometry *along each image footprint*, so it has many
+rows per product — filter, then take `PRODUCT_ID.unique()`.
+:::
+
 ## From the command line
 
 ```bash
@@ -133,6 +161,10 @@ plp psa examples MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0 -n 5
 
 # ...or jump in with a catalog key (from `plp catalog list`):
 plp psa examples mex.aspera.els_edr_high -n 5
+
+# Discover products by geometry (preview columns, or dump matching product ids):
+plp psa geometry MEX-M-HRSC-3-RDR-V4.0 -c "PRODUCT_ID,INCIDENCE_ANGLE,SOLAR_LONGITUDE"
+plp psa geometry MEX-M-HRSC-3-RDR-V4.0 --pids        # unique PRODUCT_IDs, one per line
 
 # Resolve a single product id to its download URL (--all shows every match):
 plp psa resolve IMA_AZ1120140041730C_ACCS01

@@ -31,6 +31,9 @@ __all__ = [
     "resolve",
     "resolve_all",
     "fetch_psa_product",
+    "dataset_group",
+    "group_members",
+    "geometry_index",
     "PSA_TAP_SYNC",
 ]
 
@@ -388,3 +391,144 @@ def _fetch_zip(url: str, root: Path, marker: Path, *, extract: bool) -> list[Pat
     marker.write_text("\n".join(str(p.relative_to(root)) for p in extracted))
     zip_path.unlink(missing_ok=True)
     return extracted
+
+
+# ── discovery: aggregated per-dataset geometry index ─────────────────
+#
+# A PSA dataset is split into mission-phase volumes — a base ``DATA_SET_ID``
+# plus ``-EXT1``…``-EXT9`` siblings (e.g. ``MEX-M-HRSC-3-RDR-V4.0`` +
+# ``…-RDR-EXT1-V4.0`` …). Their per-dataset PDS3 geometry index tables
+# (``GEO_*.TAB``, else ``INDEX.TAB``) carry the per-product discovery columns
+# EPN-TAP doesn't expose — ``INCIDENCE_ANGLE``, ``SOLAR_LONGITUDE``,
+# ``ORBIT_NUMBER``, ``CENTER_LAT/LON``, ``HORIZONTAL_PIXEL_SCALE`` … —
+# parseable by :class:`planetarypy.pds.index_labels.IndexLabel`. The builder
+# below aggregates a whole group's tables into one cached DataFrame, so you can
+# filter on geometry to find ``PRODUCT_ID``s and hand them to
+# :func:`fetch_psa_product`.
+
+_EXT_RE = re.compile(r"-EXT\d+", re.IGNORECASE)
+_GEO_LBL_RE = re.compile(r'href="(GEO_[^"]*\.LBL)"', re.IGNORECASE)
+
+
+def _normalise_dataset(dataset: str) -> str:
+    """Strip a trailing ``:DATA``/``::version`` so callers can pass any form."""
+    return dataset.rsplit("::", 1)[0].rsplit(":DATA", 1)[0].strip()
+
+
+def dataset_group(dataset: str) -> str:
+    """The logical group id for a PSA dataset: its ``DATA_SET_ID`` minus ``-EXTn``.
+
+    The base dataset and its mission-phase extensions share a group, so
+    ``MEX-M-HRSC-3-RDR-V4.0`` and ``MEX-M-HRSC-3-RDR-EXT4-V4.0`` both map to
+    ``MEX-M-HRSC-3-RDR-V4.0``. The archive **version** is preserved — different
+    versions (``V3.0`` vs ``V4.0``) stay distinct groups.
+    """
+    return _EXT_RE.sub("", _normalise_dataset(dataset))
+
+
+def group_members(dataset: str) -> list[str]:
+    """Every ``DATA_SET_ID`` belonging to ``dataset``'s group, sorted.
+
+    Enumerated from EPN-TAP (the instrument's distinct ``granule_gid``s) and
+    filtered by :func:`dataset_group`, so base + all ``-EXTn`` volumes come back
+    together. Returns ``[dataset]`` if the dataset can't be located.
+    """
+    target = _normalise_dataset(dataset)
+    group = dataset_group(target)
+    seed = query(
+        "SELECT TOP 1 instrument_host_name AS host, instrument_name AS instr "
+        f"FROM psa.epn_core WHERE granule_uid LIKE '{target}:%'"
+    )
+    if not seed:
+        return [target]
+    host = seed[0]["host"].replace("'", "''")
+    instr = seed[0]["instr"].replace("'", "''")
+    rows = query(
+        "SELECT DISTINCT granule_gid FROM psa.epn_core "
+        f"WHERE instrument_host_name = '{host}' AND instrument_name = '{instr}'"
+    )
+    members = {
+        ds for r in rows
+        if dataset_group(ds := _normalise_dataset(r["granule_gid"])) == group
+    }
+    members.add(target)
+    return sorted(members)
+
+
+def _index_dir_url(dataset: str) -> Optional[str]:
+    """The FTP ``…/<DATA_SET_ID>/INDEX/`` URL for a dataset, via its label_url."""
+    rows = query(
+        "SELECT TOP 1 label_url FROM psa.epn_core "
+        f"WHERE granule_uid LIKE '{_normalise_dataset(dataset)}:%' AND label_url IS NOT NULL"
+    )
+    if not rows or not rows[0].get("label_url"):
+        return None
+    label_url = rows[0]["label_url"]
+    ds = _normalise_dataset(dataset)
+    base = label_url.split(f"/{ds}/", 1)[0]
+    return f"{base}/{ds}/INDEX/"
+
+
+def _member_geometry_df(dataset: str, cache_dir: Path, *, force: bool):
+    """Parse one dataset's geometry/index table to a DataFrame (parquet-cached)."""
+    import pandas as pd
+
+    from planetarypy.pds.index_labels import IndexLabel
+    from planetarypy.utils import url_retrieve
+
+    ds = _normalise_dataset(dataset)
+    parq = cache_dir / f"{ds}.parquet"
+    if parq.exists() and not force:
+        return pd.read_parquet(parq)
+
+    index_url = _index_dir_url(ds)
+    if index_url is None:
+        return None
+    listing = requests.get(index_url, timeout=60).text
+    geo = _GEO_LBL_RE.findall(listing)
+    lbl_name = geo[0] if geo else "INDEX.LBL"
+    tab_name = lbl_name.rsplit(".", 1)[0] + ".TAB"
+
+    tmp = cache_dir / ds
+    tmp.mkdir(parents=True, exist_ok=True)
+    url_retrieve(f"{index_url}{lbl_name}", tmp / lbl_name)
+    url_retrieve(f"{index_url}{tab_name}", tmp / tab_name)
+    df = IndexLabel(tmp / lbl_name).read_index_data()
+    if "DATA_SET_ID" not in df.columns:
+        df.insert(0, "DATA_SET_ID", ds)
+    df.to_parquet(parq)
+    return df
+
+
+def geometry_index(dataset: str, *, aggregate: bool = True, force: bool = False):
+    """Build a filterable geometry/index table for a PSA dataset (group).
+
+    Downloads the per-dataset PDS3 geometry table(s) (``GEO_*.TAB``, falling
+    back to ``INDEX.TAB``), parses them with the standard PDS index reader, and
+    returns one concatenated ``pandas.DataFrame`` carrying the per-product
+    discovery columns. Each member dataset is parquet-cached under
+    ``{storage_root}/psa/.indexes/`` so the (potentially large) first build is
+    paid once; pass ``force=True`` to rebuild.
+
+    With ``aggregate=True`` (default) the whole group is unioned — base plus all
+    ``-EXTn`` mission-phase volumes (see :func:`group_members`); pass
+    ``aggregate=False`` for the single named dataset only. Filter the result on
+    any column and feed the resulting ``PRODUCT_ID`` values to
+    :func:`fetch_psa_product`.
+    """
+    import pandas as pd
+
+    from planetarypy.config import config
+
+    cache_dir = Path(config.storage_root) / "psa" / ".indexes"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    members = group_members(dataset) if aggregate else [_normalise_dataset(dataset)]
+    frames = []
+    for member in members:
+        df = _member_geometry_df(member, cache_dir, force=force)
+        if df is not None and not df.empty:
+            frames.append(df)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)

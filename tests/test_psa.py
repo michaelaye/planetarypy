@@ -479,6 +479,85 @@ def test_fetch_direct_false_forces_zip(tmp_path, monkeypatch):
     assert (tmp_path / "MEX-DS-1" / "VOLDESC.CAT").is_file()
 
 
+# ── discovery: geometry index ────────────────────────────────────────
+
+
+def test_dataset_group_strips_ext_keeps_version():
+    assert psa.dataset_group("MEX-M-HRSC-3-RDR-V4.0") == "MEX-M-HRSC-3-RDR-V4.0"
+    assert psa.dataset_group("MEX-M-HRSC-3-RDR-EXT4-V4.0:DATA") == "MEX-M-HRSC-3-RDR-V4.0"
+    # different archive version stays a distinct group
+    assert psa.dataset_group("MEX-M-HRSC-3-RDR-V3.0") == "MEX-M-HRSC-3-RDR-V3.0"
+
+
+def test_group_members_filters_by_group(monkeypatch):
+    def fake_query(adql, **k):
+        if "instrument_host_name AS host" in adql:
+            return [{"host": "MARS EXPRESS", "instr": "HRSC"}]
+        return [
+            {"granule_gid": "MEX-M-HRSC-3-RDR-V4.0:DATA"},
+            {"granule_gid": "MEX-M-HRSC-3-RDR-EXT1-V4.0:DATA"},
+            {"granule_gid": "MEX-M-HRSC-3-RDR-V3.0:DATA"},      # other version
+            {"granule_gid": "MEX-M-HRSC-5-REFDR-MAPPROJECTED-V3.0:DATA"},  # other group
+        ]
+
+    monkeypatch.setattr(psa, "query", fake_query)
+    members = psa.group_members("MEX-M-HRSC-3-RDR-V4.0")
+    assert members == ["MEX-M-HRSC-3-RDR-EXT1-V4.0", "MEX-M-HRSC-3-RDR-V4.0"]
+
+
+def test_geometry_index_aggregates_members(tmp_path, monkeypatch):
+    import pandas as pd
+    from planetarypy.config import config
+
+    monkeypatch.setattr(config, "storage_root", tmp_path)
+    monkeypatch.setattr(psa, "group_members", lambda d: ["DS-A", "DS-B"])
+
+    def fake_member(ds, cache_dir, *, force):
+        return pd.DataFrame({"PRODUCT_ID": [f"{ds}_1", f"{ds}_2"],
+                             "INCIDENCE_ANGLE": [10, 80]})
+
+    monkeypatch.setattr(psa, "_member_geometry_df", fake_member)
+    df = psa.geometry_index("DS-A")
+    assert list(df["PRODUCT_ID"]) == ["DS-A_1", "DS-A_2", "DS-B_1", "DS-B_2"]
+    # filter handle works on the aggregated frame
+    assert set(df[df.INCIDENCE_ANGLE < 50]["PRODUCT_ID"]) == {"DS-A_1", "DS-B_1"}
+
+
+def test_geometry_index_single_dataset(tmp_path, monkeypatch):
+    import pandas as pd
+    from planetarypy.config import config
+
+    monkeypatch.setattr(config, "storage_root", tmp_path)
+    called = []
+
+    def fake_member(ds, cache_dir, *, force):
+        called.append(ds)
+        return pd.DataFrame({"PRODUCT_ID": ["X"]})
+
+    # aggregate=False must not enumerate the group
+    monkeypatch.setattr(psa, "group_members",
+                        lambda d: (_ for _ in ()).throw(AssertionError("enumerated")))
+    monkeypatch.setattr(psa, "_member_geometry_df", fake_member)
+    df = psa.geometry_index("MEX-DS-1:DATA", aggregate=False)
+    assert called == ["MEX-DS-1"]  # normalised, single member
+    assert list(df["PRODUCT_ID"]) == ["X"]
+
+
+def test_member_geometry_df_reads_parquet_cache(tmp_path, monkeypatch):
+    import pandas as pd
+
+    cache_dir = tmp_path / ".indexes"
+    cache_dir.mkdir()
+    pd.DataFrame({"PRODUCT_ID": ["A"]}).to_parquet(cache_dir / "MEX-DS-1.parquet")
+    # no network setup: a cache hit must return before any query/requests call
+    monkeypatch.setattr(
+        psa, "query",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("hit network")),
+    )
+    df = psa._member_geometry_df("MEX-DS-1", cache_dir, force=False)
+    assert list(df["PRODUCT_ID"]) == ["A"]
+
+
 # ── live ─────────────────────────────────────────────────────────────
 
 
@@ -486,3 +565,10 @@ def test_fetch_direct_false_forces_zip(tmp_path, monkeypatch):
 def test_live_resolve_mars_express():
     url = psa.resolve("IMA_AZ1120140041730C_ACCS01")
     assert url and url.startswith("https://")
+
+
+@pytest.mark.slow
+def test_live_geometry_index_hrsc():
+    df = psa.geometry_index("MEX-M-HRSC-3-RDR-V4.0", aggregate=False)
+    assert not df.empty
+    assert {"PRODUCT_ID", "INCIDENCE_ANGLE", "SOLAR_LONGITUDE"} <= set(df.columns)

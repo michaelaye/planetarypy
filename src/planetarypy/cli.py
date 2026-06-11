@@ -1045,6 +1045,50 @@ def psa_examples_cmd(
     _render_df(df[["product_id", "access_url"]], f"PSA examples — {key}")
 
 
+@psa_app.command("geometry", rich_help_panel=_PANEL_DISCOVERY)
+def psa_geometry_cmd(
+    ctx: typer.Context,
+    dataset: str = typer.Argument(
+        None, help="PSA dataset id (group or member), from `plp psa datasets`."
+    ),
+    columns: list[str] = typer.Option(
+        None, "--columns", "-c", help="Columns to show (comma-sep or repeated)."
+    ),
+    head: int = typer.Option(10, "--head", "-n", help="Rows to preview."),
+    pids: bool = typer.Option(
+        False, "--pids", help="Print unique PRODUCT_IDs (one per line) instead."
+    ),
+    no_aggregate: bool = typer.Option(
+        False, "--no-aggregate", help="Only this dataset, not base + EXT volumes."
+    ),
+    force: bool = typer.Option(False, "--force", help="Rebuild the parquet cache."),
+):
+    """Build/preview a PSA dataset's geometry index for product discovery.
+
+    Parses the per-dataset PDS3 geometry table(s) (incidence, Ls, lat/lon, pixel
+    scale, …) into one filterable table, aggregating base + EXT volumes by
+    default. Use the Python API (`planetarypy.psa.geometry_index`) for filtering;
+    `--pids` dumps the unique PRODUCT_IDs for piping into a fetch.
+    """
+    if dataset is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    from planetarypy.psa import geometry_index
+
+    df = geometry_index(dataset, aggregate=not no_aggregate, force=force)
+    if df.empty:
+        typer.echo(f"No geometry index for {dataset!r}.", err=True)
+        return
+    if pids and "PRODUCT_ID" in df.columns:
+        for pid in sorted(df["PRODUCT_ID"].dropna().unique()):
+            typer.echo(pid)
+        return
+    cols = _parse_columns(columns)
+    view = df[cols] if cols else df
+    typer.echo(f"{df.shape[0]} rows × {df.shape[1]} cols", err=True)
+    _render_df(view.head(head), f"PSA geometry — {dataset}")
+
+
 # ── catalog ──────────────────────────────────────────────────────────
 
 catalog_app = typer.Typer(help="PDS catalog management.", no_args_is_help=True)
