@@ -107,7 +107,53 @@ def test_instruments_unfiltered_has_no_where(monkeypatch):
     assert "WHERE" not in captured["adql"]
 
 
+# ── product_types ────────────────────────────────────────────────────
+
+
+def test_product_types(monkeypatch):
+    captured = {}
+
+    def fake_query(adql, **k):
+        captured["adql"] = adql
+        return [
+            {"granule_gid": "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA", "products": 59040},
+            {"granule_gid": "MEX-M-ASPERA3-4-DDR-IMA-EXT3-V1.0:DATA", "products": 48816},
+        ]
+
+    monkeypatch.setattr(psa, "query", fake_query)
+    df = psa.product_types("Mars Express", "ASPERA")
+    assert list(df.columns) == ["dataset_id", "products"]
+    assert df.iloc[0]["dataset_id"] == "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0"
+    assert "instrument_host_name LIKE '%Mars Express%'" in captured["adql"]
+    assert "instrument_name LIKE '%ASPERA%'" in captured["adql"]
+    assert "GROUP BY granule_gid" in captured["adql"]
+
+
+def test_product_types_no_instrument(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        psa, "query", lambda adql, **k: captured.update(adql=adql) or []
+    )
+    psa.product_types("Rosetta")
+    assert "instrument_name" not in captured["adql"]
+
+
 # ── examples (catalog key -> DATA_SET_ID -> N products) ──────────────
+
+
+def test_examples_accepts_dataset_id_directly(monkeypatch):
+    # A PSA dataset id (contains '-') must bypass the catalog entirely.
+    captured = {}
+
+    def fake_query(adql, **k):
+        captured["adql"] = adql
+        return [{"granule_uid": "MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA:P1::1.0",
+                 "access_url": "https://u"}]
+
+    monkeypatch.setattr(psa, "query", fake_query)
+    df = psa.examples("MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0", n=1)
+    assert "LIKE 'MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:%'" in captured["adql"]
+    assert df["product_id"].tolist() == ["P1"]
 
 
 def test_granule_product_id():

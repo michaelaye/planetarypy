@@ -88,20 +88,33 @@ list` as the source of truth.
 The `products` column is the number of individually downloadable data products
 (in EPN-TAP terms, "granules") the PSA holds.
 
+### Browse entirely within the PSA (no catalog key)
+
+The PSA browse chain stays in the PSA's own vocabulary — mission → instrument →
+**product type (dataset)** → example products:
+
+```python
+psa.product_types("Mars Express", "ASPERA")   # PSA datasets for that instrument
+psa.examples("MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0", n=5)   # by dataset id
+```
+
+`examples` accepts **either** a PSA dataset id (from `product_types`) **or** a
+catalog `mission.instrument.product_type` key.
+
 ## From the command line
 
 ```bash
-# Browse available missions and instruments:
+# Browse the PSA: missions -> instruments -> product types -> examples
 plp psa missions
-plp psa instruments "Rosetta"
+plp psa instruments "Mars Express"
+plp psa product-types "Mars Express" ASPERA
+plp psa examples MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0 -n 5
 
-# Print the download URL for a product id:
-plp psa resolve IMA_AZ1120140041730C_ACCS01
-
-# Example products for a catalog product type:
+# ...or jump in with a catalog key (from `plp catalog list`):
 plp psa examples mex.aspera.els_edr_high -n 5
 
-# See every matching granule:
+# Resolve a single product id to its download URL (--all shows every match):
+plp psa resolve IMA_AZ1120140041730C_ACCS01
 plp psa resolve IMA_AZ1120140041730C_ACCS01 --all
 
 # Download and unpack the product (--key uses the standard mission/instr/type layout):

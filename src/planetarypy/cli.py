@@ -977,15 +977,37 @@ def psa_instruments_cmd(
     _render_df(df, title)
 
 
+@psa_app.command("product-types")
+def psa_product_types_cmd(
+    ctx: typer.Context,
+    mission: str = typer.Argument(None, help="PSA mission, e.g. 'Mars Express'."),
+    instrument: str = typer.Argument(None, help="Optional PSA instrument, e.g. 'ASPERA'."),
+):
+    """List PSA product types (datasets) for a mission and optional instrument."""
+    if mission is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    from planetarypy.psa import product_types
+
+    df = product_types(mission, instrument)
+    if df.empty:
+        typer.echo(f"No PSA product types for {mission!r}.", err=True)
+        return
+    title = f"PSA product types — {mission}" + (f" / {instrument}" if instrument else "")
+    _render_df(df, title)
+
+
 @psa_app.command("examples")
 def psa_examples_cmd(
     ctx: typer.Context,
     key: str = typer.Argument(
-        None, help="Catalog key 'mission.instrument.product_type', e.g. mex.aspera.els_edr_high."
+        None,
+        help="PSA dataset id (from `psa product-types`) or catalog key "
+             "'mission.instrument.product_type'.",
     ),
     n: int = typer.Option(5, "-n", "--number", help="How many examples to show."),
 ):
-    """List example PSA products for a catalog product type."""
+    """List example PSA products for a dataset id or catalog product type."""
     if key is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
@@ -994,8 +1016,8 @@ def psa_examples_cmd(
     df = examples(key, n=n)
     if df.empty:
         typer.echo(
-            f"No PSA examples for {key!r}. Browse catalog keys with "
-            "`plp catalog list <mission>` (mission codes shown by `plp psa missions`).",
+            f"No PSA examples for {key!r}. List datasets with "
+            "`plp psa product-types <mission> [instrument]`.",
             err=True,
         )
         return

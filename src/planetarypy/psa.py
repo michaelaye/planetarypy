@@ -25,6 +25,7 @@ __all__ = [
     "query",
     "missions",
     "instruments",
+    "product_types",
     "examples",
     "resolve",
     "resolve_all",
@@ -100,6 +101,33 @@ def instruments(mission: Optional[str] = None) -> "pd.DataFrame":
     return pd.DataFrame(rows, columns=["mission", "instrument", "products"])
 
 
+def product_types(mission: str, instrument: Optional[str] = None) -> "pd.DataFrame":
+    """List PSA product types (PDS3 datasets) for a mission and optional instrument.
+
+    Each row is a ``dataset_id`` (e.g. ``MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0``) with
+    its product count, busiest first. ``mission`` and ``instrument`` are matched as
+    case-sensitive substrings of the PSA host/instrument names exactly as listed by
+    :func:`missions` / :func:`instruments`. A returned ``dataset_id`` can be handed
+    straight to :func:`examples` — so the PSA browse chain stays entirely in PSA's
+    own vocabulary, no catalog key needed.
+    """
+    import pandas as pd
+
+    clauses = ["instrument_host_name LIKE '%" + mission.replace("'", "''") + "%'"]
+    if instrument:
+        clauses.append("instrument_name LIKE '%" + instrument.replace("'", "''") + "%'")
+    where = " AND ".join(clauses)
+    rows = query(
+        "SELECT granule_gid, COUNT(*) AS products FROM psa.epn_core "
+        f"WHERE {where} GROUP BY granule_gid ORDER BY products DESC"
+    )
+    out = [
+        {"dataset_id": r["granule_gid"].split(":")[0], "products": r["products"]}
+        for r in rows
+    ]
+    return pd.DataFrame(out, columns=["dataset_id", "products"])
+
+
 def _granule_product_id(granule_uid: str) -> str:
     """Extract the PDS product id from a PSA granule_uid.
 
@@ -109,35 +137,43 @@ def _granule_product_id(granule_uid: str) -> str:
 
 
 def examples(key: str, n: int = 5) -> "pd.DataFrame":
-    """Return up to ``n`` example PSA products for a catalog product type.
+    """Return up to ``n`` example PSA products for a product type.
 
-    ``key`` is the standard catalog encoding ``mission.instrument.product_type``
-    (e.g. ``"mex.aspera.els_edr_high"``). The catalog maps the key to a seed
-    product; the seed's PSA ``DATA_SET_ID`` is derived from its granule
-    identifier, then products of that dataset are listed — so no mission-name
-    translation is needed (``mex`` vs ``"Mars Express"`` never enters the query).
+    ``key`` may be either:
 
-    Returns a ``DataFrame`` with ``product_id``, ``granule_uid`` and
-    ``access_url``. Empty if the key isn't in the catalog or isn't in the PSA.
+    - a **PSA dataset id** (e.g. ``"MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0"``, as listed
+      by :func:`product_types`) — used directly, fully within PSA's vocabulary; or
+    - a **catalog key** ``mission.instrument.product_type`` (e.g.
+      ``"mex.aspera.els_edr_high"``) — the catalog maps it to a seed product whose
+      granule identifier reveals the PSA dataset id, so no mission-name translation
+      is needed.
+
+    Returns a ``DataFrame`` with ``product_id``, ``granule_uid`` and ``access_url``.
+    Empty if the key isn't resolvable to a PSA dataset.
     """
     import pandas as pd
 
-    from planetarypy.catalog import example_products
-
     cols = ["product_id", "granule_uid", "access_url"]
-    try:
-        seeds = example_products(key)["product_id"].dropna().tolist()
-    except Exception:
-        return pd.DataFrame(columns=cols)
 
-    dsid = None
-    for pid in seeds:
-        rows = resolve_all(pid, limit=1)
-        if rows:
-            dsid = rows[0]["granule_uid"].split(":")[0]
-            break
-    if dsid is None:
-        return pd.DataFrame(columns=cols)
+    if "-" in key or ":" in key:
+        # Already a PSA dataset id (or granule_gid) — catalog keys are dotted and
+        # never contain '-' or ':'.
+        dsid = key.split(":")[0]
+    else:
+        from planetarypy.catalog import example_products
+
+        try:
+            seeds = example_products(key)["product_id"].dropna().tolist()
+        except Exception:
+            return pd.DataFrame(columns=cols)
+        dsid = None
+        for pid in seeds:
+            rows = resolve_all(pid, limit=1)
+            if rows:
+                dsid = rows[0]["granule_uid"].split(":")[0]
+                break
+        if dsid is None:
+            return pd.DataFrame(columns=cols)
 
     esc = dsid.replace("'", "''")
     rows = query(
