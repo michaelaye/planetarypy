@@ -287,6 +287,54 @@ plp indexes refresh --config
 plp indexes refresh --cache mro.ctx.edr
 ```
 
+### `plp constants` — Per-body planetary constants
+
+Print the planetary constants planetarypy composes for a body from PCK
+polynomial fields, JPL DE-series GMs, and the NSSDC fact-sheet archive. The
+command has three forms.
+
+**Body table** — every scalar constant for one body, with its source:
+
+```bash
+plp constants Mars
+```
+
+**Single value** — pipe-safe: the value goes to stdout, the source/reference
+lines to stderr, so you can feed it straight into `awk`/`jq`:
+
+```bash
+plp constants Mars.GM
+plp constants Mars.GM | awk '{print $1}'
+```
+
+Body matching is case-insensitive (`mars` == `Mars` == `MARS`), and a misspelt
+body or field exits non-zero with a "did you mean …?" suggestion. `--at <date>`
+(`YYYY`, `YYYY-MM`, or `YYYY-MM-DD`) time-travels the value, walking PCK
+editions and NSSDC capture history:
+
+```bash
+plp constants Mars.pole_dec --at 2012     # IAU 2009-era value via pck00010.tpc
+```
+
+**Discovery** — `list` browses the registry by category. Bare `list` prints the
+category menu with counts; add a category to see its bodies; for `moons`, add a
+planet to restrict to its satellites:
+
+```bash
+plp constants list                  # category menu + counts
+plp constants list planets
+plp constants list moons            # every moon
+plp constants list moons saturn     # moons of Saturn only
+plp constants list dwarf_planets    # flag-based, spans classes (Pluto + Ceres)
+plp constants list mission_visited  # small bodies a mission has reached
+```
+
+Categories: `planets`, `moons`, `asteroids`, `comets`, `dwarf_planets`,
+`mission_visited`, `sun`. They overlap by design — Pluto is both a `planet` and
+a `dwarf_planet`, matching the IAU's dual classification. Each maps directly to
+a discovery helper in `planetarypy.constants` (`planets()`, `moons(of=…)`,
+`asteroids()`, …), so the same browsing is available from Python.
+
 ### Batch PID input (shared flags)
 
 `plp fetch` and `plp indexes select` share one family of flags for feeding a

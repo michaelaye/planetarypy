@@ -96,6 +96,60 @@ class TestBareInvocation:
         assert "constants" in result.stdout
 
 
+class TestListForm:
+    """`plp constants list` is a discovery surface over the body registry."""
+
+    def test_bare_list_shows_category_menu(self):
+        result = runner.invoke(app, ["constants", "list"])
+        assert result.exit_code == 0
+        for cat in ("planets", "moons", "asteroids", "comets",
+                    "dwarf_planets", "mission_visited", "sun"):
+            assert cat in result.stdout
+
+    def test_category_lists_its_bodies(self):
+        result = runner.invoke(app, ["constants", "list", "planets"])
+        assert result.exit_code == 0
+        for planet in ("Mars", "Jupiter", "Earth"):
+            assert planet in result.stdout
+
+    def test_moons_parent_restricts_to_that_planet(self):
+        result = runner.invoke(app, ["constants", "list", "moons", "saturn"])
+        assert result.exit_code == 0
+        assert "Titan" in result.stdout
+        assert "Enceladus" in result.stdout
+        # A Mars moon must not leak into Saturn's list.
+        assert "Phobos" not in result.stdout
+
+    def test_dwarf_planets_is_flag_based_and_cross_class(self):
+        result = runner.invoke(app, ["constants", "list", "dwarf_planets"])
+        assert result.exit_code == 0
+        assert "Pluto" in result.stdout
+        assert "Ceres" in result.stdout
+
+    def test_hyphenated_category_is_normalised(self):
+        result = runner.invoke(app, ["constants", "list", "dwarf-planets"])
+        assert result.exit_code == 0
+        assert "Pluto" in result.stdout
+
+    def test_unknown_category_suggests_close_match(self):
+        result = runner.invoke(app, ["constants", "list", "moon"])
+        assert result.exit_code == 1
+        assert "Unknown category" in result.stderr
+        assert "moons" in result.stderr
+
+    def test_parent_on_non_moons_category_is_noted_and_ignored(self):
+        result = runner.invoke(app, ["constants", "list", "planets", "earth"])
+        assert result.exit_code == 0
+        assert "only applies to 'moons'" in result.stderr
+        assert "Mars" in result.stdout
+
+    def test_list_does_not_shadow_a_body_query(self):
+        # Back-compat guard: the bare body-query form is untouched.
+        result = runner.invoke(app, ["constants", "Mars.GM"])
+        assert result.exit_code == 0
+        assert "km3 / s2" in result.stdout
+
+
 class TestTabCompletion:
     """The CLI offers tab-completion on bodies *and* on per-body fields."""
 
@@ -134,3 +188,13 @@ class TestTabCompletion:
         attribute names that resolve to None."""
         out = self._complete(self._ctx, [], "Jupiter.surface_")
         assert out == []
+
+    def test_list_keyword_is_offered(self):
+        out = self._complete(self._ctx, [], "li")
+        assert "list" in out
+
+    def test_category_completer_offers_categories(self):
+        from planetarypy.cli import _complete_constants_category
+
+        assert _complete_constants_category("m") == ["moons", "mission_visited"]
+        assert _complete_constants_category("d") == ["dwarf_planets"]

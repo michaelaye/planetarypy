@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.76.0] - 2026-06-11
+
+### Added
+
+- **`plp constants list` — browse the constants registry by category.** A discovery surface alongside the existing `plp constants <body>` / `plp constants <body>.<field>` value queries. Bare `plp constants list` prints the category menu with body counts; `plp constants list <category>` lists that category's bodies (name, NAIF id, class, parent); and `plp constants list moons <planet>` restricts to one planet's satellites (e.g. `plp constants list moons saturn`). Categories are `planets`, `moons`, `asteroids`, `comets`, `dwarf_planets`, `mission_visited`, `sun` — overlapping by design (Pluto is both `planet` and `dwarf_planet`). Each wraps the matching discovery helper already exported from `planetarypy.constants` (`planets()`, `moons(of=…)`, `asteroids()`, …), so the CLI stays a thin layer over the Python API. The existing body-query forms are unchanged. Documented in `docs/howto/cli.qmd`.
+
 ## [0.75.0] - 2026-06-11
 
 ### Added

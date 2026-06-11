@@ -3056,7 +3056,8 @@ def _complete_constants_query(
 
     if "." not in incomplete:
         prefix = incomplete.lower()
-        return [n for n in _body_name_set() if n.lower().startswith(prefix)]
+        names = ["list"] + _body_name_set()
+        return [n for n in names if n.lower().startswith(prefix)]
 
     body_part, _, field_part = incomplete.partition(".")
     body = bodies.find(body_part)
@@ -3085,15 +3086,118 @@ def _suggest_and_exit(target: str, choices: list[str], label: str) -> None:
     raise typer.Exit(1)
 
 
+# Category name → discovery helper in planetarypy.constants. Order is the
+# display order in the `plp constants list` menu.
+_CONSTANTS_CATEGORIES = (
+    "planets", "moons", "asteroids", "comets",
+    "dwarf_planets", "mission_visited", "sun",
+)
+
+
+def _constants_category_bodies(category: str, parent: str = None) -> list:
+    """Bodies for one discovery category, via the constants API helpers.
+
+    ``parent`` only applies to ``moons`` (restricts to that planet's moons).
+    """
+    from planetarypy import constants as C
+
+    fn = getattr(C, category)
+    if category == "moons" and parent is not None:
+        return fn(of=parent)
+    return fn()
+
+
+def _complete_constants_category(incomplete: str) -> list[str]:
+    return [c for c in _CONSTANTS_CATEGORIES if c.startswith(incomplete.lower())]
+
+
+def _constants_list(category: str, parent: str) -> None:
+    """Back end of ``plp constants list`` — the category menu and drill-down."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.constants import bodies
+
+    console = Console()
+
+    # ── Bare `list`: the category menu with counts ─────────────────────
+    if category is None:
+        table = Table(
+            title=f"planetarypy.constants — {len(_body_name_set())} bodies",
+            title_style="bold",
+            header_style="bold magenta",
+            caption="Drill in with: plp constants list <category>  "
+                    "(categories overlap — e.g. Pluto is planet + dwarf_planet)",
+            caption_justify="left",
+            pad_edge=False,
+        )
+        table.add_column("category", style="cyan", no_wrap=True)
+        table.add_column("bodies", justify="right")
+        for cat in _CONSTANTS_CATEGORIES:
+            table.add_row(cat, str(len(_constants_category_bodies(cat))))
+        console.print(table)
+        return
+
+    # ── `list <category> [parent]`: the bodies in that category ────────
+    key = category.lower().replace("-", "_")
+    if key not in _CONSTANTS_CATEGORIES:
+        _suggest_and_exit(category, list(_CONSTANTS_CATEGORIES),
+                          "Unknown category:")
+
+    if parent is not None and key != "moons":
+        typer.echo(
+            f"Note: parent {parent!r} only applies to 'moons'; ignoring.",
+            err=True,
+        )
+        parent = None
+
+    members = _constants_category_bodies(key, parent)
+    if not members:
+        where = f" of {parent!r}" if parent else ""
+        typer.echo(f"No {key}{where} in the registry.", err=True)
+        return
+
+    title = f"{key}"
+    if parent:
+        title += f" of {parent.title()}"
+    title += f" — {len(members)} bodies"
+    table = Table(
+        title=title,
+        title_style="bold",
+        header_style="bold magenta",
+        pad_edge=False,
+    )
+    table.add_column("body", style="cyan", no_wrap=True)
+    table.add_column("NAIF", justify="right")
+    table.add_column("class")
+    table.add_column("parent")
+    for b in sorted(members, key=lambda b: b.naif_id):
+        par = bodies.find(b.parent)
+        par_name = par.name.title() if par is not None else ""
+        table.add_row(b.name.title(), str(b.naif_id), b.body_class, par_name)
+    console.print(table)
+
+
 @app.command("constants", rich_help_panel=_PANEL_DISCOVERY)
 def constants_cmd(
     ctx: typer.Context,
     query: str = typer.Argument(
         None,
         help="Body name (case-insensitive) for the full quantity table, "
-             "or 'Body.field' for one value. "
-             "Examples: 'Mars', 'mars.GM', 'jupiter.bond_albedo'.",
+             "'Body.field' for one value, or 'list' to browse bodies by "
+             "category. Examples: 'Mars', 'mars.GM', 'list', 'list moons'.",
         autocompletion=_complete_constants_query,
+    ),
+    category: str = typer.Argument(
+        None,
+        help="With 'list': category to drill into (planets, moons, "
+             "asteroids, comets, dwarf_planets, mission_visited, sun).",
+        autocompletion=_complete_constants_category,
+    ),
+    parent: str = typer.Argument(
+        None,
+        help="With 'list moons': restrict to one planet's moons "
+             "(e.g. 'list moons saturn').",
     ),
     at: str = typer.Option(
         None, "--at", "-t",
@@ -3103,17 +3207,26 @@ def constants_cmd(
 ):
     """Print per-body planetary constants from PCK + NSSDC sources.
 
-    Two forms:
+    Three forms:
 
     \b
         plp constants Mars         # Rich table of every known constant
         plp constants Mars.GM      # Just the value (stdout) + source (stderr)
+        plp constants list         # Browse bodies by category
 
     For the single-field form, the quantity is printed to stdout and the
     source/reference goes to stderr, so output stays pipe-safe::
 
     \b
         plp constants Mars.GM | awk '{print $1}'
+
+    The ``list`` form is a discovery surface over the registry::
+
+    \b
+        plp constants list                 # category menu + counts
+        plp constants list moons           # every moon
+        plp constants list moons saturn    # moons of Saturn
+        plp constants list dwarf_planets
 
     Body name matching is case-insensitive (``mars`` == ``Mars`` ==
     ``MARS``). Unknown bodies print the closest matches as a suggestion.
@@ -3126,6 +3239,10 @@ def constants_cmd(
     if query is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
+
+    if query.lower() == "list":
+        _constants_list(category, parent)
+        return
 
     body_part, dot, field_part = query.partition(".")
     body = bodies.find(body_part)
