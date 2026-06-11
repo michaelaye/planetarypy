@@ -1,0 +1,68 @@
+---
+title: "HOWTO get data from the ESA PSA"
+---
+
+planetarypy can resolve and download products from **ESA's Planetary Science
+Archive (PSA)** — the home of Mars Express, Rosetta, Venus Express, BepiColombo,
+ExoMars TGO and other ESA planetary missions that are *not* in the NASA PDS.
+
+It works straight from a PDS **product id**: the PSA exposes an IVOA EPN-TAP
+service whose every granule carries a direct-download `access_url`, and the
+product id is embedded in the granule identifier — so a single lookup resolves
+id → download URL. No extra dependency is needed (it uses `requests`).
+
+## From Python
+
+```python
+from planetarypy import psa
+
+# Resolve a product id to its direct PSA download URL:
+url = psa.resolve("IMA_AZ1120140041730C_ACCS01")
+
+# Download it (the PSA serves a zip of label + data; it is unpacked by default):
+paths = psa.fetch_psa_product("IMA_AZ1120140041730C_ACCS01")
+# -> [.../IMA_..._ACCS01.LBL, .../IMA_..._ACCS01.CSV, ...]
+```
+
+The downloaded files open with `planetarypy.open()`. Files land under
+`{storage_root}/psa/<product_id>/`; pass `dest=` to choose another location, or
+`extract=False` to keep the raw zip.
+
+If a product id matches several granules (e.g. across processing levels), inspect
+them all:
+
+```python
+psa.resolve_all("IMA_AZ1120140041730C_ACCS01")
+# -> [{'granule_uid': 'MEX-M-ASPERA3-2-EDR-IMA-EXT4-V1.0:DATA:IMA_..._ACCS01::12.0',
+#      'access_url': 'https://psa.esa.int/psa-tap/data?...'}]
+```
+
+For anything the helpers don't cover, run raw ADQL against `psa.epn_core`:
+
+```python
+psa.query(
+    "SELECT TOP 5 granule_uid, access_url FROM psa.epn_core "
+    "WHERE instrument_host_name LIKE '%ROSETTA%'"
+)
+```
+
+## From the command line
+
+```bash
+# Print the download URL for a product id:
+plp psa resolve IMA_AZ1120140041730C_ACCS01
+
+# See every matching granule:
+plp psa resolve IMA_AZ1120140041730C_ACCS01 --all
+
+# Download and unpack the product:
+plp psa fetch IMA_AZ1120140041730C_ACCS01
+plp psa fetch IMA_AZ1120140041730C_ACCS01 --dest ./here --no-extract
+```
+
+## Scope
+
+This targets the **ESA PSA** (`psa.esa.int`). For NASA-archived products use the
+catalog/index fetchers or `planetarypy.search` (the NASA PDS registry). The two
+archives are complementary — PSA holds the ESA missions, the PDS holds the NASA
+ones — and both resolve products behind the same `access_url` idea.

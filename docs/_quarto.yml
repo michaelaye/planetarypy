@@ -52,6 +52,7 @@ website:
         - howto/cli.qmd
         - howto/opening_data.qmd
         - howto/pds_search.qmd
+        - howto/psa.qmd
         - howto/footprints_and_overlaps.qmd
         - howto/howto_spice_archived.ipynb
         - howto/ctx_edr.ipynb

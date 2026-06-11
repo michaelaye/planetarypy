@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`planetarypy.psa` — resolve & download ESA PSA products.** A new module over ESA's Planetary Science Archive EPN-TAP service (`psa.epn_core`): `resolve(product_id)` returns a direct download URL by substring-matching the product id against the granule identifier (ADQL `LIKE`, no per-instrument rules, no harvest); `fetch_psa_product(product_id)` downloads and unpacks the product (a zip of label + data, openable with `planetarypy.open`); plus `resolve_all` and a low-level `query`. New `plp psa resolve|fetch`. Uses only `requests` (no new dependency). This is the first archive provider behind the cross-archive resolver contract (`identity → access_url | NotResolvable`); ESA products resolve straight from a bare product id (validated on Mars Express). See `Plans/fetchability_strategy.md`.
+
 ## [0.74.0] - 2026-06-11
 
 Three additions: open any product in one call, search the whole NASA PDS, and a new extension seam so instrument-specific code can live in its own packages.

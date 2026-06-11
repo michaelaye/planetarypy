@@ -878,6 +878,65 @@ def search_fetch_cmd(
         typer.echo(str(path))
 
 
+# ── psa (ESA Planetary Science Archive) ──────────────────────────────
+
+psa_app = typer.Typer(
+    help="Resolve & download ESA PSA products (Planetary Science Archive).",
+    no_args_is_help=True,
+)
+app.add_typer(psa_app, name="psa", rich_help_panel=_PANEL_DISCOVERY)
+
+
+@psa_app.command("resolve")
+def psa_resolve_cmd(
+    ctx: typer.Context,
+    product_id: str = typer.Argument(
+        None, help="PDS product id to resolve in the PSA."
+    ),
+    all_: bool = typer.Option(False, "--all", help="Show all matching granules."),
+):
+    """Resolve a product id to its ESA PSA download URL."""
+    if product_id is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    from planetarypy.psa import resolve, resolve_all
+
+    if all_:
+        rows = resolve_all(product_id)
+        if not rows:
+            typer.echo(f"No PSA granule matches {product_id!r}.", err=True)
+            return
+        for r in rows:
+            typer.echo(f"{r['granule_uid']}\n  {r['access_url']}")
+        return
+    url = resolve(product_id)
+    if url is None:
+        typer.echo(f"No PSA granule matches {product_id!r}.", err=True)
+        raise typer.Exit(1)
+    typer.echo(url)
+
+
+@psa_app.command("fetch", rich_help_panel=_PANEL_FETCH)
+def psa_fetch_cmd(
+    ctx: typer.Context,
+    product_id: str = typer.Argument(
+        None, help="PDS product id to download from the PSA."
+    ),
+    dest: Path = typer.Option(None, "--dest", help="Destination directory."),
+    no_extract: bool = typer.Option(
+        False, "--no-extract", help="Keep the zip; don't unpack."
+    ),
+):
+    """Download an ESA PSA product by id (unpacks the product zip by default)."""
+    if product_id is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    from planetarypy.psa import fetch_psa_product
+
+    for path in fetch_psa_product(product_id, dest=dest, extract=not no_extract):
+        typer.echo(str(path))
+
+
 # ── catalog ──────────────────────────────────────────────────────────
 
 catalog_app = typer.Typer(help="PDS catalog management.", no_args_is_help=True)
