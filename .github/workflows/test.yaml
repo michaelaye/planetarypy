@@ -161,3 +161,16 @@ jobs:
         plp search --help > /dev/null
         plp psa --help > /dev/null
         plp indexes select --help > /dev/null
+
+    - name: Exercise a runtime parquet round-trip (no-extras pip env)
+      # The import + --help checks above validate the import-time dependency
+      # contract, but a parquet engine (pyarrow) is a RUNTIME-only dep: it's
+      # only needed when pandas actually reads/writes the PDS index cache, which
+      # importing the package never triggers. This step fetches a tiny real
+      # index and round-trips it through parquet, so a missing/undeclared engine
+      # fails HERE (in the env that mirrors `pip install planetarypy`) rather
+      # than only for end users. The test skips on genuine PDS downtime.
+      run: |
+        source /tmp/minimal/bin/activate
+        pip install pytest
+        pytest tests/test_pds_index_roundtrip.py -o addopts="" -v
