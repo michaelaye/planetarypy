@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.76.1] - 2026-06-12
+
+### Fixed
+
+- **Declare `pyarrow` as a core dependency.** The PDS index cache writes and reads its parquet files through pandas (`to_parquet`/`read_parquet`), which needs a parquet engine that pandas does not bundle. `pyarrow` was never declared, so a clean `pip install planetarypy` raised `ImportError: Unable to find a usable engine` the first time any index was downloaded or read back. The gap went unnoticed because the CI test gate installs its dependencies from conda-forge, which pulls `pyarrow` in transitively and masked the missing declaration that pip-based installs — and real users — actually hit; the new pip-based daily PDS-download smoke canary surfaced it. Now declared in both the PyPI core dependencies and the conda recipe.
+
 ## [0.76.0] - 2026-06-11
 
 ### Added

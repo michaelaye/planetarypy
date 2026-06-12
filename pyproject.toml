@@ -29,6 +29,7 @@ dependencies = [
     "typer>=0.9",      # For command-line interface
     "numpy",           # For numerical operations
     "pandas",          # For data handling
+    "pyarrow",         # Parquet engine for the PDS index cache (pandas to_parquet/read_parquet)
     "pooch",           # For downloading and caching data files
     "pvl",             # For PDS label parsing
     "lxml",            # Runtime backend for pandas.read_html in spice/archived_kernels.py
