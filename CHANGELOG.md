@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.76.2] - 2026-06-12
+
+### Fixed
+
+- **Graceful error when the optional `[spice]` extra is missing.** `spiceypy` and `scipy` ship in the `[spice]` extra rather than core, so a bare `pip install planetarypy` does not have them — yet importing `planetarypy.spice` (or `planetarypy.spice.spicer`) failed with a bare `ModuleNotFoundError: No module named 'spiceypy'` that gave no hint about the fix. SPICE imports now route through a small guard that raises a clear `ImportError` telling the user to `pip install 'planetarypy[spice]'` (the conda package ships SPICE by default). Core is unaffected — `planetarypy` itself never imports SPICE, and the `scipy` import in `spicer.py` stays lazy.
+
 ## [0.76.1] - 2026-06-12
 
 ### Fixed

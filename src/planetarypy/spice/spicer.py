@@ -36,8 +36,8 @@ from math import tau
 
 import dateutil.parser as tparser
 import numpy as np
-import spiceypy as spice
 
+from ._deps import SPICE_INSTALL_HINT, spice
 from .generic_kernels import load_generic_kernels
 
 _kernels_loaded = False
@@ -64,7 +64,10 @@ def _rotate_vector(vector, axis, angle_rad):
     np.ndarray
         Rotated 3D vector.
     """
-    from scipy.spatial.transform import Rotation
+    try:
+        from scipy.spatial.transform import Rotation
+    except ImportError as exc:  # pragma: no cover - only without the [spice] extra
+        raise ImportError(SPICE_INSTALL_HINT) from exc
 
     axis = np.array(axis, dtype=np.float64)
     axis /= np.linalg.norm(axis)

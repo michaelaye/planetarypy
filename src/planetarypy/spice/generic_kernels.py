@@ -18,8 +18,7 @@ __all__ = [
 
 from pathlib import Path
 
-import spiceypy as spice
-
+from ._deps import spice
 from ..utils import url_retrieve
 from .config import KERNEL_STORAGE, NAIF_URL
 
