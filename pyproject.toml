@@ -185,6 +185,7 @@ DEP001 = [
 # DEP002 = "declared dependency is not used in the codebase"
 DEP002 = [
     "lxml",          # used at call time by pandas.read_html in spice/archived_kernels.py
+    "pyarrow",       # parquet engine loaded internally by pandas to_parquet/read_parquet; never imported directly
     "pytest",        # CLI tool used in CI / dev; not imported from src
     "pytest-cov",
     "pytest-xdist",
