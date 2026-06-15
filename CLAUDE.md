@@ -113,6 +113,8 @@ Supporting files: `_mission_map.py`, `_parser.py`, `_repo.py`, `_schema.py`, `_u
 
 A duplicate of the `process_parallel` pattern still lives in `isis/projected.py`; treat it as out-of-scope debt until a real refactor cycle picks it up.
 
+**Namespace guard:** `instruments/` and `instruments/mro/` are PEP 420 **namespace packages** — they have *no* `__init__.py` on purpose, so the in-progress `planetarypy-hirise` split can ship `instruments/mro/hirise.py` from a separate distribution at the same import path. Never re-add an `__init__.py` at either level; doing so converts them back to regular packages and breaks that cross-distribution layout. (`mro/ctx/` and `go/` stay normal subpackages *inside* the namespace.)
+
 ## Constants (`constants/`)
 
 PCK polynomial fields + JPL DE-series GMs + NSSDC fact-sheet values composed into a single `Body` object per target. The composition happens at import time in `constants/__init__.py`.

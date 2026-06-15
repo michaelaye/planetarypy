@@ -398,6 +398,14 @@ try:
 except ImportError:
     pass  # catalog not available
 
+# Register the HiRISE meta-display handler with the PDS meta dispatcher
+try:
+    from planetarypy.pds.meta_display import register_meta_handler
+    register_meta_handler("mro.hirise.edr", format_meta)
+    register_meta_handler("mro.hirise.rdr", format_meta)
+except ImportError:
+    pass  # pds.meta_display not available
+
 
 def _edr_base_url() -> URL:
     """Resolve EDR base URL from config."""
