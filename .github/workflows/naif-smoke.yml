@@ -1,0 +1,33 @@
+name: NAIF download smoke
+
+# Standalone NAIF-availability canary. Range-GETs each default generic SPICE
+# kernel from naif.jpl.nasa.gov so an outage OR a kernel rename/version bump
+# surfaces as a failed run here — WITHOUT blocking the release gate (the main
+# test workflow uses cached kernels and skips the Spicer tests when they can't
+# load, so a NAIF blip can't red it). Scheduled daily; also runnable on demand.
+on:
+  schedule:
+    - cron: "37 6 * * *"   # daily ~06:37 UTC (offset from the PDS smoke at :17)
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Check NAIF generic kernels are reachable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # [spice] so `planetarypy.spice.generic_kernels` (which imports spiceypy)
+      # is importable — the canary derives the kernel URLs from it so the list
+      # can't drift from the code.
+      - name: Install planetarypy
+        run: pip install -e ".[dev,spice]"
+
+      # No cache: every run is a genuine reachability probe against NAIF. The
+      # smoke test is `slow`-marked, so it runs here (no `-m "not slow"` filter).
+      - name: Run NAIF download smoke
+        run: pytest tests/test_naif_smoke.py -o addopts="" -v

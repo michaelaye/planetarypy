@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-import requests
 
 from planetarypy.pds import get_index
 from planetarypy.utils import have_internet
@@ -28,14 +27,19 @@ from planetarypy.utils import have_internet
 INDEX_KEY = "msl.sam.l0"
 
 
-def test_index_download_and_parquet_roundtrip():
+def test_index_download_and_parquet_roundtrip(is_transient_network_error):
     if not have_internet():
         pytest.skip("no internet connection")
     try:
         # force_refresh re-downloads and re-converts, exercising both the
         # parquet write (to_parquet) and the read (read_parquet) paths.
         df = get_index(INDEX_KEY, force_refresh=True)
-    except (requests.exceptions.RequestException, ConnectionError, TimeoutError) as exc:
-        pytest.skip(f"{INDEX_KEY} unreachable: {exc}")
+    except Exception as exc:
+        # Skip ONLY on a transient connectivity blip. A wrong/renamed URL (404),
+        # a missing parquet engine, or a parse regression must fail loudly — that
+        # is exactly what this clean-run test exists to catch.
+        if is_transient_network_error(exc):
+            pytest.skip(f"{INDEX_KEY} unreachable (transient network error): {exc!r}")
+        raise
     assert isinstance(df, pd.DataFrame)
     assert len(df) > 0

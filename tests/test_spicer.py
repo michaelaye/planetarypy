@@ -8,6 +8,29 @@ spiceypy = pytest.importorskip("spiceypy")
 from planetarypy.spice.spicer import Spicer, _rotate_vector  # noqa: E402
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _require_generic_kernels(is_transient_network_error):
+    """Skip the SPICE tests *only* when the generic kernels can't be loaded due to
+    a transient NAIF connectivity blip — fail loudly on anything else.
+
+    On the warm path (cache hit, or NAIF reachable) the kernels load and the tests
+    run normally. On a cold cache during a NAIF *timeout* they're absent and can't
+    be fetched — we skip rather than red the gate on an upstream-availability blip,
+    and the scheduled ``NAIF download smoke`` workflow tracks the outage. But any
+    *other* load failure (a wrong/renamed kernel URL → 404, an SSL error, a parse
+    or code regression) is a real bug that the cold-cache path is meant to catch —
+    so it propagates and fails. A blanket skip here would mask exactly those.
+    """
+    from planetarypy.spice.generic_kernels import load_generic_kernels
+
+    try:
+        load_generic_kernels()
+    except Exception as exc:
+        if is_transient_network_error(exc):
+            pytest.skip(f"SPICE generic kernels unavailable — NAIF unreachable: {exc!r}")
+        raise
+
+
 class TestSpicerBasics:
     def test_create(self):
         s = Spicer("MARS")

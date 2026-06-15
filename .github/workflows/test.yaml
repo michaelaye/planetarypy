@@ -65,20 +65,21 @@ jobs:
         restore-keys: |
           planetarypy-testdata-v1-
 
-    - name: Prefetch SPICE generic kernels
+    - name: Prefetch SPICE generic kernels (best-effort)
       shell: bash -l {0}
       # Seeds the small generic kernel set (~20 MB: lsk + pck + de432s +
       # mar099s) for the in-gate Spicer tests. Idempotent after a cache hit.
-      # Retries with exponential backoff so a transient NAIF timeout on a
-      # cold cache doesn't false-red a release. (The HiRISE RDR prefetch was
-      # removed — TestSolarAzimuth now uses embedded reference values instead
-      # of the ~200 MB index.)
+      # Retries with exponential backoff. **Non-fatal**: a NAIF outage on a cold
+      # cache must NOT red the gate — the Spicer tests skip themselves when the
+      # kernels can't be loaded (see the _require_generic_kernels fixture in
+      # tests/test_spicer.py), and NAIF availability is tracked separately by the
+      # scheduled `NAIF download smoke` workflow.
       run: |
         attempt=1; max=5; delay=15
         until python -c "from planetarypy.spice.generic_kernels import download_generic_kernels; download_generic_kernels()"; do
           if [ "$attempt" -ge "$max" ]; then
-            echo "::error::NAIF prefetch failed after $max attempts."
-            exit 1
+            echo "::warning::NAIF prefetch failed after $max attempts; SPICE tests needing kernels will skip this run (tracked by the scheduled NAIF smoke canary)."
+            break
           fi
           echo "::warning::NAIF prefetch attempt $attempt failed; retrying in ${delay}s..."
           sleep "$delay"
