@@ -22,7 +22,7 @@ requirements:
     - pip
   run:
     - python >=3.11
-    - astropy
+    - astropy-base
     - typer >=0.9
     - numpy
     - pandas
