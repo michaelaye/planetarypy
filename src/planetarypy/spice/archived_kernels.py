@@ -20,6 +20,7 @@ __all__ = [
     "list_cached_kernels",
 ]
 
+import re
 import zipfile
 from datetime import timedelta
 from io import BytesIO
@@ -516,16 +517,33 @@ class Subsetter:
             else self.save_location
         )
         savepath = basepath / self.metakernel_file
-        with (
-            open(savepath, "w") as outfile,
-            self.z.open(self.metakernel_file) as infile,
-        ):
-            for line in infile:
-                linestr = line.decode()
-                if "'./data'" in linestr:
-                    linestr = linestr.replace("'./data'", f"'{savepath.parent}'")
-                outfile.write(linestr)
+        text = self.z.read(self.metakernel_file).decode()
+        savepath.write_text(_repoint_path_values(text, str(savepath.parent)))
         return savepath
+
+
+def _repoint_path_values(text: str, abspath: str) -> str:
+    """Rewrite a metakernel's ``PATH_VALUES`` to the local kernel directory.
+
+    NAIF archive metakernels use different relative conventions for
+    ``PATH_VALUES`` — most missions ship ``'./data'``, but some (e.g. Hayabusa2's
+    PDS4 archive) ship ``'..'``. Replace whatever single-quoted value the
+    ``PATH_VALUES = ( … )`` block holds with ``abspath``, leaving every other line
+    (notably ``KERNELS_TO_LOAD``'s ``$SYMBOL/…`` references) untouched. The old
+    code matched the ``'./data'`` literal only, so it silently no-opped on ``'..'``
+    and left an unresolvable path that broke ``furnsh``.
+    """
+    out = []
+    in_path_values = False
+    for line in text.splitlines(keepends=True):
+        if "PATH_VALUES" in line:
+            in_path_values = True
+        if in_path_values:
+            line = re.sub(r"'[^']*'", f"'{abspath}'", line)
+            if ")" in line:
+                in_path_values = False
+        out.append(line)
+    return "".join(out)
 
 
 def get_metakernel_and_files(

@@ -119,7 +119,11 @@ def _build_q(
         clauses.append(query)
     if not clauses:
         return None
-    return " and ".join(clauses)
+    # The PDS registry API requires the whole q wrapped in outer parentheses:
+    # a bare ``A and B`` returns HTTP 400 (UnparsableQParamException), while
+    # ``(A and B)`` parses. (peppi does the same in its ResultSet before sending.)
+    # Wrapping a single clause is harmless.
+    return "(" + " and ".join(clauses) + ")"
 
 
 def _flatten(value: Any) -> Any:

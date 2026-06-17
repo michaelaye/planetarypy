@@ -81,12 +81,14 @@ def test_build_q_combines_filters():
 
 
 def test_build_q_lidvid_vs_lid():
-    assert 'lidvid eq "a::1.0"' == search._build_q(
+    # The whole q is wrapped in outer parens — the PDS registry requires it
+    # (a bare clause / multi-clause AND without the wrap returns HTTP 400).
+    assert '(lidvid eq "a::1.0")' == search._build_q(
         target=None, instrument=None, instrument_host=None, investigation=None,
         processing_level=None, before=None, after=None, observationals=False,
         lidvid="a::1.0", query=None,
     )
-    assert 'lid eq "a"' == search._build_q(
+    assert '(lid eq "a")' == search._build_q(
         target=None, instrument=None, instrument_host=None, investigation=None,
         processing_level=None, before=None, after=None, observationals=False,
         lidvid="a", query=None,
@@ -125,7 +127,7 @@ def test_search_products_dataframe(fake_api):
     assert p1["pds:Identification_Area.pds:title"] == "First"
     assert pd.isna(p1["empty"])
     assert p1["multi"] == ["a", "b"]
-    assert fake_api["q"] == 'lid like "urn:nasa:pds:demo*"'
+    assert fake_api["q"] == '(lid like "urn:nasa:pds:demo*")'
     assert fake_api["limit"] == 10
 
 

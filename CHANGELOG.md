@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.76.3] - 2026-06-17
+
+### Fixed
+
+- **PDS registry search: multi-filter queries no longer fail with HTTP 400.** `planetarypy.search` built its query string by joining clauses with ` and `, but the NASA PDS registry API requires the whole query wrapped in outer parentheses — so any search combining two or more filters (e.g. `target` + `observationals`, or a spatial bounding-box) returned `400 UnparsableQParamException` and only single-clause lookups worked. The query builder now wraps the joined clauses in `(...)`, matching what `pds.peppi` does. This also unblocks spatial searches via the `cart:Bounding_Coordinates.cart:*_bounding_coordinate` fields.
+- **Archived SPICE metakernels with non-`'./data'` path conventions now load.** `archived_kernels.get_metakernel()` rewrote kernel paths by matching the literal `'./data'` in `PATH_VALUES`, which most NAIF archives use — but some (e.g. Hayabusa2's PDS4 archive) ship `'..'` instead. The rewrite silently no-opped on those, leaving an unresolvable relative path that broke `furnsh`. The rewrite is now convention-agnostic: it repoints whatever value the `PATH_VALUES` block holds to the absolute local kernel directory, leaving `KERNELS_TO_LOAD` symbol references intact.
+- **`plotting.add_sun_indicator` no longer rescales the image.** The sun-direction glyph was drawn in data coordinates anchored in a corner; for any azimuth pointing past that corner, plotting the off-bounds marker triggered matplotlib autoscale, adding whitespace and pushing the indicator outside the frame. It is now drawn in axes-fraction coordinates with an inset anchor, so it stays inside the panel for any azimuth and never touches the data limits (this also removes a latent `origin='upper'`-only assumption).
+
+### Changed
+
+- **`plotting.add_sun_indicator` / `imshow_with_sun` are marked experimental.** They now carry an experimental note and emit a one-shot `UserWarning`. The azimuth-convention handoff is not yet validated end-to-end: these helpers expect azimuth clockwise-from-image-top (PDS `SUB_SOLAR_AZIMUTH`), whereas `Spicer.solar_azimuth_at` returns clockwise-from-north — they agree only when image-north points up.
+
 ## [0.76.2] - 2026-06-12
 
 ### Fixed
