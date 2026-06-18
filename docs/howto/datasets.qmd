@@ -1,0 +1,84 @@
+---
+title: "HOWTO read remote reference rasters (`planetarypy.datasets`)"
+---
+
+`planetarypy.datasets` gives **body-namespaced** access to remote reference
+rasters — global mosaics, DEMs, IR composites — and reads a **lon/lat window**
+straight from a cloud-optimised GeoTIFF (COG) over HTTP, *without downloading the
+whole file*. This complements `pds`/`catalog`/`search` (PDS products) with the
+institutional mosaics that never went to PDS.
+
+It needs `rasterio`, `rioxarray` and `pyproj` (shipped with the conda package; on
+PyPI they come with the geospatial dependencies).
+
+## What's registered
+
+```python
+from planetarypy import datasets
+
+datasets.bodies()              # ['mars', 'moon']
+datasets.list_datasets("mars") # the Mars rasters
+datasets.mars                  # <datasets.mars: ['ctx_dtms', 'hrsc_level3', 'themis_mosaics']>
+```
+
+Two kinds sit behind the same namespace:
+
+- **`RemoteRaster`** — one fixed global COG (e.g. the FU Berlin / DLR HRSC
+  level-3 mosaic).
+- **`StacCollection`** — a USGS Astrogeology STAC collection holding *many* COGs
+  (per quad / per observation), resolved by location.
+
+## Read a window from a single COG
+
+`read_window(lon, lat, size)` reads a `size`-degree box and returns a
+georeferenced `xarray.DataArray` (rioxarray):
+
+```python
+da = datasets.mars.hrsc_level3.read_window(lon=0, lat=0, size=1.0)   # 1° at (0,0)
+da = datasets.mars.hrsc_level3.read_window(77.4, 18.4, 0.5, out="jezero.tif")  # + GeoTIFF
+```
+
+`anchor` places `(lon, lat)` on the box: `"center"` (default), or a corner —
+`"lower-left"`/`"sw"` (the degree-square tiling convention), `"upper-left"`/`"nw"`
+(raster origin), `"lower-right"`/`"se"`, `"upper-right"`/`"ne"`. For an explicit
+extent use `read_bbox(west, south, east, north)`.
+
+The lon/lat box is transformed into the file's own CRS (via pyproj), so this works
+for any body / projection — not just equirectangular.
+
+## STAC-backed collections
+
+A collection holds many COGs, so you first resolve a location to item(s):
+
+```python
+items = datasets.mars.themis_mosaics.at(lon=-90, lat=-30)   # items covering the point
+items = datasets.mars.themis_mosaics.search(bbox=(-95, -35, -85, -25))  # by box
+items[0].read_window(-90, -30, 0.5)        # read that item's COG
+
+# convenience: read straight from the first covering item
+datasets.mars.themis_mosaics.read_window(-90, -30, 0.3, out="themis.tif")
+
+# a different body
+datasets.moon.lola_dtms.at(lon=0, lat=85)
+```
+
+::: {.callout-note}
+When several items overlap your point, the `read_window` convenience uses the
+first one; use `search` / `at` to see all candidates and pick yourself.
+Mosaicking across overlapping items is a planned follow-up.
+:::
+
+## Adding a dataset
+
+Registering a product is one entry in `datasets/__init__.py`: a `RemoteRaster`
+(a COG URL) or a `StacCollection` (a STAC API + collection id). The USGS STAC
+(`stac.astrogeology.usgs.gov`) alone exposes ~14 collections across several
+bodies.
+
+::: {.callout-note collapse="true"}
+## Status
+
+This is the first slice of the `planetarypy.datasets` design: body-namespaced
+registry + windowed COG/STAC reads. A remote-refreshed registry, a download mode,
+and a `plp datasets` CLI are planned.
+:::
