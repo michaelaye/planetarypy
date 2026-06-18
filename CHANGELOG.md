@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.77.0] - 2026-06-18
+
+A geospatial-discovery release: search the PDS registry by area, ask "what data is at this coordinate?" from the terminal, and read lon/lat windows straight out of remote cloud-optimised GeoTIFFs.
+
+### Added
+
+- **Spatial search of the NASA PDS registry.** `planetarypy.search_products(bbox=(west, south, east, north))` filters by footprint overlap via the registry's `cart:Bounding_Coordinates` fields (degrees; shapely/GeoJSON order). `planetarypy.search.bbox_from_point(lon, lat, radius_deg)` builds a box around a point, and `planetarypy.search.count(**filters)` returns the number of matching products without fetching any rows — handy to size a query first. Spatial fields are only populated where the archive added them (common for derived/calibrated products, often absent for raw/EDR), and a footprint crossing a pole or the anti-meridian can have a degenerate bounding box.
+- **`plp search at BODY LON LAT`** — "what PDS data exists at this coordinate?" from the command line, with `--radius`, `--instrument`, `--count`, and `--limit`. `BODY` is a planet name (mapped to its target LID) or a full target LID; negative coordinates are accepted as positionals.
+- **`planetarypy.datasets` — body-namespaced access to remote reference rasters.** A registry of non-PDS institutional mosaics/DEMs read by lon/lat window straight from cloud-optimised GeoTIFFs over HTTP, with no full download. Two kinds: `RemoteRaster` (one fixed global COG — the FU Berlin / DLR HRSC level-3 mosaic) and `StacCollection` (a STAC collection of many COGs resolved by location — the USGS Astrogeology `mo_themis_controlled_mosaics` and `mro_ctx_controlled_usgs_dtms` for Mars, `lunar_orbiter_laser_altimeter` for the Moon). `read_window(lon, lat, size, anchor="center"|"sw"|"nw"|"se"|"ne")` and `read_bbox(west, south, east, north)` accept a `RemoteRaster`, a `StacItem`, a registry key or a bare COG URL, transform the box into the file's own CRS via pyproj (so any body/projection works), and return a georeferenced rioxarray `DataArray` (or write a GeoTIFF with `out=`). Access is by body: `datasets.mars.hrsc_level3`, `datasets.moon.lola_dtms`, …. This is the first slice of the `planetarypy.datasets` design; a remote-refreshed registry, a download mode, and a `plp datasets` CLI are planned.
+
 ## [0.76.3] - 2026-06-17
 
 ### Fixed
