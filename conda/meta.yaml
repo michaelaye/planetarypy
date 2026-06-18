@@ -1,4 +1,4 @@
-{% set version = "0.76.3" %}
+{% set version = "0.77.0" %}
 
 package:
   name: planetarypy
@@ -6,7 +6,7 @@ package:
 
 source:
   url: https://pypi.org/packages/source/p/planetarypy/planetarypy-{{ version }}.tar.gz
-  sha256: 39dcc2ba196d2b6185ebfaf24dee5c7dc5f0cabc76101f2bff387e7baab5849c
+  sha256: 166bf81cac2e5a224e490d968de77f963877b32359f73e861d98918ac9f8201f
 
 build:
   entry_points:
