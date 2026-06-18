@@ -876,6 +876,86 @@ def search_get_cmd(
     typer.echo(f"  ({len(props)} properties)")
 
 
+@search_app.command(
+    "at",
+    # Let negative coordinates (e.g. lat -85, lon -120) be parsed as positional
+    # arguments rather than mistaken for short option flags ("-8").
+    context_settings={"ignore_unknown_options": True},
+)
+def search_at_cmd(
+    ctx: typer.Context,
+    body: str = typer.Argument(None, help="Body name (e.g. Mars) or full target LID."),
+    lon: float = typer.Argument(None, help="Longitude, degrees (PDS cart convention)."),
+    lat: float = typer.Argument(None, help="Latitude, degrees North."),
+    radius: float = typer.Option(
+        1.0, "--radius", "-r", help="Half-box size in degrees around the point."
+    ),
+    instrument: str = typer.Option(
+        None, "--instrument", help="Restrict to this instrument LID."
+    ),
+    count_only: bool = typer.Option(
+        False, "--count", help="Print only the number of matching products."
+    ),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max products to list."),
+):
+    """What PDS data exists at a coordinate on a body.
+
+    Spatial search of the NASA PDS registry by a bounding box around a point.
+    BODY is a planet name (mapped to its target LID) or a full target LID.
+
+    Examples:
+        plp search at Mars 77.4 18.4              # ~Jezero crater
+        plp search at Mars 77.4 18.4 -r 0.5 --count
+
+    Note: only products whose archive populated ``cart:Bounding_Coordinates`` can
+    match — common for derived/calibrated products, often missing for raw/EDR.
+    """
+    if body is None or lon is None or lat is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    from planetarypy import search as _search
+
+    target = body if body.startswith("urn:") else (
+        f"urn:nasa:pds:context:target:planet.{body.lower()}"
+    )
+    bbox = _search.bbox_from_point(lon, lat, radius)
+    kw = dict(target=target, instrument=instrument, observationals=True, bbox=bbox)
+
+    n = _search.count(**kw)
+    typer.echo(
+        f"{n} product(s) overlap {lat}°N {lon}°E ±{radius}° on "
+        f"{body} (cart-indexed products only)", err=True,
+    )
+    if count_only:
+        typer.echo(n)
+        return
+    if n == 0:
+        return
+
+    from rich.console import Console
+    from rich.table import Table
+
+    df = _search.search_products(
+        **kw,
+        fields=["ref_lid_instrument", "pds:Time_Coordinates.pds:start_date_time"],
+        limit=limit,
+    )
+    table = Table(
+        title=f"{body}: data at {lat}°N {lon}°E (showing {len(df)} of {n})",
+        header_style="bold magenta", pad_edge=False,
+    )
+    table.add_column("lidvid", overflow="fold")
+    table.add_column("instrument", overflow="fold")
+    table.add_column("start_time")
+    for lidvid, row in df.iterrows():
+        instr = row.get("ref_lid_instrument")
+        instr = str(instr).rsplit(":", 1)[-1] if instr is not None else ""
+        start = row.get("pds:Time_Coordinates.pds:start_date_time") or ""
+        table.add_row(str(lidvid), instr, str(start))
+    Console().print(table)
+
+
 @search_app.command("fetch", rich_help_panel=_PANEL_FETCH)
 def search_fetch_cmd(
     ctx: typer.Context,
