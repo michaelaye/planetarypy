@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "search_products",
+    "count",
+    "bbox_from_point",
     "get_product",
     "product_file_urls",
     "fetch_pds_product",
@@ -82,6 +84,7 @@ def _build_q(
     observationals: bool,
     lidvid: Optional[str],
     query: Optional[str],
+    bbox: "Optional[tuple[float, float, float, float]]" = None,
 ) -> Optional[str]:
     """Translate keyword filters into a PDS API ``q`` clause string.
 
@@ -115,6 +118,19 @@ def _build_q(
     if lidvid:
         field = "lidvid" if "::" in lidvid else "lid"
         clauses.append(f'{field} eq "{lidvid}"')
+    if bbox is not None:
+        west, south, east, north = bbox
+        c = "cart:Bounding_Coordinates.cart:"
+        # Footprint *overlaps* the query box (intersection), not strict
+        # containment: product.west<=qe and product.east>=qw and
+        # product.south<=qn and product.north>=qs. Only matches products whose
+        # archive populated the cart:Bounding_Coordinates fields.
+        clauses += [
+            f"{c}west_bounding_coordinate le {east}",
+            f"{c}east_bounding_coordinate ge {west}",
+            f"{c}south_bounding_coordinate le {north}",
+            f"{c}north_bounding_coordinate ge {south}",
+        ]
     if query:
         clauses.append(query)
     if not clauses:
@@ -155,6 +171,7 @@ def search_products(
     observationals: bool = False,
     lidvid: Optional[str] = None,
     query: Optional[str] = None,
+    bbox: "Optional[tuple[float, float, float, float]]" = None,
     fields: Optional[list[str]] = None,
     limit: int = 100,
     host: str = _DEFAULT_HOST,
@@ -180,6 +197,14 @@ def search_products(
         Raw PDS API query clause, AND-combined with the other filters — the
         escape hatch for anything the keyword filters don't cover (e.g.
         ``query='lid like "urn:nasa:pds:cassini_iss_saturn*"'``).
+    bbox : (west, south, east, north), optional
+        Spatial filter: keep products whose footprint **overlaps** this
+        longitude/latitude box (degrees), via the
+        ``cart:Bounding_Coordinates`` fields. Order matches shapely's
+        ``.bounds`` / GeoJSON bbox. Note: only products whose archive populated
+        those fields can match (often present for derived/calibrated products,
+        absent for many raw/EDR), and a product's bounding box can be degenerate
+        for polar/long-track or anti-meridian-crossing footprints.
     fields : list[str], optional
         Restrict the returned columns to these registry property names.
     limit : int
@@ -206,6 +231,7 @@ def search_products(
         observationals=observationals,
         lidvid=lidvid,
         query=query,
+        bbox=bbox,
     )
     resp = _api(host).product_list(q=q, fields=fields, limit=limit)
     rows = [
@@ -216,6 +242,61 @@ def search_products(
     df = pd.DataFrame.from_records(rows, index=index)
     df.index.name = "lidvid"
     return df
+
+
+def count(
+    *,
+    target: Optional[str] = None,
+    instrument: Optional[str] = None,
+    instrument_host: Optional[str] = None,
+    investigation: Optional[str] = None,
+    processing_level: Optional[str] = None,
+    before: "Optional[Union[str, _dt.datetime]]" = None,
+    after: "Optional[Union[str, _dt.datetime]]" = None,
+    observationals: bool = False,
+    lidvid: Optional[str] = None,
+    query: Optional[str] = None,
+    bbox: "Optional[tuple[float, float, float, float]]" = None,
+    host: str = _DEFAULT_HOST,
+) -> int:
+    """Number of products matching the filters, without fetching any rows.
+
+    Takes the same filter keywords as :func:`search_products`; issues a single
+    ``limit=0`` request and reads the registry's total-hit count. Useful to size
+    a result set (which :func:`search_products` would otherwise truncate at
+    ``limit``) before deciding how to page through it.
+    """
+    q = _build_q(
+        target=target,
+        instrument=instrument,
+        instrument_host=instrument_host,
+        investigation=investigation,
+        processing_level=processing_level,
+        before=before,
+        after=after,
+        observationals=observationals,
+        lidvid=lidvid,
+        query=query,
+        bbox=bbox,
+    )
+    return int(_api(host).product_list(q=q, limit=0).summary.hits)
+
+
+def bbox_from_point(
+    lon: float, lat: float, radius_deg: float
+) -> "tuple[float, float, float, float]":
+    """Build a ``(west, south, east, north)`` box of ``±radius_deg`` around a point.
+
+    Convenience for the ``bbox=`` filter of :func:`search_products` — e.g. "data
+    within 1° of Jezero". Latitude is clamped to ``[-90, 90]``; longitude is
+    returned as-is (no anti-meridian wrapping), so use small radii near ±180°.
+    """
+    return (
+        lon - radius_deg,
+        max(-90.0, lat - radius_deg),
+        lon + radius_deg,
+        min(90.0, lat + radius_deg),
+    )
 
 
 def get_product(lidvid: str, *, host: str = _DEFAULT_HOST) -> dict:

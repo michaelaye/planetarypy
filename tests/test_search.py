@@ -80,6 +80,21 @@ def test_build_q_combines_filters():
     assert " and " in q
 
 
+def test_build_q_bbox_intersects():
+    q = search._build_q(
+        target=None, instrument=None, instrument_host=None, investigation=None,
+        processing_level=None, before=None, after=None, observationals=False,
+        lidvid=None, query=None, bbox=(76.0, 17.0, 79.0, 20.0),  # W,S,E,N
+    )
+    c = "cart:Bounding_Coordinates.cart:"
+    # Intersection: west<=E, east>=W, south<=N, north>=S.
+    assert f"{c}west_bounding_coordinate le 79.0" in q
+    assert f"{c}east_bounding_coordinate ge 76.0" in q
+    assert f"{c}south_bounding_coordinate le 20.0" in q
+    assert f"{c}north_bounding_coordinate ge 17.0" in q
+    assert q.startswith("(") and q.endswith(")")
+
+
 def test_build_q_lidvid_vs_lid():
     # The whole q is wrapped in outer parens — the PDS registry requires it
     # (a bare clause / multi-clause AND without the wrap returns HTTP 400).
@@ -205,3 +220,10 @@ def test_live_registry_query():
         {"ops:Data_File_Info.ops:file_ref": [df.iloc[0, 0]]}
     )
     assert urls and urls[0].startswith("https://")
+
+
+def test_bbox_from_point():
+    assert search.bbox_from_point(10.0, 20.0, 1.0) == (9.0, 19.0, 11.0, 21.0)
+    # latitude clamped to valid range
+    w, s, e, n = search.bbox_from_point(0.0, 89.5, 2.0)
+    assert s == 87.5 and n == 90.0

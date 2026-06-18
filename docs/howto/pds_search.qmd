@@ -36,7 +36,8 @@ df = planetarypy.search_products(
 `search_products` returns a `pandas.DataFrame` — one row per product, indexed by
 LIDVID, columns are registry property names. Available filters: `target`,
 `instrument`, `instrument_host`, `investigation`, `processing_level`, `before`,
-`after`, `observationals`, `lidvid`, and a raw `query` escape hatch:
+`after`, `observationals`, `bbox` (see [Spatial search](#spatial-search)),
+`lidvid`, and a raw `query` escape hatch:
 
 ```python
 # Anything the keyword filters don't cover — raw PDS API query syntax:
@@ -46,6 +47,45 @@ df = planetarypy.search_products(
 ```
 
 Restrict the returned columns with `fields=[...]` for faster, narrower results.
+
+## Spatial search {#spatial-search}
+
+Filter by a longitude/latitude box with `bbox=(west, south, east, north)`
+(degrees; shapely/GeoJSON order). Products whose footprint **overlaps** the box
+are returned:
+
+```python
+df = planetarypy.search_products(
+    target="urn:nasa:pds:context:target:planet.mars",
+    observationals=True,
+    bbox=(76, 17, 79, 20),                 # ~Jezero crater
+)
+```
+
+For a box around a point, `bbox_from_point(lon, lat, radius_deg)` builds the tuple:
+
+```python
+from planetarypy import search
+box = search.bbox_from_point(77.4, 18.4, 1.0)   # 1° around Jezero
+df = planetarypy.search_products(target="…mars", observationals=True, bbox=box)
+```
+
+::: {.callout-warning}
+Spatial filtering uses the `cart:Bounding_Coordinates` registry fields, which are
+only populated when the archive added them — common for derived/calibrated
+products, often **absent for raw/EDR**. A product without that metadata won't
+match even if data exists there, and a footprint that crosses a pole or the
+anti-meridian can have a degenerate (over-wide) bounding box.
+:::
+
+### How many match?
+
+`count(...)` takes the same filters and returns just the number of hits — without
+fetching any rows — handy to size a query before pulling it:
+
+```python
+search.count(target="…mars", observationals=True, bbox=box)   # e.g. 968
+```
 
 ## Download
 
@@ -66,6 +106,10 @@ open directly with `planetarypy.open()`.
 plp search products -q 'lid like "urn:nasa:pds:cassini_iss_saturn*"' -n 5
 plp search get   urn:nasa:pds:cassini_iss_saturn:data_raw:1717602192n::1.0
 plp search fetch urn:nasa:pds:cassini_iss_saturn:data_raw:1717602192n::1.0
+
+# "what data is at this coordinate?" — spatial search by body + lon/lat
+plp search at Mars 77.4 18.4 -r 0.5         # products within ±0.5° of Jezero
+plp search at Mars 77.4 18.4 --count        # just the number
 ```
 
 ## Scope and limits
