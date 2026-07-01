@@ -610,6 +610,7 @@ def fetch_product(
     if local_dir is None:
         local_dir = _local_product_dir(
             mission, instrument, product_key, resolved.product_id,
+            resolved=resolved,
         )
     written = download_product(
         resolved, local_dir, files=files, label_only=label_only, force=force,
@@ -626,6 +627,7 @@ def fetch_product(
         local_dir=local_dir,
         files=written,
         label_file=label_path,
+        file_urls=resolved.file_urls,
     )
     if open:
         return result.open()

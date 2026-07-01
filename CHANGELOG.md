@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.78.0] - 2026-07-01
+
+A fetch fast-path release: repeated and batch downloads stop re-reading the same PDS index, the single-product CLI path resolves once instead of twice, and instrument storage resolvers can reuse what resolution already found.
+
+### Added
+
+- **In-process index caching.** `planetarypy.pds.get_index` now memoizes the loaded frame per dotted index key for the life of the process, so a batch `plp fetch` or a notebook session reads each parquet once instead of on every lookup. Callers always get a distinct frame (pandas Copy-on-Write keeps that cheap), so mutating a returned index can't corrupt the cache. New `planetarypy.pds.clear_index_cache(dotted_index_key=None)` drops cached frames when you need a reload.
+- **`DownloadedProduct.file_urls`.** `fetch_product` now carries the resolved filename → URL map on its result, so callers (and the CLI) don't have to resolve a second time just to show or record where files came from.
+- **`StorageContext` resolver contract.** `register_storage_resolver` now also accepts a resolver taking a single `StorageContext` (mission, instrument, product_type, product_id, and the `ResolvedProduct` from the resolution that just happened). The existing `(product_type, product_id)` form keeps working — the form is detected from the callable's arity. `ResolvedProduct.meta` exposes the matched index row so a resolver can reuse fields (e.g. a PDS volume) instead of re-reading the index. See the instrument-packages guide.
+
+### Changed
+
+- **`plp fetch <KEY> <PID>` resolves once.** The single-product path previously resolved the product twice — once to print its URL, once to download it. It now resolves once and reports the URL from the result. Combined with index caching, a warm-cache single fetch drops from ~0.28 s to ~0.01 s, and the CTX EDR local-path lookup no longer triggers a third full index read.
+
 ## [0.77.0] - 2026-06-18
 
 A geospatial-discovery release: search the PDS registry by area, ask "what data is at this coordinate?" from the terminal, and read lon/lat windows straight out of remote cloud-optimised GeoTIFFs.

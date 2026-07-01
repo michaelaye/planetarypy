@@ -262,17 +262,17 @@ def fetch(
     # Single-PID path preserves the existing output contract: URL to stderr,
     # files (or folder) to stdout, so shell composition stays unchanged.
     if len(pids) == 1:
-        from planetarypy.catalog import fetch_product, get_product_urls
+        from planetarypy.catalog import fetch_product
         product_id = pids[0]
         typer.echo(f"Resolving {key} / {product_id}...", err=True)
         try:
-            for url in get_product_urls(key, product_id).values():
-                typer.echo(f"URL: {url}", err=True)
             downloaded = fetch_product(
                 key, product_id,
                 local_dir=Path.cwd() if here else None,
                 label_only=label_only, force=force,
             )
+            for url in downloaded.file_urls.values():
+                typer.echo(f"URL: {url}", err=True)
             if folder:
                 typer.echo(downloaded.local_dir)
             else:

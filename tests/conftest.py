@@ -64,3 +64,20 @@ def _is_transient_network_error(exc: BaseException) -> bool:
 def is_transient_network_error():
     """Session fixture exposing the transient-network-error classifier."""
     return _is_transient_network_error
+
+
+@pytest.fixture(autouse=True)
+def _isolate_index_cache():
+    """Clear the process-level index cache around every test.
+
+    ``get_index`` memoizes the loaded frame per dotted key for the life of
+    the process. Tests stub ``Index`` with different canned frames under the
+    same key (e.g. ``mro.ctx.edr``), so without this the second test would
+    read the first test's cached frame. Real callers are unaffected — same
+    key means same index.
+    """
+    from planetarypy.pds import clear_index_cache
+
+    clear_index_cache()
+    yield
+    clear_index_cache()

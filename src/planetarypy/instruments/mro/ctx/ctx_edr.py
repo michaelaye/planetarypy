@@ -420,7 +420,23 @@ class EDR:
 # so `plp fetch mro.ctx.edr <pid>` lands in the same folder that
 # `EDR(pid).local_storage_folder` resolves to.
 
-def _ctx_local_product_dir(product_type, product_id):
+def _volume_from_resolved(resolved):
+    """Pull the (lowercased) PDS volume from an already-resolved product.
+
+    Returns ``None`` when there's nothing to reuse (no resolution happened,
+    or the index row carried no ``VOLUME_ID``), so callers fall back to a
+    direct index lookup.
+    """
+    meta = getattr(resolved, "meta", None)
+    if not meta:
+        return None
+    vol = meta.get("VOLUME_ID")
+    if vol is None:
+        return None
+    return str(vol).strip().lower()
+
+
+def _ctx_local_product_dir(ctx):
     """Resolve the local directory for `plp fetch mro.ctx.<product_type>`.
 
     For ``product_type == "edr"`` this returns the same folder that
@@ -430,7 +446,13 @@ def _ctx_local_product_dir(product_type, product_id):
     For other product types this falls back to the catalog's generic
     layout so registering the resolver doesn't accidentally change
     behavior for unrelated CTX products.
+
+    Receives a :class:`~planetarypy.catalog._resolver.StorageContext`; when it
+    carries the resolved index row, the PDS volume is read straight from that
+    row instead of loading the full CTX EDR index a second time.
     """
+    product_type = ctx.product_type
+    product_id = ctx.product_id
     if product_type == "edr":
         # Skip the index lookup when volume isn't needed — avoids loading
         # the full CTX EDR parquet just to resolve a path.
@@ -442,6 +464,9 @@ def _ctx_local_product_dir(product_type, product_id):
         )
         if not needs_volume:
             return _edr_local_folder(pid=product_id)
+        volume = _volume_from_resolved(ctx.resolved)
+        if volume is not None:
+            return _edr_local_folder(volume=volume, pid=product_id)
         return EDR(product_id).local_storage_folder
     safe_pid = product_id.replace("/", "_").replace("\\", "_")
     return _storage_root() / "mro" / "ctx" / product_type / safe_pid

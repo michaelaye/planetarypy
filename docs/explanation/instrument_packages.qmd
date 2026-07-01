@@ -55,6 +55,26 @@ resolver has the final say for your `mission.instrument` keys. Use
 `default_product_dir(...)` if you want core's default layout and only need to
 tweak it.
 
+A resolver may instead take a single `StorageContext` argument. Core detects
+the form from the callable's arity, so the two-argument form above keeps
+working — but the context form gives you the `ResolvedProduct` from the
+resolution that just happened, including its `meta` (the matched index row).
+Use it when your layout depends on a field the index already resolved (e.g. a
+PDS volume) so you don't re-read the index just to recover it:
+
+```python
+def _my_dir(ctx):
+    # ctx has mission, instrument, product_type, product_id, resolved
+    volume = ctx.resolved.meta["VOLUME_ID"].lower()  # already read during resolution
+    return config.storage_root / "mymission" / volume / ctx.product_id
+
+register_storage_resolver("mymission.mycam", _my_dir)
+```
+
+`ctx.resolved` is `None` when the path is computed outside a fetch (no
+resolution took place), so guard on it if your layout can be requested that
+way.
+
 ### Meta handler — custom `plp meta` output
 
 ```python

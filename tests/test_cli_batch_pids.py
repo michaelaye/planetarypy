@@ -26,6 +26,7 @@ def _fake_downloaded(pid: str) -> MagicMock:
     dp.local_dir = Path(f"/tmp/{pid}")
     dp.files = [Path(f"/tmp/{pid}/{pid}.IMG")]
     dp.label_file = None
+    dp.file_urls = {"data": f"http://example/{pid}.IMG"}
     return dp
 
 
@@ -45,8 +46,6 @@ class TestFetchInputHandling:
             return []
         monkeypatch.setattr(catalog_mod, "fetch_product", _single)
         monkeypatch.setattr(catalog_mod, "fetch_products", _batch)
-        monkeypatch.setattr(catalog_mod, "get_product_urls",
-                            lambda k, p, **kw: {"data": "http://example/x"})
 
         result = runner.invoke(app, ["fetch", "mro.ctx.edr", "P_A"])
         assert result.exit_code == 0

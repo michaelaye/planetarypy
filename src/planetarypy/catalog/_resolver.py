@@ -18,8 +18,9 @@ Resolution strategy (chain of responsibility):
    needed (variable URL, no index available, etc.).
 """
 
+import inspect
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from loguru import logger
@@ -45,6 +46,11 @@ class ResolvedProduct:
     files: list[str]
     label_file: str | None
     source: str  # 'catalog', 'index', 'constructed'
+    meta: dict | None = None
+    """Index row that produced this resolution, as a plain dict, when
+    ``source == 'index'``. Lets a storage resolver reuse fields already read
+    during resolution (e.g. the PDS ``VOLUME_ID``) instead of re-reading the
+    index. ``None`` for the catalog and pattern tiers."""
 
     @property
     def file_urls(self) -> dict[str, str]:
@@ -108,6 +114,11 @@ class DownloadedProduct:
     """Pointer to the PDS label file (``.LBL`` / ``.XML``) if it was
     downloaded by this call, else ``None``."""
 
+    file_urls: dict[str, str] = field(default_factory=dict)
+    """Map of filename → source URL the files were resolved to. Same
+    information :func:`planetarypy.catalog.get_product_urls` returns, but
+    carried on the result so callers don't have to resolve a second time."""
+
     def open(self, **kwargs):
         """Open this downloaded product in memory in one step.
 
@@ -143,9 +154,30 @@ class DownloadedProduct:
 # commands (hiedr, ctxfetch, etc.) and respects per-instrument config files.
 #
 # Register with:  register_storage_resolver("mro.hirise", my_func)
-# The function signature is:  (product_type, product_id) -> Path
+# Two resolver contracts are accepted (detected by arity):
+#   * context: (ctx: StorageContext) -> Path        (preferred)
+#   * legacy:  (product_type, product_id) -> Path
 
 _STORAGE_RESOLVERS: dict[str, callable] = {}
+
+
+@dataclass(frozen=True)
+class StorageContext:
+    """Everything a storage resolver needs to place a product on disk.
+
+    Handed to context-style resolvers registered via
+    :func:`register_storage_resolver`. Carries the ``ResolvedProduct`` from
+    the resolution that just happened, so a resolver can reuse already-read
+    index fields (via ``resolved.meta``) instead of re-reading the index to
+    recover, e.g., a PDS volume. ``resolved`` is ``None`` when the path is
+    computed outside a fetch (no resolution took place).
+    """
+
+    mission: str
+    instrument: str
+    product_type: str
+    product_id: str
+    resolved: "ResolvedProduct | None" = None
 
 
 def register_storage_resolver(key: str, resolver: callable):
@@ -161,10 +193,33 @@ def register_storage_resolver(key: str, resolver: callable):
     key : str
         Dotted mission.instrument key, e.g. ``"mro.hirise"``.
     resolver : callable
-        Function ``(product_type: str, product_id: str) -> Path``
-        returning the local directory for a product.
+        Either a **context** resolver ``(ctx: StorageContext) -> Path`` or a
+        **legacy** resolver ``(product_type: str, product_id: str) -> Path``,
+        returning the local directory for a product. The form is detected from
+        the callable's arity, so both keep working; new resolvers should take
+        the ``StorageContext`` to get access to the resolved index row.
     """
     _STORAGE_RESOLVERS[key] = resolver
+
+
+def _call_storage_resolver(resolver: callable, ctx: StorageContext) -> Path:
+    """Invoke a resolver under whichever contract it declares.
+
+    A two-positional-argument resolver gets the legacy
+    ``(product_type, product_id)`` call; anything else gets the
+    ``StorageContext``. This keeps already-registered legacy resolvers working
+    while letting new ones opt into the richer context.
+    """
+    try:
+        positional = [
+            p for p in inspect.signature(resolver).parameters.values()
+            if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+        ]
+    except (TypeError, ValueError):
+        positional = []
+    if len(positional) == 2:
+        return resolver(ctx.product_type, ctx.product_id)
+    return resolver(ctx)
 
 
 def default_product_dir(
@@ -189,6 +244,7 @@ _STORAGE_RESOLVER_MODULES = {
 
 def _local_product_dir(
     mission: str, instrument: str, product_type: str, product_id: str,
+    resolved: "ResolvedProduct | None" = None,
 ) -> Path:
     """Build local storage path for a product.
 
@@ -196,12 +252,23 @@ def _local_product_dir(
     eagerly registered or lazy-loaded from ``_STORAGE_RESOLVER_MODULES``),
     then falls back to the default layout:
     ``{storage_root}/{mission}/{instrument}/{product_type}/{product_id}/``
+
+    ``resolved``, when supplied, is forwarded to context-style resolvers so
+    they can reuse fields read during resolution instead of re-reading the
+    index.
     """
     key = f"{mission}.{instrument}"
+    ctx = StorageContext(
+        mission=mission,
+        instrument=instrument,
+        product_type=product_type,
+        product_id=product_id,
+        resolved=resolved,
+    )
 
     # Check eager registrations first
     if key in _STORAGE_RESOLVERS:
-        return _STORAGE_RESOLVERS[key](product_type, product_id)
+        return _call_storage_resolver(_STORAGE_RESOLVERS[key], ctx)
 
     # Try lazy-loading
     if key in _STORAGE_RESOLVER_MODULES:
@@ -211,7 +278,7 @@ def _local_product_dir(
             mod = importlib.import_module(mod_path)
             resolver = getattr(mod, func_name)
             _STORAGE_RESOLVERS[key] = resolver  # cache for next call
-            return resolver(product_type, product_id)
+            return _call_storage_resolver(resolver, ctx)
         except (ImportError, AttributeError):
             pass
 

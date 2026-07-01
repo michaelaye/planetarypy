@@ -684,6 +684,7 @@ def resolve_from_index(
         files=files,
         label_file=label_file,
         source="index",
+        meta=row.to_dict(),
     )
 
 

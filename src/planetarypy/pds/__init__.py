@@ -40,7 +40,33 @@ __all__ = [
     "complete_pid",
     "rebuild_pid_cache",
     "register_meta_handler",
+    "clear_index_cache",
 ]
+
+
+# Process-level cache of fully-loaded index frames, keyed by dotted index key.
+# Populated and consulted by get_index; cleared with clear_index_cache.
+_INDEX_CACHE: dict[str, DataFrame] = {}
+
+
+def clear_index_cache(dotted_index_key: str | None = None) -> None:
+    """Drop cached index frames held in memory by :func:`get_index`.
+
+    ``get_index`` keeps the last-loaded frame for each index so repeated
+    lookups in one process (e.g. a batch ``plp fetch`` or a notebook
+    session) don't re-read the parquet each time. Call this to force the
+    next ``get_index`` to reload from disk — useful after an out-of-band
+    parquet change, or in tests.
+
+    Parameters
+    ----------
+    dotted_index_key : str, optional
+        Clear only this index. ``None`` (default) clears every cached index.
+    """
+    if dotted_index_key is None:
+        _INDEX_CACHE.clear()
+    else:
+        _INDEX_CACHE.pop(dotted_index_key, None)
 
 
 def get_index(
@@ -93,32 +119,48 @@ def get_index(
         When ``pids`` is given, only rows matching those PIDs are returned;
         when ``columns`` is given, only those columns are returned.
     """
-    # Use InventoryIndex for special inventory files that have multi-target CSV format
-    if dotted_index_key.endswith('.inventory'):
-        index = InventoryIndex(dotted_index_key, force_config_update=force_config_update)
-    else:
-        index = Index(dotted_index_key, force_config_update=force_config_update)
+    # Serve the full frame from the process cache on the plain-read path.
+    # Any flag that could re-download or rebuild bypasses the cache and then
+    # refreshes it, so callers asking for fresh data always get it.
+    use_cache = not (
+        allow_refresh or force_refresh or rebuild_parquet or force_config_update
+    )
+    df = _INDEX_CACHE.get(dotted_index_key) if use_cache else None
 
-    # Ensure parquet exists; optionally rebuild from existing files only
-    downloaded = index.ensure_parquet(force=rebuild_parquet)
+    if df is None:
+        # Use InventoryIndex for special inventory files that have multi-target CSV format
+        if dotted_index_key.endswith('.inventory'):
+            index = InventoryIndex(dotted_index_key, force_config_update=force_config_update)
+        else:
+            index = Index(dotted_index_key, force_config_update=force_config_update)
 
-    # Skip refresh logic if we just downloaded in ensure_parquet
-    if not downloaded:
-        # Check update_available only once to avoid repeated remote checks
-        update_avail = index.update_available if not force_refresh else False
-        if (allow_refresh and update_avail) or force_refresh:
-            logger.debug(
-                f"Refreshing index {dotted_index_key}, downloading latest version."
-            )
-            index.download()
-        elif update_avail:
-            # Warn user that an update is available but not being downloaded
-            logger.warning(
-                f"Update available for {dotted_index_key}. "
-                "Call get_index() with allow_refresh=True to download the latest version."
-            )
+        # Ensure parquet exists; optionally rebuild from existing files only
+        downloaded = index.ensure_parquet(force=rebuild_parquet)
 
-    df = index.dataframe
+        # Skip refresh logic if we just downloaded in ensure_parquet
+        if not downloaded:
+            # Check update_available only once to avoid repeated remote checks
+            update_avail = index.update_available if not force_refresh else False
+            if (allow_refresh and update_avail) or force_refresh:
+                logger.debug(
+                    f"Refreshing index {dotted_index_key}, downloading latest version."
+                )
+                index.download()
+            elif update_avail:
+                # Warn user that an update is available but not being downloaded
+                logger.warning(
+                    f"Update available for {dotted_index_key}. "
+                    "Call get_index() with allow_refresh=True to download the latest version."
+                )
+
+        df = index.dataframe
+        _INDEX_CACHE[dotted_index_key] = df
+
+    # Hand out a distinct frame so a caller's in-place mutation (e.g.
+    # get_edr_index appends columns) can't pollute the cached original.
+    # Copy-on-Write keeps this shallow copy cheap (shares the data blocks).
+    df = df.copy(deep=False)
+
     if pids is not None:
         col = pid_column(dotted_index_key, df)
         if prefix:

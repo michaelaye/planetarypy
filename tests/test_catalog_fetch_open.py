@@ -17,7 +17,9 @@ LABEL = DATA / "test_index.lbl"
 
 def _patch_resolver(monkeypatch):
     """Make fetch_product resolve to the bundled label without any network."""
-    resolved = SimpleNamespace(product_id="TEST_PID", label_file=LABEL.name)
+    resolved = SimpleNamespace(
+        product_id="TEST_PID", label_file=LABEL.name, file_urls={}
+    )
     monkeypatch.setattr(
         "planetarypy.catalog._resolver.resolve_product",
         lambda *a, **k: resolved,
