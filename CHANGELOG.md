@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.79.1] - 2026-07-16
+
+### Fixed
+
+- **PSA geometry index 404 for slash-containing `DATA_SET_ID`s.** `plp psa geometry` (and `planetarypy.psa.geometry_index`) 404'd for a dataset whose id contains a slash — e.g. `VEX-V-VIRTIS-2/3-V3.0`. PSA's FTP directory names encode that slash as a dash (`VEX-V-VIRTIS-2-3-V3.0`), but the index-URL builder split the label URL on the raw-slash form, which never matched — so it kept the whole deep product URL and appended a bogus `INDEX/` path. The slash is now encoded as a dash when building the path, and kept out of the local parquet/tmp cache paths (where it had been silently creating nested directories).
+
 ## [0.79.0] - 2026-07-16
 
 A COG-browsing release: an interactive, zero-install web viewer for cloud-optimised GeoTIFFs — shipped as a documentation tab and launchable from Python — plus a STAC "unpacker" to see what a collection holds, and a full remote-rasters tutorial.
