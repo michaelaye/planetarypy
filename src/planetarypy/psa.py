@@ -464,7 +464,11 @@ def _index_dir_url(dataset: str) -> Optional[str]:
     if not rows or not rows[0].get("label_url"):
         return None
     label_url = rows[0]["label_url"]
-    ds = _normalise_dataset(dataset)
+    # PSA FTP directory names encode a DATA_SET_ID's "/" as "-" (e.g.
+    # VEX-V-VIRTIS-2/3-V3.0 lives under .../VEX-V-VIRTIS-2-3-V3.0/), so split and
+    # rebuild the path in that form — the raw slash never matches the URL, which
+    # would leave the whole deep label_url in place and 404.
+    ds = _normalise_dataset(dataset).replace("/", "-")
     base = label_url.split(f"/{ds}/", 1)[0]
     return f"{base}/{ds}/INDEX/"
 
@@ -477,7 +481,8 @@ def _member_geometry_df(dataset: str, cache_dir: Path, *, force: bool):
     from planetarypy.utils import url_retrieve
 
     ds = _normalise_dataset(dataset)
-    parq = cache_dir / f"{ds}.parquet"
+    safe = ds.replace("/", "-")   # a "/" in the DATA_SET_ID must not split the cache path
+    parq = cache_dir / f"{safe}.parquet"
     if parq.exists() and not force:
         return pd.read_parquet(parq)
 
@@ -489,7 +494,7 @@ def _member_geometry_df(dataset: str, cache_dir: Path, *, force: bool):
     lbl_name = geo[0] if geo else "INDEX.LBL"
     tab_name = lbl_name.rsplit(".", 1)[0] + ".TAB"
 
-    tmp = cache_dir / ds
+    tmp = cache_dir / safe
     tmp.mkdir(parents=True, exist_ok=True)
     url_retrieve(f"{index_url}{lbl_name}", tmp / lbl_name)
     url_retrieve(f"{index_url}{tab_name}", tmp / tab_name)

@@ -145,6 +145,26 @@ def test_granule_gid_pds3_and_pds4():
             == "urn:esa:psa:bc_mpo_berm:data_calibrated")
 
 
+# ── geometry index: DATA_SET_ID containing a slash (e.g. VIRTIS-2/3) ──
+
+
+def test_normalise_and_group_keep_slash_but_drop_data_suffix():
+    assert psa._normalise_dataset("VEX-V-VIRTIS-2/3-V3.0:DATA") == "VEX-V-VIRTIS-2/3-V3.0"
+    assert psa.dataset_group("VEX-V-VIRTIS-2/3-V3.0:DATA") == "VEX-V-VIRTIS-2/3-V3.0"
+
+
+def test_index_dir_url_encodes_slash_as_dash(monkeypatch):
+    # PSA FTP directory names render a DATA_SET_ID's "/" as "-"; splitting on the
+    # raw slash never matched, leaving the whole deep label_url in place -> 404.
+    label = ("https://archives.esac.esa.int/psa/ftp/VENUS-EXPRESS/VIRTIS/"
+             "VEX-V-VIRTIS-2-3-V3.0/DATA/MTP001/VIR0023/RAW/VH0023_00.QUB/VH0023_00.LBL")
+    monkeypatch.setattr(psa, "query", lambda adql, **k: [{"label_url": label}])
+    url = psa._index_dir_url("VEX-V-VIRTIS-2/3-V3.0:DATA")
+    assert url == ("https://archives.esac.esa.int/psa/ftp/VENUS-EXPRESS/VIRTIS/"
+                   "VEX-V-VIRTIS-2-3-V3.0/INDEX/")
+    assert "VIRTIS-2/3" not in url          # the raw slash never leaks into the path
+
+
 # ── examples (catalog key -> DATA_SET_ID -> N products) ──────────────
 
 
