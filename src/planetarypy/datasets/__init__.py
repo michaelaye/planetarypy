@@ -22,8 +22,15 @@ from typing import Optional, Union
 
 __all__ = [
     "RemoteRaster", "StacCollection", "StacItem",
-    "list_datasets", "bodies", "read_window", "read_bbox", "stac_search",
+    "list_datasets", "bodies", "read_window", "read_bbox",
+    "stac_search", "stac_items", "stac_collections", "browse",
 ]
+
+# The interactive COG viewer shipped as a docs tab (docs/cogbrowser/), published to
+# GitHub Pages. `browse()` opens it with the dataset baked into the query string.
+VIEWER_URL = "https://michaelaye.github.io/planetarypy/cogbrowser/index.html"
+# Self-contained presets baked into the viewer app (no CRS needed — it carries them).
+_VIEWER_PRESETS = {"robbins_spole", "robbins_equatorial", "hrsc_level3"}
 
 # GDAL options that make /vsicurl/ COG reads fast (no directory listing, only
 # fetch the byte ranges the window needs).
@@ -99,6 +106,10 @@ class RemoteRaster:
         """Read an explicit lon/lat box (degrees). See :func:`read_bbox`."""
         return read_bbox(self, west, south, east, north, out=out)
 
+    def browse(self, *, open_browser: bool = True) -> str:
+        """Open this raster in the interactive COG Browser. See :func:`browse`."""
+        return browse(self, open_browser=open_browser)
+
 
 @dataclass(frozen=True)
 class StacItem:
@@ -122,6 +133,10 @@ class StacItem:
 
     def read_bbox(self, west, south, east, north, *, out=None):
         return read_bbox(self, west, south, east, north, out=out)
+
+    def browse(self, *, open_browser: bool = True) -> str:
+        """Open this STAC item's COG in the interactive COG Browser. See :func:`browse`."""
+        return browse(self, open_browser=open_browser)
 
 
 @dataclass(frozen=True)
@@ -152,6 +167,13 @@ class StacCollection:
         """Items covering a lon/lat point."""
         return stac_search(self, lon=lon, lat=lat, limit=limit)
 
+    def items(self, *, limit: int = 50):
+        """List this collection's items (its contained products), no spatial filter.
+
+        The "unpacker": enumerate what a collection holds. See :func:`stac_items`.
+        """
+        return stac_items(self, limit=limit)
+
     def read_window(self, lon, lat, size=1.0, *, anchor="center", out=None):
         """Convenience: read from the first item covering ``(lon, lat)``."""
         items = self.at(lon, lat, limit=1)
@@ -160,6 +182,10 @@ class StacCollection:
                 f"no {self.collection!r} item covers lon={lon}, lat={lat}"
             )
         return items[0].read_window(lon, lat, size, anchor=anchor, out=out)
+
+    def browse(self, lon: float, lat: float, *, open_browser: bool = True) -> str:
+        """Open the COG covering ``(lon, lat)`` in the COG Browser. See :func:`browse`."""
+        return browse(self, lon=lon, lat=lat, open_browser=open_browser)
 
 
 def _pick_cog_asset(assets: dict, asset_key: "Optional[str]") -> "Optional[str]":
@@ -174,9 +200,27 @@ def _pick_cog_asset(assets: dict, asset_key: "Optional[str]") -> "Optional[str]"
     return None
 
 
+def _items_from_features(features, coll: "StacCollection") -> "list[StacItem]":
+    """Turn STAC ``features`` into COG-bearing :class:`StacItem` s (non-COG skipped)."""
+    items: "list[StacItem]" = []
+    for f in features:
+        href = _pick_cog_asset(f.get("assets", {}), coll.asset_key)
+        if not href:
+            continue
+        items.append(StacItem(
+            id=f.get("id"),
+            cog_url=href,
+            collection=coll.collection,
+            bbox=tuple(f.get("bbox", ()) or ()),
+            datetime=(f.get("properties", {}) or {}).get("datetime"),
+            short=coll.short,
+        ))
+    return items
+
+
 def stac_search(coll: "StacCollection", *, bbox=None, lon=None, lat=None,
                 limit: int = 20) -> "list[StacItem]":
-    """Query a STAC collection; return its COG-bearing items as StacItems.
+    """Query a STAC collection by location; return its COG-bearing items as StacItems.
 
     ``bbox`` is ``(west, south, east, north)`` in degrees; or pass ``lon``/``lat``
     for a point (expanded to a tiny box, since STAC rejects a zero-area bbox).
@@ -195,20 +239,40 @@ def stac_search(coll: "StacCollection", *, bbox=None, lon=None, lat=None,
     }
     resp = requests.get(f"{coll.stac_url}/search", params=params, timeout=60)
     resp.raise_for_status()
-    items: "list[StacItem]" = []
-    for f in resp.json().get("features", []):
-        href = _pick_cog_asset(f.get("assets", {}), coll.asset_key)
-        if not href:
-            continue
-        items.append(StacItem(
-            id=f.get("id"),
-            cog_url=href,
-            collection=coll.collection,
-            bbox=tuple(f.get("bbox", ()) or ()),
-            datetime=(f.get("properties", {}) or {}).get("datetime"),
-            short=coll.short,
-        ))
-    return items
+    return _items_from_features(resp.json().get("features", []), coll)
+
+
+def stac_items(coll: "StacCollection", *, limit: int = 50) -> "list[StacItem]":
+    """List a collection's items (its contents) with no spatial filter — the "unpacker".
+
+    Hits the STAC ``/collections/{id}/items`` endpoint. ``limit`` caps how many are
+    returned (the endpoint paginates; this fetches the first page).
+    """
+    import requests
+
+    resp = requests.get(
+        f"{coll.stac_url}/collections/{coll.collection}/items",
+        params={"limit": int(limit)}, timeout=60,
+    )
+    resp.raise_for_status()
+    return _items_from_features(resp.json().get("features", []), coll)
+
+
+def stac_collections(stac_url: str) -> "list[dict]":
+    """Discover the collections a STAC API root offers: ``[{id, title, description}]``.
+
+    E.g. ``stac_collections("https://stac.astrogeology.usgs.gov/api")`` lists every
+    USGS Astrogeology collection — the ids you'd register as a :class:`StacCollection`.
+    """
+    import requests
+
+    resp = requests.get(f"{stac_url}/collections", timeout=60)
+    resp.raise_for_status()
+    return [
+        {"id": c.get("id"), "title": c.get("title"),
+         "description": (c.get("description") or "").strip()[:160]}
+        for c in resp.json().get("collections", [])
+    ]
 
 
 # ── baked-in registry (the remote-refreshed TOML from the design doc is deferred) ──
@@ -395,6 +459,92 @@ def read_window(source, lon: float, lat: float, size: float = 1.0, *,
     """
     west, south, east, north = _box_lonlat(lon, lat, size, anchor)
     return read_bbox(source, west, south, east, north, out=out)
+
+
+def _viewer_proj4(source, ds_crs=None) -> "Optional[str]":
+    """proj4 string for the viewer: from a registry IAU code, else from the COG's CRS.
+
+    Planetary COGs rarely carry an EPSG code, so the browser needs the projection as
+    a proj4 string. It is *generated* by pyproj (never hand-written) — from the
+    registry entry's IAU authority code when present, otherwise from the CRS read out
+    of the COG itself (``ds_crs``).
+    """
+    import warnings
+
+    from pyproj import CRS
+
+    for candidate in (getattr(source, "crs", None), ds_crs):
+        if candidate is None:
+            continue
+        try:
+            with warnings.catch_warnings():       # to_proj4 warns "lossy"; fine for proj4.js
+                warnings.simplefilter("ignore")
+                return CRS.from_user_input(candidate).to_proj4()
+        except Exception:
+            continue
+    return None
+
+
+def browse(source=None, *, lon: "Optional[float]" = None, lat: "Optional[float]" = None,
+           base_url: str = VIEWER_URL, open_browser: bool = True) -> str:
+    """Open the interactive COG Browser (the docs viewer) for a raster source.
+
+    ``source`` may be:
+
+    - a :class:`RemoteRaster`, :class:`StacItem`, registry key, or bare COG URL —
+      the viewer opens on that COG, with its projection resolved to proj4 by
+      :func:`_viewer_proj4` (from the IAU code, else read from the COG);
+    - a :class:`StacCollection` — pass ``lon``/``lat`` to pick the covering item;
+    - a viewer preset name (``"robbins_spole"``, ``"robbins_equatorial"``) or ``None``
+      for the default preset — the viewer carries these self-contained.
+
+    Returns the viewer URL (also opened in a browser unless ``open_browser=False``).
+    Note the URL points at the published docs; a locally built docs site can be
+    targeted with ``base_url=".../cogbrowser/index.html"``.
+    """
+    from urllib.parse import urlencode
+
+    if source is None:
+        url = base_url
+        if open_browser:
+            import webbrowser
+            webbrowser.open(url)
+        return url
+
+    if isinstance(source, str) and source in _VIEWER_PRESETS:
+        url = f"{base_url}?{urlencode({'preset': source})}"
+        if open_browser:
+            import webbrowser
+            webbrowser.open(url)
+        return url
+
+    if isinstance(source, StacCollection):
+        if lon is None or lat is None:
+            raise ValueError("browsing a StacCollection needs lon= and lat= to pick an item")
+        items = source.at(lon, lat, limit=1)
+        if not items:
+            raise ValueError(f"no {source.collection!r} item covers lon={lon}, lat={lat}")
+        source = items[0]
+
+    src = _as_source(source)
+    cog_url = getattr(src, "url", None) or getattr(src, "cog_url", None)
+    proj4 = _viewer_proj4(src)
+    if proj4 is None:                              # no IAU code -> read the COG's CRS
+        import rasterio
+        _set_gdal_env()
+        with rasterio.open(src.vsicurl) as ds:
+            proj4 = _viewer_proj4(src, ds.crs)
+    params = [("cog", cog_url)]
+    if proj4:
+        params.append(("crs", proj4))
+    nodata = getattr(src, "nodata", None)
+    if nodata is not None:
+        params.append(("nodata", nodata))
+    url = f"{base_url}?{urlencode(params)}"
+    if open_browser:
+        import webbrowser
+        webbrowser.open(url)
+    return url
 
 
 class _BodyNamespace:
