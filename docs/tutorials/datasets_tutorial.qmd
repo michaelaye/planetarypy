@@ -1,0 +1,193 @@
+---
+title: "Remote rasters: COGs and STAC with planetarypy.datasets"
+subtitle: "Discover, subset, and browse institutional mosaics and DEMs — without downloading them"
+jupyter: python3
+---
+
+::: {.callout-note}
+## What this tutorial shows
+
+`planetarypy.datasets` gives you the big institutional rasters that never went to PDS —
+global mosaics, DEMs, IR composites — and reads them **by streaming**, so you only ever
+fetch the bytes your lon/lat window needs. This tutorial walks the whole surface:
+
+1. the **registry** of known datasets, namespaced by body;
+2. reading a **lon/lat window** from any Cloud-Optimized GeoTIFF (COG);
+3. working with **STAC collections** — discover them, *unpack* their contents, search by
+   location, and read a window from an item;
+4. opening a dataset in the interactive **COG Browser**.
+
+It needs the geospatial extras (`rasterio`, `rioxarray`, `pyproj`) and a network
+connection. Everything reads over HTTP — nothing is downloaded in full.
+:::
+
+```{python}
+from planetarypy import datasets
+```
+
+## 1. The registry
+
+Datasets are namespaced **by body**. Ask which bodies are registered, list a body's
+datasets, or reach one as an attribute:
+
+```{python}
+datasets.bodies()
+```
+
+```{python}
+datasets.mars          # the Mars namespace
+```
+
+```{python}
+[r.key for r in datasets.list_datasets("mars")]
+```
+
+Two kinds sit behind the namespace:
+
+- **`RemoteRaster`** — one fixed COG (e.g. the FU Berlin / DLR HRSC level-3 global mosaic).
+- **`StacCollection`** — a STAC collection holding *many* COGs (per quad / per observation),
+  resolved by location or listed on demand.
+
+```{python}
+hrsc = datasets.mars.hrsc_level3
+hrsc.name, hrsc.url, hrsc.crs
+```
+
+## 2. Read a lon/lat window from a COG
+
+`read_window(lon, lat, size)` reads a `size`-degree box and returns a georeferenced
+`xarray.DataArray` (via rioxarray). Only the byte ranges the window needs are fetched.
+
+```{python}
+da = hrsc.read_window(lon=77.4, lat=18.4, size=0.5)   # 0.5° over Jezero crater
+da
+```
+
+It's a real georeferenced array — CRS, transform, and nodata come along:
+
+```{python}
+da.rio.crs, da.rio.resolution()
+```
+
+```{python}
+#| label: fig-jezero
+#| fig-cap: "HRSC level-3 brightness mosaic, 0.5° around Jezero crater (the delta is bottom-left)."
+import matplotlib.pyplot as plt
+
+da.isel(band=0).plot.imshow(cmap="gray", add_colorbar=True)
+plt.title("HRSC level-3 — Jezero")
+plt.show()
+```
+
+### Anchors and explicit boxes
+
+`(lon, lat)` sits at the box **center** by default. Pass `anchor=` to put it on a corner —
+handy for degree-square tiling conventions (`"lower-left"`/`"sw"`), or the raster origin
+(`"upper-left"`/`"nw"`):
+
+```{python}
+da_sw = hrsc.read_window(0, 0, 1.0, anchor="sw")     # (0,0) is the SW corner
+da_bbox = hrsc.read_bbox(-1, -1, 1, 1)               # explicit W,S,E,N degrees
+da_sw.shape, da_bbox.shape
+```
+
+Add `out="patch.tif"` to any read to also write a GeoTIFF:
+
+```{python}
+#| eval: false
+hrsc.read_window(77.4, 18.4, 0.5, out="jezero.tif")
+```
+
+### From a bare COG URL
+
+You don't need a registry entry — point `read_window` / `read_bbox` at **any** COG URL
+(the box is reprojected into the file's own CRS, so any body/projection works):
+
+```{python}
+url = ("https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mars/"
+       "Mars_MRO_CTX_Equi_Mosaics_Robbins/100mpp/MC11_100mpp.16bit.tif")
+datasets.read_window(url, lon=-25, lat=15, size=0.5)
+```
+
+## 3. STAC collections
+
+A `StacCollection` is a *catalog*, not a single raster: each item points to a COG. There
+are three things you'll want to do with one.
+
+### Discover what a STAC endpoint offers
+
+```{python}
+cols = datasets.stac_collections("https://stac.astrogeology.usgs.gov/api")
+len(cols), [c["id"] for c in cols[:6]]
+```
+
+Any of those ids can be registered as a `StacCollection` (see §5). Three are already in the
+registry:
+
+```{python}
+[r.key for r in datasets.list_datasets() if r.__class__.__name__ == "StacCollection"]
+```
+
+### Unpack a collection's contents
+
+`items()` lists what a collection holds — no spatial filter — so you can see the products:
+
+```{python}
+themis = datasets.mars.themis_mosaics
+items = themis.items(limit=8)
+[(it.id, it.cog_url.split("/")[-1]) for it in items]
+```
+
+### Search by location
+
+When you *do* have a place in mind, `at(lon, lat)` / `search(bbox=…)` return the items
+covering it:
+
+```{python}
+here = themis.at(lon=-90, lat=-30)      # items covering the point
+[it.id for it in here]
+```
+
+### Read a window from an item
+
+A `StacItem` reads exactly like a `RemoteRaster`:
+
+```{python}
+tile = themis.at(lon=-90, lat=-30, limit=1)[0]
+tile.read_window(-90, -30, 0.3)
+```
+
+::: {.callout-note}
+When several items overlap your point, the `StacCollection.read_window` convenience uses
+the first; use `at` / `search` to see all candidates and pick yourself. Mosaicking across
+overlapping items is a planned follow-up.
+:::
+
+## 4. Browse it interactively
+
+`browse()` opens the [COG Browser](../cogbrowser.qmd) on a dataset — streaming overviews,
+colormaps, and adaptive histogram-equalization, all in the browser. It resolves the COG URL
+and its projection (proj4 generated by pyproj) and hands them to the viewer:
+
+```{python}
+#| eval: false
+datasets.mars.hrsc_level3.browse()          # a registered raster
+datasets.browse(url)                          # any COG URL
+themis.at(-90, -30, limit=1)[0].browse()      # a STAC item
+```
+
+The call returns the viewer URL (and opens your default browser unless
+`open_browser=False`).
+
+## 5. Add your own dataset
+
+Registering a product is one entry in `planetarypy/datasets/__init__.py`: a `RemoteRaster`
+(a COG URL + its IAU CRS code) or a `StacCollection` (a STAC API root + a collection id from
+`stac_collections(...)` above). Extent, native resolution, and nodata are read from the COG
+itself — you only supply what a planetary COG can't self-describe.
+
+## See also
+
+- [HOWTO: read remote reference rasters](../howto/datasets.qmd) — the quick reference.
+- [COG Browser](../cogbrowser.qmd) — the interactive viewer `browse()` opens.
+- [Planetary CRS tutorial](planetary_crs_tutorial.ipynb) — the IAU codes behind the reprojection.

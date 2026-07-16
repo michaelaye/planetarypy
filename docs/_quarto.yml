@@ -1,6 +1,8 @@
 project:
   type: website
   output-dir: _build
+  resources:
+    - cogbrowser/          # the standalone COG-viewer app (copied verbatim to _build/)
   preview:
     port: 4200
     browser: true
@@ -27,6 +29,8 @@ website:
         href: explanation/index.qmd
       - text: API Reference
         href: reference/index.qmd
+      - text: COG Browser
+        href: cogbrowser.qmd
       - text: Fact Sheets
         href: factsheets.qmd
       - text: Contributing
@@ -43,6 +47,7 @@ website:
         - tutorials/pds_indexes_examples.ipynb
         - tutorials/pds_catalog_tutorial.ipynb
         - tutorials/geospatial_tutorial.ipynb
+        - tutorials/datasets_tutorial.qmd
         - tutorials/planetary_crs_tutorial.ipynb
         - tutorials/spicer_tutorial.ipynb
         - tutorials/spice_kernel_examples.ipynb

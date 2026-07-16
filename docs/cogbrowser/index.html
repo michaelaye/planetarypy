@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Robbins MC30 South Polar CTX Mosaic — browser</title>
+<style>
+  html, body { margin:0; height:100%; background:#111; color:#eee; font:13px/1.4 system-ui,sans-serif; }
+  #map { position:absolute; inset:0; }
+  #overlay { position:absolute; inset:0; pointer-events:none; z-index:5; }
+  #panel { position:absolute; top:10px; right:10px; z-index:10; width:240px;
+    background:rgba(20,20,24,.92); border:1px solid #333; border-radius:8px; padding:12px 14px;
+    box-shadow:0 4px 18px rgba(0,0,0,.5); }
+  #panel h1 { font-size:13px; margin:0 0 8px; font-weight:600; }
+  .row { margin:8px 0; display:flex; flex-direction:column; gap:3px; }
+  .row label { font-size:11px; color:#9aa; display:flex; justify-content:space-between; }
+  .row input[type=range]{ width:100%; }
+  select,.seg{ width:100%; background:#222; color:#eee; border:1px solid #444; border-radius:5px; padding:4px; }
+  .seg{ display:flex; padding:0; overflow:hidden; }
+  .seg button{ flex:1; background:#222; color:#bbb; border:0; padding:6px; cursor:pointer; font:inherit; }
+  .seg button.on{ background:#3a6; color:#fff; }
+  .btn{ width:100%; background:#2a2f3a; color:#cde; border:1px solid #456; border-radius:5px; padding:6px; cursor:pointer; font:inherit; }
+  .btn:hover{ background:#37506a; } .btn:active{ background:#3a6; color:#fff; }
+  #status{ position:absolute; left:10px; bottom:10px; z-index:10; background:rgba(0,0,0,.6);
+    padding:4px 8px; border-radius:4px; font-size:11px; color:#8c8; }
+  #latlon{ position:absolute; right:12px; bottom:10px; z-index:10; width:168px;
+    background:rgba(20,20,24,.8); border:1px solid #345; border-radius:4px;
+    padding:3px 8px; font:11px/1.5 ui-monospace,SFMono-Regular,monospace; color:#8ad;
+    font-variant-numeric:tabular-nums; }
+  #latlon:focus{ outline:none; border-color:#3a6; color:#eff; }
+  #scalebar{ position:absolute; left:50%; transform:translateX(-50%); bottom:10px; z-index:10;
+    background:rgba(20,20,24,.7); padding:3px 7px 4px; border-radius:4px; text-align:center;
+    color:#cde; font-size:10px; font-variant-numeric:tabular-nums; }
+  #scalebar-bar{ height:3px; margin:0 auto 2px; background:#cde;
+    border-left:1px solid #cde; border-right:1px solid #cde; }
+  .histeq-only{ display:none; } body.histeq .histeq-only{ display:flex; }
+  .adaptive-only{ display:none; } body.histeq:not(.global) .adaptive-only{ display:flex; }
+  .flatten-only{ display:none; } body.histeq.flatten .flatten-only{ display:flex; }
+  .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; background:#3c6;
+        vertical-align:middle; margin-left:7px; transition:background .12s;
+        box-shadow:0 0 5px rgba(0,0,0,.6); }
+  .dot.busy{ background:#e33; }
+  #zoombar{ position:relative; height:8px; background:#333; border-radius:4px; margin-top:5px;
+            cursor:ew-resize; touch-action:none; }
+  #zoommark{ position:absolute; top:-2px; width:3px; height:10px; background:#3c6;
+             border-radius:2px; transform:translateX(-50%); transition:left .06s linear; }
+  #zoomnative{ position:absolute; top:-3px; width:1px; height:12px; background:#8ad; }
+</style>
+  <script type="module" crossorigin src="./assets/index-CjWTuaff.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-c_1sG1-7.css">
+</head>
+<body>
+<div id="map"></div>
+<canvas id="overlay"></canvas>
+<div id="panel">
+  <h1 id="title">MC30 South Polar CTX · 6&nbsp;m/px <span id="dot" class="dot" title="ready"></span></h1>
+  <div class="row"><label>Display</label>
+    <div class="seg" id="mode">
+      <button data-mode="linear" class="on">Linear</button>
+      <button data-mode="histeq">Hist-equal</button>
+    </div></div>
+  <div class="row histeq-only"><label>Method (raw&nbsp;16-bit)</label>
+    <div class="seg" id="hemethod">
+      <button data-he="adaptive" class="on">Adaptive</button>
+      <button data-he="global">Global</button>
+    </div></div>
+  <div class="row histeq-only"><label>Flatten seams</label>
+    <div class="seg" id="flatten">
+      <button data-flat="off" class="on">Off</button>
+      <button data-flat="on">On</button>
+    </div></div>
+  <div class="row flatten-only"><label>window <span id="winv">15%</span></label>
+    <input type="range" id="win" min="4" max="60" value="15"></div>
+  <div class="row"><label>zoom <span id="zoomval">—</span></label>
+    <div id="zoombar"><div id="zoomnative" title="native 6 m/px"></div><div id="zoommark"></div></div>
+  </div>
+  <div class="row"><label>Colormap</label>
+    <select id="cmap">
+      <option value="gray">gray</option>
+      <option value="gray_r">gray (inverted)</option>
+      <option value="viridis">viridis</option>
+      <option value="magma">magma</option>
+      <option value="inferno">inferno</option>
+    </select></div>
+  <div class="row"><label>Stretch</label>
+    <div class="seg" id="autostretch">
+      <button data-auto="on" class="on">Auto</button>
+      <button data-auto="off">Manual</button>
+    </div></div>
+  <div class="row"><button id="restretch" class="btn">⟳ Restretch to view</button></div>
+  <div class="row"><label>min <span id="lov">6147</span></label>
+    <input type="range" id="lo" min="0" max="30000" value="6147"></div>
+  <div class="row"><label>max <span id="hiv">27397</span></label>
+    <input type="range" id="hi" min="0" max="30000" value="27397"></div>
+  <div class="row"><label>gamma <span id="gv">1.00</span></label>
+    <input type="range" id="gamma" min="20" max="300" value="100"></div>
+  <div class="row adaptive-only"><label>clip limit <span id="clv">3.0</span></label>
+    <input type="range" id="clip" min="10" max="120" value="30"></div>
+  <div class="row adaptive-only"><label>tile grid <span id="tgv">8</span></label>
+    <input type="range" id="grid" min="2" max="16" value="8"></div>
+  <div class="row adaptive-only"><label>tail clip <span id="pctv">0.5%</span></label>
+    <input type="range" id="pct" min="0" max="50" value="5"></div>
+</div>
+<div id="status">loading…</div>
+<input id="latlon" spellcheck="false" autocomplete="off" placeholder="lat, lon → Enter"
+       title="cursor position — type a lat, lon and press Enter to fly there">
+<div id="scalebar"><div id="scalebar-bar"></div><span id="scalebar-label">—</span></div>
+
+</body>
+</html>

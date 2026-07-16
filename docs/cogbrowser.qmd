@@ -1,0 +1,85 @@
+---
+title: "COG Browser"
+page-layout: full
+toc: false
+---
+
+A zero-install, in-browser viewer for **Cloud-Optimized GeoTIFFs streamed from a URL** —
+no download, no server-side tiling. It renders in the COG's **native planetary projection**
+(any CRS via proj4), streams overviews by HTTP range request, and adds histogram
+equalization on the raw 16-bit DN. Everything runs client-side; the only requirement is
+that the COG's host allows cross-origin reads (CORS).
+
+::: {.callout-tip appearance="simple"}
+Open it full-screen: [**S-polar CTX ↗**](cogbrowser/index.html){target="_blank"} ·
+[**Equatorial CTX belt ↗**](cogbrowser/index.html?preset=robbins_equatorial){target="_blank"} ·
+[**HRSC level-3 global ↗**](cogbrowser/index.html?preset=hrsc_level3){target="_blank"}
+:::
+
+<iframe src="cogbrowser/index.html"
+        style="width:100%; height:82vh; border:1px solid var(--bs-border-color); border-radius:6px;"
+        loading="lazy" title="COG Browser"></iframe>
+
+## Choosing a dataset
+
+The viewer is driven entirely by URL query parameters, so a link *is* a view:
+
+| Parameter | Meaning |
+|---|---|
+| `?preset=<name>` | A built-in preset — `robbins_spole` (default), `robbins_equatorial`, or `hrsc_level3`. |
+| `?cog=<url>` | Any Cloud-Optimized GeoTIFF (repeatable for a multi-COG mosaic sharing one CRS). |
+| `&crs=<proj4>` | The COG's projection as a proj4 string. Omit for COGs that carry an EPSG code; planetary COGs usually don't, so pass it (see below). |
+| `&nodata=<value>` | Override the no-data value. Normally read from the COG's `GDAL_NODATA` tag. |
+
+Extent, native resolution, no-data, and a default 2/98-percentile stretch are all
+**auto-derived from the COG** — a preset only needs the URL(s) and, for planetary data,
+the CRS.
+
+## Generating the CRS from `planetarypy`
+
+Planetary COGs rarely carry an EPSG authority code, so the viewer needs the projection as a
+proj4 string. Generate it — never hand-write it — from the COG itself or an IAU code:
+
+```python
+from pyproj import CRS
+
+# from a registered dataset's IAU authority code …
+CRS.from_user_input("IAU_2015:49910").to_proj4()
+
+# … or straight from the COG (works for any body / projection)
+import rasterio
+with rasterio.open("/vsicurl/https://host/product.tif") as ds:
+    proj4 = ds.crs.to_proj4()
+```
+
+This is the same resolution `planetarypy.datasets` uses to build a viewer link for a
+registered raster or a STAC item.
+
+## Working with STAC collections
+
+A STAC collection is a *discovery* index, not a single raster: each item points to a COG.
+So the workflow composes with this viewer —
+
+```python
+from planetarypy import datasets
+
+coll = datasets._REGISTRY["usgs.mars.ctx.controlled_dtms"]
+item = coll.at(lon=137.4, lat=-4.6, limit=1)[0]   # STAC search → a COG
+# item.cog_url is a COG → open it here with ?cog=<item.cog_url>&crs=<proj4>
+```
+
+STAC finds the product; the COG browser shows it.
+
+## Notes
+
+- **Auto-restretch.** The min/max stretch recomputes from the current viewport as you
+  pan and zoom (2/98 percentile of the on-screen DN), so a dark or bright region always
+  fills the dynamic range. Switch **Stretch** to *Manual* to lock a value, or press
+  *Restretch to view* for a one-shot recompute after tweaking the sliders.
+- **CORS is the one hard requirement.** A browser can only range-read a COG whose host
+  sends `Access-Control-Allow-Origin`. The USGS `asc-pds-services` bucket (the Robbins
+  presets) is open; some hosts are readable server-side (e.g. from `rasterio`) but not from
+  a browser.
+- **First paint** can take 20–30 s on a cold start while the decode worker spins up.
+- The bright white streaks in the equatorial sample are outlier columns in the *source*
+  mosaic (above the stretch max), not a viewer artifact.
