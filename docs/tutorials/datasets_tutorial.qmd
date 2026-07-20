@@ -2,6 +2,13 @@
 title: "Remote rasters: COGs and STAC with planetarypy.datasets"
 subtitle: "Discover, subset, and browse institutional mosaics and DEMs — without downloading them"
 jupyter: python3
+execute:
+  # Always render from the committed _freeze/ (this tutorial hits live FU-Berlin /
+  # USGS / S3 endpoints). CI has no Jupyter kernel and shouldn't depend on those
+  # servers being up. Regenerate the freeze locally after editing:
+  #   quarto render docs/tutorials/datasets_tutorial.qmd
+  # then `git add docs/_freeze/tutorials/datasets_tutorial` and commit.
+  freeze: true
 ---
 
 ::: {.callout-note}
