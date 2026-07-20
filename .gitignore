@@ -166,3 +166,8 @@ Plans/
 # Raw NSSDC HTML corpus — kept locally for re-deriving the parsed archive,
 # but lives on Zenodo (10.5281/zenodo.20122987) for distribution.
 src/planetarypy/constants/nssdc/_raw/
+
+# throwaway __init__.py created by docs/build-reference.sh for the API-reference
+# build only (instruments/ + mro/ are PEP 420 namespace packages); never commit these.
+src/planetarypy/instruments/__init__.py
+src/planetarypy/instruments/mro/__init__.py

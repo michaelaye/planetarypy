@@ -43,7 +43,9 @@ jobs:
 
       - name: Build API reference
         working-directory: docs
-        run: python -m quartodoc build
+        # build-reference.sh wraps `quartodoc build` with throwaway __init__.py for the
+        # instruments/ namespace packages (griffe can't traverse them); see the script.
+        run: bash build-reference.sh
 
       - name: Render Quarto site
         run: quarto render docs

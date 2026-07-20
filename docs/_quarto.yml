@@ -170,6 +170,11 @@ quartodoc:
     #     - isis.autoseed
 
     - title: Instruments
+      # NB instruments/ and instruments/mro/ are PEP 420 namespace packages (no
+      # __init__.py — for the planetarypy-hirise split). griffe can't statically
+      # traverse a namespace package, so the reference is built via
+      # docs/build-reference.sh, which creates throwaway __init__.py just for the
+      # build (never committed / shipped). See that script.
       contents:
         - instruments.mro.ctx
         - instruments.mro.hirise
