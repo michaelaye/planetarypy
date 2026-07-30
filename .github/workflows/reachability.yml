@@ -1,0 +1,67 @@
+name: Archive reachability
+
+# Cheap per-URL reachability probe of every registered index (HEAD only, no
+# downloads), so hosts whose smallest index is 100 MB+ are covered too — the
+# `PDS download smoke` canary can only afford three of them.
+#
+# Results are published to the orphan `status` branch, which the README badges
+# read via shields.io. Nothing is ever committed to `main`, so this cannot
+# create commit noise or retrigger the test workflow.
+on:
+  schedule:
+    - cron: "47 */6 * * *"   # every 6h, offset from the :17/:37 smoke canaries
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reachability
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe every registered index URL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install planetarypy
+        run: pip install -e "."
+
+      - name: Probe
+        run: python scripts/check_node_reachability.py --outdir status
+
+      - name: Publish to the status branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git clone --depth 1 --branch status "$url" /tmp/status 2>/dev/null; then
+            find /tmp/status -maxdepth 1 -name '*.json' -delete
+          else
+            git init -q -b status /tmp/status
+            git -C /tmp/status remote add origin "$url"
+          fi
+          cp status/*.json status/STATUS.md /tmp/status/
+          git -C /tmp/status add -A
+          # Only commit on an actual change: summary.json carries a timestamp,
+          # so a blind commit would land every six hours forever.
+          if git -C /tmp/status diff --cached --quiet -- ':!summary.json'; then
+            echo "no reachability change; skipping commit"
+          else
+            git -C /tmp/status commit -qm "reachability: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git -C /tmp/status push -q origin status
+            echo "published"
+          fi
+
+      - name: Summary
+        if: always()
+        run: cat status/STATUS.md >> "$GITHUB_STEP_SUMMARY"

@@ -6,6 +6,20 @@
 
 Python tools for planetary science data access.
 
+### Archive reachability
+
+Every registered PDS index URL is probed every six hours. Badges are live —
+they reflect the archives right now, not whenever this page was published.
+Full table, including which individual indexes are failing:
+[STATUS.md](https://github.com/michaelaye/planetarypy/blob/status/STATUS.md).
+
+[![PDS Geosciences (WUSTL)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmichaelaye%2Fplanetarypy%2Fstatus%2Fpds-geosciences-wustl-edu.json)](https://pds-geosciences.wustl.edu/)
+[![PDS Rings (SETI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmichaelaye%2Fplanetarypy%2Fstatus%2Fpds-rings-seti-org.json)](https://pds-rings.seti.org/)
+[![PDS Imaging (JPL)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmichaelaye%2Fplanetarypy%2Fstatus%2Fplanetarydata-jpl-nasa-gov.json)](https://planetarydata.jpl.nasa.gov/)
+[![HiRISE (LPL)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmichaelaye%2Fplanetarypy%2Fstatus%2Fhirise-pds-lpl-arizona-edu.json)](https://hirise-pds.lpl.arizona.edu/PDS/)
+[![LROC (ASU)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmichaelaye%2Fplanetarypy%2Fstatus%2Fpds-lroc-asu-edu.json)](https://pds.lroc.asu.edu/)
+[![SBN (PSI)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmichaelaye%2Fplanetarypy%2Fstatus%2Fsbnarchive-psi-edu.json)](https://sbnarchive.psi.edu/)
+
 > **Note for users of v0.32 and earlier (nbplanetary):**
 > This version (0.50+) is a ground-up rewrite with a new API.
 > If you need functionality from the previous version, it remains available at
