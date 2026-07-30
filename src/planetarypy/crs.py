@@ -25,12 +25,36 @@ Examples
 from pyproj import CRS
 from pyproj.exceptions import CRSError
 
-__all__ = ["body_crs", "local_crs", "get_crs"]
+__all__ = ["body_crs", "local_crs", "get_crs", "projected_crs"]
 
 # IAU code = naif_id * 100 + variant offset. Offset 0 ("Sphere / Ocentric")
 # exists for every body; 1 ("Ographic") only for some (e.g. Mars, Jupiter —
 # not the Moon or Vesta).
 _SYSTEM_OFFSET = {"ocentric": 0, "ographic": 1}
+
+# Projected variants sit at offsets 10..90 in steps of 5, each followed by a
+# 3-slot system triple. Note the triple differs from _SYSTEM_OFFSET above:
+# for projected codes slot 0 is the *sphere*, and ocentric moves to slot 2.
+_PROJECTION_OFFSET = {
+    "equirectangular": 10,
+    "equirectangular_180": 15,
+    "sinusoidal": 20,
+    "sinusoidal_180": 25,
+    "north_polar": 30,
+    "south_polar": 35,
+    "mollweide": 40,
+    "mollweide_180": 45,
+    "robinson": 50,
+    "robinson_180": 55,
+    "transverse_mercator": 60,
+    "orthographic": 65,
+    "orthographic_180": 70,
+    "lambert_conic_conformal": 75,
+    "lambert_azimuthal_equal_area": 80,
+    "albers_equal_area": 85,
+    "mercator": 90,
+}
+_PROJECTED_SYSTEM_OFFSET = {"sphere": 0, "ographic": 1, "ocentric": 2}
 
 # PROJ ships only the IAU 2015 CRS edition (no IAU_2009/2006/... authority),
 # so this is the single authority we build against.
@@ -123,6 +147,55 @@ def local_crs(lon: float, lat: float, body, *, system: str = "ocentric") -> CRS:
         ),
         geodetic_crs=geodetic,
     )
+
+
+def projected_crs(body, projection: str, system: str = "sphere") -> CRS:
+    """Return one of a body's standard projected CRS from the IAU 2015 authority.
+
+    Parameters
+    ----------
+    body : str or int
+        Body name (resolved via :mod:`planetarypy.constants`) or NAIF id.
+    projection : str
+        Projection key, e.g. ``"north_polar"``, ``"equirectangular"``,
+        ``"mercator"``. The ``*_180`` variants are the clon=180 forms.
+    system : {"sphere", "ographic", "ocentric"}
+        Figure of the body. ``"sphere"`` exists for every projection; the other
+        two are the biaxial-ellipsoid forms and only exist for bodies that
+        define an ographic system.
+
+    Returns
+    -------
+    pyproj.CRS
+
+    Examples
+    --------
+    >>> projected_crs(499, "north_polar").to_authority()
+    ('IAU_2015', '49930')
+    """
+    try:
+        proj_offset = _PROJECTION_OFFSET[projection]
+    except KeyError:
+        raise ValueError(
+            f"projection must be one of {sorted(_PROJECTION_OFFSET)}, "
+            f"got {projection!r}."
+        ) from None
+    try:
+        sys_offset = _PROJECTED_SYSTEM_OFFSET[system]
+    except KeyError:
+        raise ValueError(
+            f"system must be one of {sorted(_PROJECTED_SYSTEM_OFFSET)}, "
+            f"got {system!r}."
+        ) from None
+    naif_id = _resolve_naif_id(body)
+    code = naif_id * 100 + proj_offset + sys_offset
+    try:
+        return CRS.from_authority(_IAU_AUTHORITY, code)
+    except CRSError:
+        raise ValueError(
+            f"No {_IAU_AUTHORITY} {projection!r}/{system!r} CRS for body "
+            f"{body!r} (code {code})."
+        ) from None
 
 
 def get_crs(body, system: str = "default") -> CRS:

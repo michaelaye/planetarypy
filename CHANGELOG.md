@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.80.0] - 2026-07-30
+
+A HiRISE-to-GeoTIFF release: projected HiRISE JP2s become GeoTIFFs carrying an official IAU 2015 code instead of the ISIS-style CRS the PDS ships, bit-exactly and roughly 3.6× faster than a plain `rio warp`. Every external command is echoed as it runs, so the equivalent `rio` one-liner is always on screen.
+
+### Added
+
+- **`plp hitif` / `planetarypy.instruments.mro.hirise.jp2_to_geotiff()`** — convert a projected HiRISE JP2 to a GeoTIFF in an official IAU 2015 CRS. This is a real reprojection, not a relabel: HiRISE polar RDRs are built on a sphere of Mars' **polar** radius (`R=3376200`), which no IAU 2015 code describes, so stamping `IAU_2015:49930` onto the existing grid would displace the image by ~1.8 km. Between two ocentric spheres sharing `lat_0`/`lon_0`/`k` the transform is a pure uniform scale, so the warp lands on an exactly 1:1 pixel grid and the output is bit-exact against the JP2 (verified per-pixel over all 804,859,200 px of `ESP_081720_2650_RED`). The target code is auto-detected from the source projection — polar stereographic by hemisphere, equirectangular by central meridian — or forced with `--iau-code`.
+- **Kakadu as an optional decode accelerator.** GDAL's OpenJPEG decode is ~89% of the wall clock on a full RDR and barely threads (`GDAL_NUM_THREADS=ALL_CPUS` bought 0.8 s of 70.5 s, inside the noise floor). When `kdu_expand` is on `PATH` it is used instead — 4.2 s versus 70.5 s, a 16.9× decode speedup, verified bit-identical — via a `VRTRawRasterBand` over its flat output. Without it the JP2 goes straight to `rio warp`, so nothing depends on a commercial decoder. End to end: ~23 s versus ~83 s.
+- **`planetarypy.crs.projected_crs(body, projection, system)`** — resolve a body's standard projected CRS from the IAU 2015 authority, extending `body_crs`'s `naif_id*100 + offset` convention to the 17 projected variants (`north_polar`, `equirectangular`, `mercator`, …). Note the system triple differs from the geographic one: for projected codes slot 0 is the *sphere* and ocentric moves to slot 2.
+- **Defaults chosen from measurements, not convention.** Tiles are 1024 rather than GDAL's 256 (2.4 MB smaller on a RED product), `PREDICTOR` is deliberately *not* set (it makes tiled HiRISE output 5.7 MB *larger*), `nodata=0` is tagged because HiRISE reserves 0 for null and an untagged product reports `VALID_PERCENT=100` while being 62.8% background, and an 8-level overview pyramid (`average`) is built so an 800 Mpix raster is pannable. Each is individually overridable; `--no-nodata` and `--no-overviews` opt out.
+- **Per-band `ColorInterp` is restored after warping.** `rio warp` discards it, so a COLOR/IRB product would otherwise open as three unrelated grey bands; a single `rio edit-info` call puts the RGB tagging and the nodata value back without touching a pixel.
+
 ## [0.79.1] - 2026-07-16
 
 ### Fixed

@@ -16,7 +16,13 @@ Examples
 >>> prod.download()
 """
 
+import os
 import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
 import warnings
 from pathlib import Path
 
@@ -761,8 +767,6 @@ def download_edr(
 #   .IMG → .cub → .cal.cub → .cal.norm.cub → .cal.norm.map.cub
 #       → .cal.norm.map.equ.mos.cub
 
-import subprocess  # noqa: E402
-
 try:
     from kalasiris import (
         automos, cam2map, catlab, cubenorm, equalizer,
@@ -1197,4 +1201,213 @@ def create_mosaics(
             overwrite=overwrite,
             **kwargs,
         )
+    return out
+
+
+# ── JP2 → GeoTIFF with an official IAU CRS ───────────────────────
+
+_MARS_NAIF_ID = 499
+
+# GDAL's OpenJPEG decode is ~90% of the wall clock on a full HiRISE RDR and
+# barely threads. Kakadu's kdu_expand does the same decode bit-identically at
+# ~17x, so it is used when present. Kakadu is commercial and not a dependency;
+# without it the JP2 is handed to rio directly.
+_KDU_EXPAND = "kdu_expand"
+
+
+def _projection_key(crs) -> str:
+    """Map a source CRS onto a :mod:`planetarypy.crs` projection key."""
+    d = crs.to_dict()
+    proj = d.get("proj")
+    if proj == "stere":
+        return "north_polar" if d.get("lat_0", 0) >= 0 else "south_polar"
+    if proj == "eqc":
+        lon_0 = d.get("lon_0", 0.0)
+        return "equirectangular" if abs(lon_0) < 1e-6 else "equirectangular_180"
+    raise ValueError(
+        f"Cannot map source projection {proj!r} to an IAU projected code; "
+        "pass iau_code explicitly."
+    )
+
+
+def _run(cmd: list[str], echo: bool) -> None:
+    if echo:
+        print("$ " + shlex.join(cmd), file=sys.stderr)
+    subprocess.run(cmd, check=True)
+
+
+def _write_raw_vrt(
+    raws, width, height, dtype, transform, wkt, colorinterp, path: Path
+) -> Path:
+    """Wrap kdu_expand's flat output planes in a VRT carrying the source geo info.
+
+    The source filename must be written relative: GDAL's
+    GDAL_VRT_RAWRASTERBAND_ALLOWED_SOURCE defaults to trusting only siblings or
+    children of the VRT's own directory, and rejects absolute paths outright.
+    """
+    from xml.sax.saxutils import escape
+
+    px = {"uint8": 1, "uint16": 2, "int16": 2, "uint32": 4, "float32": 4}[dtype]
+    gdal_type = {"uint8": "Byte", "uint16": "UInt16", "int16": "Int16",
+                 "uint32": "UInt32", "float32": "Float32"}[dtype]
+    gt = (transform.c, transform.a, transform.b,
+          transform.f, transform.d, transform.e)
+    bands = "\n".join(
+        f'  <VRTRasterBand dataType="{gdal_type}" band="{i}" '
+        'subClass="VRTRawRasterBand">\n'
+        f"    <ColorInterp>{ci.name.capitalize()}</ColorInterp>\n"
+        f'    <SourceFilename relativeToVRT="1">{escape(raw.name)}'
+        "</SourceFilename>\n"
+        "    <ImageOffset>0</ImageOffset>\n"
+        f"    <PixelOffset>{px}</PixelOffset>\n"
+        f"    <LineOffset>{px * width}</LineOffset>\n"
+        "    <ByteOrder>LSB</ByteOrder>\n"
+        "  </VRTRasterBand>"
+        for i, (raw, ci) in enumerate(zip(raws, colorinterp), start=1)
+    )
+    path.write_text(
+        f'<VRTDataset rasterXSize="{width}" rasterYSize="{height}">\n'
+        f"  <SRS>{escape(wkt)}</SRS>\n"
+        f"  <GeoTransform>{', '.join(repr(float(v)) for v in gt)}</GeoTransform>\n"
+        f"{bands}\n"
+        "</VRTDataset>\n"
+    )
+    return path
+
+
+def jp2_to_geotiff(
+    jp2: str | Path,
+    out: str | Path | None = None,
+    *,
+    iau_code: int | None = None,
+    compress: str = "deflate",
+    blocksize: int = 1024,
+    overviews: bool = True,
+    nodata: float | None = 0,
+    threads: int | None = None,
+    overwrite: bool = False,
+    echo: bool = True,
+) -> Path:
+    """Convert a projected HiRISE JP2 to a GeoTIFF carrying an official IAU CRS.
+
+    HiRISE RDRs ship an ISIS-style CRS built on a sphere of Mars' *polar* radius
+    (``R=3376200``) for polar stereographic products. No IAU_2015 code describes
+    that figure, so this is a real reprojection, not a relabel — assigning
+    ``IAU_2015:49930`` without warping would displace the image by ~1.8 km.
+    Nearest-neighbour is used because the transform between the two spheres is a
+    pure uniform scale, which lands on an exactly 1:1 pixel grid.
+
+    Every external command is echoed to stderr so the equivalent ``rio``
+    invocation is visible and reusable.
+
+    Parameters
+    ----------
+    jp2 : str or Path
+        Input ``.JP2``.
+    out : str or Path, optional
+        Output path. Defaults to the input with a ``.tif`` suffix.
+    iau_code : int, optional
+        IAU_2015 projected code. Defaults to the sphere variant matching the
+        source projection, via :func:`planetarypy.crs.projected_crs`.
+    compress : str
+        GeoTIFF compression. ``PREDICTOR`` is deliberately not set: on tiled
+        output it makes HiRISE files ~5.7 MB *larger*.
+    blocksize : int
+        Tile size. 1024 compresses better than GDAL's 256 default.
+    overviews : bool
+        Build internal overviews (levels 2..256, ``average``) afterwards. On by
+        default — an 800 Mpix raster is painful to pan in QGIS without them.
+    nodata : float or None
+        Output NoData value, ``0`` by default. HiRISE reserves 0 for null (the
+        smallest real DN is 1), and the JP2 carries no nodata tag, so untagged
+        output reports 100% valid while being majority background — an
+        end-of-mission product with a failed CCD has a hole through its middle.
+        Pass ``None`` to leave it unset.
+    threads : int, optional
+        Decode/warp threads. Defaults to the CPU count.
+    overwrite : bool
+        Replace ``out`` if it exists.
+    echo : bool
+        Echo each external command to stderr.
+
+    Returns
+    -------
+    Path
+        The written GeoTIFF.
+    """
+    import rasterio
+
+    from planetarypy.crs import projected_crs
+
+    jp2 = Path(jp2)
+    out = Path(out) if out is not None else jp2.with_suffix(".tif")
+    if out.exists() and not overwrite:
+        raise FileExistsError(f"{out} exists (pass overwrite=True)")
+    threads = threads or os.cpu_count() or 4
+
+    with rasterio.open(jp2) as ds:
+        width, height, count = ds.width, ds.height, ds.count
+        dtype = ds.dtypes[0]
+        transform, src_wkt = ds.transform, ds.crs.to_wkt()
+        src_crs = ds.crs
+        colorinterp = ds.colorinterp
+
+    if iau_code is None:
+        key = _projection_key(src_crs)
+        iau_code = int(projected_crs(_MARS_NAIF_ID, key).to_authority()[1])
+    target = f"IAU_2015:{iau_code}"
+
+    warp_co = [
+        "--co", "tiled=true",
+        "--co", f"blockxsize={blocksize}",
+        "--co", f"blockysize={blocksize}",
+        "--co", f"compress={compress}",
+    ]
+    warp_tail = ["--threads", str(threads), *warp_co]
+    if overwrite:
+        warp_tail.append("--overwrite")
+
+    with tempfile.TemporaryDirectory(prefix=".hijp2tif-", dir=out.parent) as tmp:
+        tmpdir = Path(tmp)
+        if shutil.which(_KDU_EXPAND):
+            raws = [tmpdir / f"band{i}.rawl" for i in range(count)]
+            _run(
+                [_KDU_EXPAND, "-i", str(jp2), "-o", ",".join(str(r) for r in raws),
+                 "-num_threads", str(threads)],
+                echo,
+            )
+            source = _write_raw_vrt(
+                raws, width, height, dtype, transform, src_wkt, colorinterp,
+                tmpdir / "src.vrt",
+            )
+        else:
+            logger.info("kdu_expand not found; decoding the JP2 with rio directly")
+            source = jp2
+        _run(["rio", "warp", "--dst-crs", target, "--resampling", "nearest",
+              *warp_tail, str(source), str(out)], echo)
+
+    # Two things rio warp won't do: it discards per-band ColorInterp (gdalwarp
+    # preserves it), so an RGB product would open as three unrelated grey bands;
+    # and it rejects --dst-nodata unless --src-nodata is also given, which would
+    # put nodata handling inside the warp. Both are metadata, so both are set
+    # afterwards in one edit-info — and GDAL already initialises uncovered
+    # output to 0, so tagging 0 marks any fill correctly.
+    edits = []
+    names = [ci.name for ci in colorinterp]
+    if any(n not in ("undefined", "gray") for n in names):
+        edits += ["--colorinterp", ",".join(names)]
+    if nodata is not None:
+        edits += ["--nodata", repr(float(nodata))]
+    if edits:
+        _run(["rio", "edit-info", *edits, str(out)], echo)
+
+    if overviews:
+        _run(["rio", "overview", "--build", "2,4,8,16,32,64,128,256",
+              "--resampling", "average", str(out)], echo)
+        if echo:
+            print(
+                "Added an 8-level overview pyramid (2..256, average resampling). "
+                "Skip it with --no-overviews (CLI) or overviews=False (API).",
+                file=sys.stderr,
+            )
     return out

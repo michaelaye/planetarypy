@@ -631,6 +631,80 @@ def himos(
         typer.echo(f"{color.upper()} mosaic: {path}")
 
 
+@app.command(rich_help_panel=_PANEL_FETCH)
+def hitif(
+    ctx: typer.Context,
+    jp2: str = typer.Argument(None, help="Projected HiRISE .JP2 file"),
+    out: str = typer.Argument(None, help="Output .tif (default: input with .tif suffix)"),
+    iau_code: int = typer.Option(
+        None, "--iau-code",
+        help="IAU_2015 projected code (default: matched to the source projection)",
+    ),
+    compress: str = typer.Option("deflate", "--compress", help="GeoTIFF compression"),
+    blocksize: int = typer.Option(1024, "--blocksize", help="Tile size"),
+    overviews: bool = typer.Option(
+        True, "--overviews/--no-overviews",
+        help="Build internal overviews, levels 2..256 (on by default)",
+    ),
+    nodata: float = typer.Option(
+        0.0, "--nodata", help="Output NoData value (HiRISE reserves 0 for null)"
+    ),
+    no_nodata: bool = typer.Option(
+        False, "--no-nodata", help="Leave NoData unset instead of tagging 0"
+    ),
+    threads: int = typer.Option(
+        None, "--threads", help="Decode/warp threads (default: CPU count)"
+    ),
+    overwrite: bool = typer.Option(False, "--force", "-f", help="Overwrite existing output"),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Don't echo the rio / kdu_expand commands"
+    ),
+):
+    """Convert a projected HiRISE JP2 to a GeoTIFF with an official IAU CRS.
+
+    HiRISE polar RDRs carry an ISIS-style CRS on a sphere of Mars' polar
+    radius, which no IAU_2015 code describes — so this reprojects rather than
+    relabels. The transform is a pure uniform scale, so the output lands on an
+    exactly 1:1 pixel grid and is bit-exact.
+
+    Each rio / kdu_expand command is echoed to stderr before it runs, so the
+    equivalent one-liner is there to copy. Uses Kakadu's kdu_expand for the
+    JP2 decode when it's on PATH (~17x faster than OpenJPEG), else rio alone.
+
+    An 8-level overview pyramid is built by default (--no-overviews to skip), and
+    NoData is tagged as 0 (--no-nodata to skip) since HiRISE reserves 0 for null.
+
+    Examples:
+        plp hitif ESP_081720_2650_RED.JP2
+        plp hitif ESP_081720_2650_RED.JP2 out.tif --no-overviews
+        plp hitif in.JP2 --iau-code 49935          (force south polar)
+        plp hitif in.JP2 --compress zstd --blocksize 512
+    """
+    if jp2 is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    from planetarypy.instruments.mro.hirise import jp2_to_geotiff
+
+    try:
+        path = jp2_to_geotiff(
+            jp2, out,
+            iau_code=iau_code,
+            compress=compress,
+            blocksize=blocksize,
+            overviews=overviews,
+            nodata=None if no_nodata else nodata,
+            threads=threads,
+            overwrite=overwrite,
+            echo=not quiet,
+        )
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(str(path))
+
+
 # ── CTX commands ────────────────────────────────────────────────────
 
 

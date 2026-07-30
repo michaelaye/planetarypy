@@ -55,3 +55,59 @@ class TestLocalCrs:
 class TestGetCrs:
     def test_default_is_ocentric(self):
         assert get_crs(499).to_wkt() == body_crs(499, "ocentric").to_wkt()
+
+
+class TestProjectedCrs:
+    def test_mars_north_polar_code(self):
+        from planetarypy.crs import projected_crs
+
+        assert projected_crs(499, "north_polar").to_authority() == ("IAU_2015", "49930")
+
+    def test_mars_south_polar_code(self):
+        from planetarypy.crs import projected_crs
+
+        assert projected_crs(499, "south_polar").to_authority() == ("IAU_2015", "49935")
+
+    def test_equirectangular_clon_variants_differ(self):
+        from planetarypy.crs import projected_crs
+
+        assert projected_crs(499, "equirectangular").to_authority()[1] == "49910"
+        assert projected_crs(499, "equirectangular_180").to_authority()[1] == "49915"
+
+    def test_sphere_variant_uses_equatorial_radius(self):
+        from planetarypy.crs import projected_crs
+
+        crs = projected_crs(499, "north_polar")
+        assert crs.ellipsoid.semi_major_metre == pytest.approx(3396190.0)
+        assert crs.ellipsoid.is_semi_minor_computed or (
+            crs.ellipsoid.semi_minor_metre == pytest.approx(3396190.0)
+        )
+
+    def test_ellipsoid_variants_offset_by_one_and_two(self):
+        from planetarypy.crs import projected_crs
+
+        assert projected_crs(499, "north_polar", "ographic").to_authority()[1] == "49931"
+        assert projected_crs(499, "north_polar", "ocentric").to_authority()[1] == "49932"
+
+    def test_projected_is_not_geographic(self):
+        from planetarypy.crs import projected_crs
+
+        assert projected_crs(499, "north_polar").is_projected
+
+    def test_unknown_projection_raises(self):
+        from planetarypy.crs import projected_crs
+
+        with pytest.raises(ValueError, match="projection must be one of"):
+            projected_crs(499, "not_a_projection")
+
+    def test_unknown_system_raises(self):
+        from planetarypy.crs import projected_crs
+
+        with pytest.raises(ValueError, match="system must be one of"):
+            projected_crs(499, "north_polar", "bogus")
+
+    def test_body_without_ographic_raises(self):
+        from planetarypy.crs import projected_crs
+
+        with pytest.raises(ValueError, match="No IAU_2015"):
+            projected_crs(301, "north_polar", "ographic")

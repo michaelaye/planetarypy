@@ -274,3 +274,55 @@ class TestUrlLiveness:
         prod = SOURCE_PRODUCT("ESP_013807_2035_RED4_0")
         resp = requests.head(str(prod.url), timeout=30)
         assert resp.ok
+
+
+class TestProjectionKey:
+    """_projection_key maps a source CRS onto a planetarypy.crs projection key."""
+
+    def _crs(self, proj4):
+        rasterio = pytest.importorskip("rasterio")
+        return rasterio.crs.CRS.from_proj4(proj4)
+
+    def test_north_polar_stereographic(self):
+        from planetarypy.instruments.mro.hirise import _projection_key
+
+        assert _projection_key(
+            self._crs("+proj=stere +lat_0=90 +lon_0=0 +R=3376200")
+        ) == "north_polar"
+
+    def test_south_polar_stereographic(self):
+        from planetarypy.instruments.mro.hirise import _projection_key
+
+        assert _projection_key(
+            self._crs("+proj=stere +lat_0=-90 +lon_0=0 +R=3376200")
+        ) == "south_polar"
+
+    def test_equirectangular_clon_0(self):
+        from planetarypy.instruments.mro.hirise import _projection_key
+
+        assert _projection_key(
+            self._crs("+proj=eqc +lon_0=0 +R=3396190")
+        ) == "equirectangular"
+
+    def test_equirectangular_clon_180(self):
+        from planetarypy.instruments.mro.hirise import _projection_key
+
+        assert _projection_key(
+            self._crs("+proj=eqc +lon_0=180 +R=3396190")
+        ) == "equirectangular_180"
+
+    def test_unsupported_projection_raises(self):
+        from planetarypy.instruments.mro.hirise import _projection_key
+
+        with pytest.raises(ValueError, match="pass iau_code explicitly"):
+            _projection_key(self._crs("+proj=sinu +lon_0=0 +R=3396190"))
+
+
+class TestJp2ToGeotiffGuards:
+    def test_refuses_existing_output_without_overwrite(self, tmp_path):
+        from planetarypy.instruments.mro.hirise import jp2_to_geotiff
+
+        out = tmp_path / "already.tif"
+        out.write_bytes(b"")
+        with pytest.raises(FileExistsError, match="overwrite=True"):
+            jp2_to_geotiff(tmp_path / "nonexistent.JP2", out)
