@@ -1381,7 +1381,17 @@ def jp2_to_geotiff(
                 tmpdir / "src.vrt",
             )
         else:
-            logger.info("kdu_expand not found; decoding the JP2 with rio directly")
+            # Not logger.info: library logging is disabled by default, which made
+            # losing the accelerator invisible — the symptom is a single-threaded
+            # decode at ~1 core for ~15x longer, with nothing to explain it.
+            if echo:
+                print(
+                    "kdu_expand not found on PATH — decoding the JP2 with OpenJPEG "
+                    "instead. That path is single-threaded and dominates the "
+                    "runtime (~70 s vs ~4 s on a full RED product); install Kakadu "
+                    "to avoid it.",
+                    file=sys.stderr,
+                )
             source = jp2
         _run(["rio", "warp", "--dst-crs", target, "--resampling", "nearest",
               *warp_tail, str(source), str(out)], echo)
