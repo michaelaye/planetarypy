@@ -216,7 +216,13 @@ class Index:
             self.remote.log.log_update_available(False)
 
         except Exception as e:
+            # Must re-raise: every caller proceeds to use the files this was
+            # supposed to fetch. Swallowing turned an upstream HTTP 401 into a
+            # FileNotFoundError from read_parquet three layers away, and the
+            # log line above is invisible because library logging is disabled
+            # by default.
             logger.error(f"Error downloading {self.index_key}: {e}")
+            raise
 
     def ensure_parquet(self, force: bool = False) -> bool:
         """Ensure a parquet cache exists for this index.
