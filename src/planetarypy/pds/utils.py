@@ -60,6 +60,52 @@ def _all_dotted_index_keys() -> list[str]:
     return sorted(static_keys | dynamic_keys)
 
 
+def check_index_key_shape(index_key: str) -> str:
+    """Check that ``index_key`` looks like ``mission.instrument.index``.
+
+    Shape only, deliberately: ``Index`` is a low-level construct that must stay
+    usable with keys the registry does not know — tests build one with a
+    synthetic key and a monkeypatched remote, and a not-yet-registered index has
+    to be constructible before it can be registered. Membership belongs at the
+    user-facing boundary; see :func:`validate_index_key`.
+
+    Raises
+    ------
+    ValueError
+        If the key does not have exactly three dot-separated parts.
+    """
+    if len(index_key.split(".")) != 3:
+        raise ValueError(
+            f"Malformed index key: {index_key!r}. Expected "
+            "'mission.instrument.index', e.g. 'mro.ctx.edr'."
+        )
+    return index_key
+
+
+def validate_index_key(index_key: str) -> str:
+    """Check that ``index_key`` is well-formed *and* registered, and return it.
+
+    Single home for a check that had been copy-pasted seven times — five in
+    ``cli.py``, twice here — around a shared ``_all_dotted_index_keys()``
+    primitive that nobody built a shared check on. An eighth site forgot it.
+
+    Use this at user-facing boundaries. For construction-time shape checking,
+    use :func:`check_index_key_shape`.
+
+    Raises
+    ------
+    ValueError
+        If the key is malformed, or well-formed but not registered.
+    """
+    check_index_key_shape(index_key)
+    if index_key not in set(_all_dotted_index_keys()):
+        raise ValueError(
+            f"Unknown index key: {index_key!r}. "
+            "Use planetarypy.pds.print_available_indexes() to list valid keys."
+        )
+    return index_key
+
+
 def get_mission_names() -> list[str]:
     """Return a sorted list of all available missions (from static and dynamic configs)."""
     keys = _all_dotted_index_keys()
@@ -332,12 +378,7 @@ def get_example_pid(instr_key: str) -> str:
         If ``instr_key`` is not a registered index, or if the index
         contains no recognizable product-id column.
     """
-    registered = set(_all_dotted_index_keys())
-    if instr_key not in registered:
-        raise ValueError(
-            f"Unknown index key: {instr_key!r}. "
-            "Use planetarypy.pds.print_available_indexes() to list valid keys."
-        )
+    validate_index_key(instr_key)
 
     # Prefer the product-id column configured in the catalog INDEX_REGISTRY
     # for this index (handles non-standard cases like UVIS using FILE_NAME),
@@ -600,12 +641,7 @@ def get_meta(instr_key: str, product_id: str, long: bool = False):
     ValueError
         If ``instr_key`` is not registered, or no row matches ``product_id``.
     """
-    registered = set(_all_dotted_index_keys())
-    if instr_key not in registered:
-        raise ValueError(
-            f"Unknown index key: {instr_key!r}. "
-            "Use planetarypy.pds.print_available_indexes() to list valid keys."
-        )
+    validate_index_key(instr_key)
 
     # Per-instrument override: HiRISE etc. own their entire match/shape pipeline.
     from planetarypy.pds.meta_display import get_handler

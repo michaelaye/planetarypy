@@ -101,3 +101,44 @@ def test_print_available_indexes_keys_only_and_filters():
     # Filter by mission and instrument
     mro_ctx_keys = pds_utils.print_available_indexes("mro", "ctx", keys_only=True)
     assert set(["mro.ctx.edr"]).issubset(mro_ctx_keys)
+
+
+class TestValidateIndexKey:
+    """One home for a check that had been copy-pasted seven times."""
+
+    def test_accepts_a_registered_key(self):
+        from planetarypy.pds.utils import validate_index_key
+
+        assert validate_index_key("mro.ctx.edr") == "mro.ctx.edr"
+
+    @pytest.mark.parametrize("key", ["foo", "foo.bar", "a.b.c.d"])
+    def test_malformed_key_names_the_shape_problem(self, key):
+        from planetarypy.pds.utils import validate_index_key
+
+        # Previously these reached Index.__init__'s bare tuple unpack and came
+        # back as "not enough values to unpack (expected 3, got 2)".
+        with pytest.raises(ValueError, match="Malformed index key"):
+            validate_index_key(key)
+
+    def test_well_formed_but_unregistered_key_is_unknown_not_malformed(self):
+        from planetarypy.pds.utils import validate_index_key
+
+        with pytest.raises(ValueError, match="Unknown index key"):
+            validate_index_key("foo.bar.baz")
+
+    def test_index_construction_checks_shape(self):
+        from planetarypy.pds import Index
+
+        with pytest.raises(ValueError, match="Malformed index key"):
+            Index("foo.bar")
+
+    def test_index_stays_constructible_with_an_unregistered_key(self, monkeypatch):
+        """Index is low-level: tests and not-yet-registered indexes need it.
+
+        Membership is checked at the user-facing boundary, not here — enforcing
+        it in __init__ broke four existing tests that build an Index around a
+        synthetic key with a monkeypatched remote.
+        """
+        from planetarypy.pds.utils import check_index_key_shape
+
+        assert check_index_key_shape("go.ssi.raw") == "go.ssi.raw"

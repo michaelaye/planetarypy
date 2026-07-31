@@ -20,6 +20,7 @@ from .dynamic_index import (
 )
 from .index_labels import IndexLabel
 from .static_index import StaticRemoteHandler
+from .utils import check_index_key_shape
 
 
 class Index:
@@ -49,7 +50,7 @@ class Index:
             index_key: Dotted key identifying the index (e.g., "mro.ctx.edr")
             local_dir: Local directory for index files
         """
-        self.index_key = index_key
+        self.index_key = check_index_key_shape(index_key)
         self.mission, self.instrument, self.indexname = index_key.split(".")
         self._local_dir = Path(local_dir) if local_dir else self._default_local_dir()
 
