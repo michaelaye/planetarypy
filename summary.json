@@ -1,5 +1,5 @@
 {
-  "checked": "2026-07-31 09:33 UTC",
+  "checked": "2026-07-31 15:09 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -10,8 +10,8 @@
     {
       "host": "pds-geosciences.wustl.edu",
       "total": 22,
-      "failing": 5,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -449,8 +449,8 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.cmn.edr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1/mslcmn_0xxx/index/index.lbl",
-      "status": "401",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -463,29 +463,29 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l0",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l0_index.lbl",
-      "status": "401",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l1a",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l1a_index.lbl",
-      "status": "401",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l1b",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l1b_index.lbl",
-      "status": "401",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l2",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l2_index.lbl",
-      "status": "401",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
