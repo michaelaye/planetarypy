@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>claude</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="CLAUDE_files/libs/clipboard/clipboard.min.js"></script>
+<script src="CLAUDE_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="CLAUDE_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="CLAUDE_files/libs/quarto-html/popper.min.js"></script>
+<script src="CLAUDE_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="CLAUDE_files/libs/quarto-html/anchor.min.js"></script>
+<link href="CLAUDE_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="CLAUDE_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="CLAUDE_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="CLAUDE_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="CLAUDE_files/libs/bootstrap/bootstrap-138a6193a3bd40baf1e627da441a4734.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<section id="claude.md" class="level1">
+<h1>CLAUDE.md</h1>
+<p>Guidance for Claude Code (claude.ai/code) when working in this repository.</p>
+<section id="build-and-test" class="level2">
+<h2 class="anchored" data-anchor-id="build-and-test">Build and Test</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-e</span> <span class="st">".[dev]"</span>          <span class="co"># dev install</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-e</span> <span class="st">".[dev,spice]"</span>    <span class="co"># with SPICE extras</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">pytest</span>                                            <span class="co"># all tests (parallel, coverage, -xvs)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">pytest</span> tests/test_config.py <span class="at">-xvs</span>                  <span class="co"># one file</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">pytest</span> tests/test_config.py::test_name <span class="at">-xvs</span>       <span class="co"># one test</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ex">pytest</span> tests/test_config.py <span class="at">-xvs</span> <span class="at">-p</span> no:xdist      <span class="co"># serial (for debugging)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">pytest</span> <span class="at">-m</span> <span class="st">"not slow"</span>                              <span class="co"># skip slow</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ex">flake8</span> src/planetarypy tests                      <span class="co"># lint</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Default pytest opts (pyproject): <code>-xvs --import-mode=importlib --cov=planetarypy -n auto</code>.</p>
+</section>
+<section id="source-layout" class="level2">
+<h2 class="anchored" data-anchor-id="source-layout">Source Layout</h2>
+<p><code>src/</code> layout, hatchling build. Tests in <code>tests/</code>. Docs in <code>docs/</code> (Quarto + quartodoc).</p>
+<p>Top-level under <code>src/planetarypy/</code>:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Module</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>config.py</code></td>
+<td>Singleton TOML config (<code>from planetarypy.config import config</code>)</td>
+</tr>
+<tr class="even">
+<td><code>pds/</code></td>
+<td>PDS3 index download, parse, parquet cache</td>
+</tr>
+<tr class="odd">
+<td><code>catalog/</code></td>
+<td>DuckDB catalog of all PDS instruments/products (3-tier URL resolver)</td>
+</tr>
+<tr class="even">
+<td><code>spice/</code></td>
+<td>SPICE kernel mgmt + <code>spicer.py</code> illumination calculator</td>
+</tr>
+<tr class="odd">
+<td><code>instruments/</code></td>
+<td>Mission-specific handlers (mro/, go/)</td>
+</tr>
+<tr class="even">
+<td><code>constants/</code></td>
+<td>IAU 2009/2015 rotation/shape constants + NSSDC fact sheets</td>
+</tr>
+<tr class="odd">
+<td><code>isis/</code></td>
+<td>ISIS3 helpers (autoseed, projected)</td>
+</tr>
+<tr class="even">
+<td><code>geo.py</code></td>
+<td>Coordinate transforms, <code>Point</code> class, IAU CRS resolution</td>
+</tr>
+<tr class="odd">
+<td><code>plotting.py</code></td>
+<td><code>imshow_gray</code>, <code>add_sun_indicator</code>, <code>imshow_with_sun</code></td>
+</tr>
+<tr class="even">
+<td><code>cli.py</code></td>
+<td>Unified <code>plp</code> Typer CLI</td>
+</tr>
+<tr class="odd">
+<td><code>datetime_format_converters.py</code>, <code>utils.py</code></td>
+<td>Shared helpers</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="configuration-system" class="level2">
+<h2 class="anchored" data-anchor-id="configuration-system">Configuration System</h2>
+<p>Two user-level TOML files, auto-managed: - <code>~/.planetarypy_config.toml</code> — general; primarily <code>storage_root</code> (default <code>~/planetarypy_data/</code>). Override path with <code>PLANETARYPY_CONFIG</code> env var. - <code>~/.planetarypy_index_urls.toml</code> — PDS index URLs, auto-fetched from the <code>planetarypy/planetarypy_configs</code> GitHub repo.</p>
+</section>
+<section id="pds-index-system-pds" class="level2">
+<h2 class="anchored" data-anchor-id="pds-index-system-pds">PDS Index System (<code>pds/</code>)</h2>
+<p><strong>Dotted key convention:</strong> <code>{mission}.{instrument}.{indexname}</code> — e.g.&nbsp;<code>mro.ctx.edr</code>, <code>cassini.iss.ring_summary</code>, <code>go.ssi.raw</code>.</p>
+<p><strong>Two handler types (composition):</strong> 1. <code>StaticRemoteHandler</code> — fixed URLs from config (Cassini, Galileo, …). 2. <code>DynamicRemoteHandler</code> — URLs discovered by scraping. Handler classes registered in <code>DYNAMIC_URL_HANDLERS</code> in <code>dynamic_index.py</code> (<code>CTXIndex</code>, <code>LROCIndex</code> live in <code>dynamic_url_handlers.py</code>).</p>
+<p><strong>Flow:</strong> <code>Index(key)</code> → static/dynamic dispatch → download <code>.lbl</code> + <code>.tab</code> → <code>IndexLabel</code> parses PDS3 label → convert to parquet → cache at <code>{storage_root}/{mission}/{instrument}/indexes/{indexname}/</code>.</p>
+<p>Other notable files: <code>index_main.py</code> (entry <code>Index</code>), <code>index_logging.py</code> (<code>AccessLog</code>), <code>index_fixes.py</code> (per-mission patches), <code>meta_display.py</code>.</p>
+</section>
+<section id="pds-catalog-catalog" class="level2">
+<h2 class="anchored" data-anchor-id="pds-catalog-catalog">PDS Catalog (<code>catalog/</code>)</h2>
+<p>DuckDB-backed catalog of every known PDS instrument + product, built from the MillionConcepts <code>pdr-tests</code> repo. Surface API in <code>catalog/__init__.py</code>: <code>build_catalog</code>, <code>list_missions</code>, <code>list_instruments</code>, <code>list_products</code>, <code>example_products</code>, <code>ambiguous_mappings</code>.</p>
+<p><strong>3-tier URL resolution</strong> (in order): 1. <code>_resolver.py</code> — explicit pattern map 2. <code>_index_resolver.py</code> — derive from PDS index entry 3. <code>_pattern_resolver.py</code> — last-resort heuristic</p>
+<p>Supporting files: <code>_mission_map.py</code>, <code>_parser.py</code>, <code>_repo.py</code>, <code>_schema.py</code>, <code>_url_rewrite.py</code>, <code>_validation.py</code>, <code>_objects.py</code>.</p>
+</section>
+<section id="spice-spice-optional-spice-extra" class="level2">
+<h2 class="anchored" data-anchor-id="spice-spice-optional-spice-extra">SPICE (<code>spice/</code>) — optional <code>[spice]</code> extra</h2>
+<ul>
+<li><code>generic_kernels.py</code> — LSK, PCK</li>
+<li><code>archived_kernels.py</code> — mission-specific kernels</li>
+<li><code>pckernels.py</code> — planetary constants kernels</li>
+<li><code>spicer.py</code> — <strong><code>Spicer</code> illumination calculator</strong>, on-demand satellite ephemeris (primary user-facing API)</li>
+<li><code>config.py</code> — SPICE-specific paths</li>
+<li>Kernels cached under <code>{storage_root}/spice_kernels/</code></li>
+</ul>
+</section>
+<section id="instruments-instruments" class="level2">
+<h2 class="anchored" data-anchor-id="instruments-instruments">Instruments (<code>instruments/</code>)</h2>
+<ul>
+<li><code>mro/ctx/</code> — <code>ctx_edr.py</code>, <code>ctx_calib.py</code></li>
+<li><code>mro/hirise.py</code> — <code>get_browse</code>, <code>get_metadata</code>, <code>sun_azimuth_from_top</code></li>
+<li><code>go/ssi.py</code> — Galileo SSI</li>
+</ul>
+</section>
+<section id="cli-cli.py-plp-entry-point" class="level2">
+<h2 class="anchored" data-anchor-id="cli-cli.py-plp-entry-point">CLI (<code>cli.py</code>) — <code>plp</code> entry point</h2>
+<p>Typer app with sub-apps grouped by Rich help panel: - <code>plp catalog …</code> (Discovery), <code>plp indexes …</code> (Discovery), <code>plp spice …</code> (Discovery) - Top-level commands by panel: Fetch &amp; download, Visualize, Inspect a product, Science computations, Maintenance (<code>plp ctx-migrate</code>) - Roadmap: <code>plp geo</code> sub-app planned over <code>planetarypy.geo</code>.</p>
+</section>
+<section id="conventions" class="level2">
+<h2 class="anchored" data-anchor-id="conventions">Conventions</h2>
+<ul>
+<li><strong>IAU 2015 CRS codes</strong> preferred over raw proj4 strings.</li>
+<li><strong>HiRISE azimuths</strong> (<code>SUB_SOLAR_AZIMUTH</code>, <code>NORTH_AZIMUTH</code>) are CW from 3 o’clock. Convert to CW-from-top with <code>(az + 90) % 360</code>.</li>
+<li>Logging: loguru, <strong>disabled by default</strong> (library convention). Enable via <code>logger.enable("planetarypy")</code> or <code>planetarypy.enable_logging("DEBUG")</code>.</li>
+<li>Code style: line length 88 (Black-compatible); flake8 ignoring E203, E701. Python ≥ 3.11. Type hints throughout.</li>
+<li>No f-strings without substitutions (linter rule).</li>
+</ul>
+</section>
+<section id="release-process" class="level2">
+<h2 class="anchored" data-anchor-id="release-process">Release Process</h2>
+<p>Triggered by “do a release cycle”:</p>
+<ol type="1">
+<li>CHANGELOG.md entry (date <code>YYYY-MM-DD</code>, prose bullets matching prior style).</li>
+<li>Stage feature work; commit with a descriptive message.</li>
+<li><code>bump-my-version bump {patch|minor|major}</code> (auto-commits + tags).</li>
+<li><code>git push &amp;&amp; git push --tags</code></li>
+<li><code>rm -rf dist/ &amp;&amp; python -m build &amp;&amp; python -m twine check dist/* &amp;&amp; python -m twine upload dist/*</code></li>
+<li>Update <code>conda/meta.yaml</code>:
+<ul>
+<li>Bump <code>{% set version = "X.Y.Z" %}</code>.</li>
+<li>Replace <code>sha256:</code> with the new sdist hash: <code>curl -s https://pypi.org/pypi/planetarypy/X.Y.Z/json | jq -r '.urls[] | select(.packagetype=="sdist") | .digests.sha256'</code></li>
+</ul></li>
+<li><code>conda-build conda/ --output-folder /tmp/conda-output --no-anaconda-upload</code> (recipe is edited in place — no grayskull regeneration).</li>
+<li><code>anaconda --site anaconda upload /tmp/conda-output/noarch/planetarypy-X.Y.Z-*.conda</code> (glob the build string — hash suffix varies).</li>
+</ol>
+<p><strong>Notes:</strong> - <code>--site anaconda</code> required (bypasses an interactive prompt that fails in non-TTY). - <code>grayskull</code>, <code>conda-build</code>, <code>anaconda-client</code> live in the <code>py314</code> conda env. - Dep name mapping: <code>duckdb</code> (pip) → <code>python-duckdb</code> (conda-forge); others 1:1. - <code>noarch: python</code> — one build for all platforms.</p>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

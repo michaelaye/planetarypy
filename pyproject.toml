@@ -71,6 +71,22 @@ isis = [
     "geopandas",      # Footprint shapefiles → GeoDataFrames
     "hvplot",         # Interactive rasterized image display via .hvplot accessor
 ]
+# Instrument packages. Their behaviour ships separately so core stays lean and
+# each instrument versions independently; core keeps the declarative catalog
+# knowledge either way, so `plp fetch mro.hirise.edr` and index discovery work
+# without these. Installing one adds its `plp` verbs through the
+# `planetarypy.cli_plugins` entry point and restores the
+# `planetarypy.instruments.mro.*` import path via PEP 420 namespace packages.
+hirise = [
+    "planetarypy-hirise",
+]
+ctx = [
+    "planetarypy-ctx",
+]
+instruments = [
+    "planetarypy-hirise",
+    "planetarypy-ctx",
+]
 # Optional dependencies for PDS-wide product discovery (planetarypy.search).
 # pds.api-client is the NASA PDS Engineering Node's REST client for the
 # registry-wide search API. Kept optional (not core) even though it's light
@@ -180,7 +196,6 @@ pds-api-client = "pds"
 # DEP001 = "imported module is not declared as a dependency"
 DEP001 = [
     "planetarypy",   # first-party self-imports; not a third-party dep
-    "psutil",        # gated by try/except ImportError in hirise.py:940 with explicit fallback
 ]
 # DEP002 = "declared dependency is not used in the codebase"
 DEP002 = [

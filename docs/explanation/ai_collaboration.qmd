@@ -1,0 +1,208 @@
+---
+title: "AI collaboration in PlanetaryPy"
+subtitle: "How this package came to be, and who (or what) did what"
+draft: true
+date: 2026-05-29
+---
+
+::: {.callout-warning}
+**Draft.** This page is a work-in-progress disclosure of how AI assistance
+shaped PlanetaryPy. Author estimates of "AI involvement" are honest
+ballparks, not measurements; the package's behavior is the same either
+way and is validated by the test suite.
+:::
+
+## Why this page exists
+
+[TODO: opening paragraph — the *why*. Suggested points to weave in, drop,
+or replace entirely:]
+
+- Transparency. Users, reviewers, and grant funders deserve to know what
+  parts of a scientific tool were authored by a human, what parts by an
+  LLM assistant, and what the collaboration loop looked like.
+- Not a hype piece, not a confession. The package is open-source and
+  test-covered; the question of *who wrote which keystrokes* is
+  documentation, not provenance for trust.
+- My (Aye's) working hypothesis is that AI-assisted development, when
+  driven by a domain expert who reviews every change, produces code that
+  is *better* than I would write alone in the same calendar time — more
+  tests, more docstrings, fewer copy-paste bugs — without sacrificing
+  scientific correctness.
+- [TODO: anything else you want to say up front — e.g. tooling used
+  (Claude Code, model versions over time), review discipline, what you
+  would never delegate.]
+
+## How to read the per-module estimates
+
+For each subpackage below:
+
+- **Origin** — a one-line note on when and why the module was added.
+- **AI involvement** — a rough five-band scale that I (the human author)
+  apply by introspection:
+  - **None / negligible** — written and maintained by hand.
+  - **Light** — Claude suggested a refactor or wrote a docstring; I
+    accepted with minor edits.
+  - **Moderate** — Claude wrote a substantial draft (one function, one
+    test class) that I reviewed and adjusted.
+  - **Heavy** — Claude wrote most of the code under my direction; I
+    designed the API and verified every behavior.
+  - **Co-authored end-to-end** — Multi-session collaboration where the
+    design itself was negotiated with the model.
+
+The scale is admittedly fuzzy; treat it as a vibe-check, not a metric.
+
+## Per-subpackage history
+
+::: {.callout-note}
+Items marked `[AI stub]` are guesses Claude made while drafting this
+page; please correct them.
+:::
+
+### `planetarypy.config` — TOML configuration singleton
+
+- **Origin.** [TODO: when did this land? Was it part of the original
+  refactor away from `~/.planetarypy.toml`?]
+- **AI involvement.** [AI stub: Light–Moderate. The recent
+  ``filter_deprecation_warnings`` and ``max_table_rows`` knobs +
+  backfill machinery were co-developed with Claude (v0.65.0 and
+  v0.66.0); the original `Config` class predates that.]
+
+### `planetarypy.pds` — PDS3 index download, parse, parquet cache
+
+- **Origin.** [TODO: the index handling was the seed of the package,
+  right? Trace back to the early nbdev era?]
+- **AI involvement.** [AI stub: Light overall, with Moderate pockets.
+  The static/dynamic handler split and `IndexLabel` parser were
+  hand-written; the segment-aware tab completion (v0.65.0), the
+  `plp indexes last` verb (v0.65.0), the `get_index(pids=...)` filter
+  + `missing_pids` helper (v0.66.0), and the `pid_column` resolver
+  are AI-assisted.]
+
+### `planetarypy.catalog` — DuckDB catalog of PDS instruments + products
+
+- **Origin.** [TODO: built from the MillionConcepts pdr-tests repo —
+  what was the prompt for adding this? Catalog discovery without
+  needing to scrape PDS each time?]
+- **AI involvement.** [AI stub: Moderate–Heavy. The three-tier URL
+  resolver (`_resolver` → `_index_resolver` → `_pattern_resolver`) and
+  the `_objects` Mission/Instrument model were AI-paired; the
+  `fetch_products` batch API and `BatchFetchResult` (v0.66.0) were
+  co-developed.]
+
+### `planetarypy.spice` — SPICE kernel management + `spicer.py`
+
+- **Origin.** [TODO: SPICE access patterns came from your previous
+  work in HiRISE pipelines. Was `spicer.py` a port or a rewrite?]
+- **AI involvement.** [AI stub: Light. The kernel management plumbing
+  (`generic_kernels.py`, `archived_kernels.py`, `pckernels.py`) and
+  `spicer.py` itself are mostly hand-authored. AI helped with edge
+  cases, docstrings, and concurrent kernel downloads.]
+
+### `planetarypy.instruments` — Mission-specific handlers (mro/, go/)
+
+- **Origin.** [TODO: this is your "personal cache" of mission code that
+  graduated into the package — HiRISE, CTX, Galileo SSI. Each came in
+  at a different time. Which ones were written before the AI
+  collaboration?]
+- **AI involvement.** [AI stub: Mixed by sub-module.
+  - **`mro/ctx/`** — older code; AI involvement Light, focused on the
+    recent `process_parallel` shim refactor.
+  - **`mro/hirise.py`** — older code with AI-assisted additions
+    (`sun_azimuth_from_top`, browse fetch, EDR channel logic).
+  - **`go/ssi.py`** — [TODO: history?]]
+
+### `planetarypy.constants` — IAU 2009/2015 + NSSDC fact sheets
+
+- **Origin.** Added in v0.61.0 as a unified planetary-constants API:
+  PCK polynomial fields, JPL DE-series GMs, and the NSSDC fact-sheet
+  archive composed into a single `Body` object per target.
+- **AI involvement.** Heavy / co-authored end-to-end. The PCK +
+  NSSDC architecture, the 30-year NSSDC longitudinal archive
+  (`parsed_archive.json.gz`), the parser bugfix cycle in v0.64.0
+  (J2, range, uncertainty, unit aliases, ten silent-drop fixes), the
+  Range / RangeWarning model, the Zenodo lazy-download mechanism
+  (v0.65.1) including the cache-key refactor — all developed across
+  multi-session Claude Code conversations with the user reviewing
+  every change. The 147-test anti-hallucination suite was a
+  deliberate guardrail against AI-generated drift.
+
+### `planetarypy.isis` — ISIS3 helpers
+
+- **Origin.** [TODO: ISIS3 integration for CTX coregistration / map
+  projection? When was this added?]
+- **AI involvement.** [AI stub: Light. Mostly hand-written wrappers
+  around ISIS command-line tools; AI helped with the `autoseed`
+  fallbacks and error handling.]
+
+### `planetarypy.geo` — Coordinate transforms, `Point` class, IAU CRS
+
+- **Origin.** [TODO: the IAU 2015 CRS handling was a clear
+  improvement over raw proj4 strings — when did that shift happen?]
+- **AI involvement.** [AI stub: Moderate. The `Point` class and the
+  CRS resolver were AI-paired; the underlying math is yours.]
+
+### `planetarypy.plotting` — `imshow_gray`, `add_sun_indicator`
+
+- **Origin.** [TODO: spun out from your HiRISE notebook helpers?]
+- **AI involvement.** [AI stub: Light. Mostly thin matplotlib
+  wrappers; the sun-azimuth indicator was the AI-assisted piece.]
+
+### `planetarypy.cli` — Unified `plp` Typer CLI
+
+- **Origin.** Replaced a small handful of standalone scripts with a
+  single `plp` entry point.
+- **AI involvement.** Heavy. The Typer surface (sub-apps, panel
+  grouping, tab-completion plumbing, `--pids-from` batch verbs,
+  `_emit_batch_report` formatters) was developed with Claude. Always
+  with the **API-first / CLI-thin** discipline documented in the
+  [CLI how-to](../howto/cli.qmd) — useful logic lives in the library,
+  not in `cli.py`.
+
+### `planetarypy.utils` — Shared helpers
+
+- **Origin.** Catch-all for cross-cutting helpers (HTTP, atomic
+  writes, internet check, `parallel_map`, `read_pids`).
+- **AI involvement.** [AI stub: Moderate. Older helpers
+  (`url_retrieve`, `atomic_write`, `have_internet`) are hand-written;
+  `parallel_map` and `read_pids` (v0.66.0) were co-developed.]
+
+### `planetarypy.datetime_format_converters` — DOY/UTC plumbing
+
+- **Origin.** [TODO: solving the day-of-year → calendar-date pain in
+  PDS labels.]
+- **AI involvement.** [AI stub: None / negligible. Pure-Python
+  numerical helpers; predates the bulk of the AI work.]
+
+## What the AI did *not* touch
+
+[TODO: places where you intentionally kept AI out of the loop. Possible
+candidates I'd guess at:]
+
+- Scientific judgment calls (e.g. choosing IAU 2015 over IAU 2009 as
+  the default; the `range_strategy = "nan"` default in NSSDC; the
+  "Williams 1996–2025" provenance attribution).
+- The published Zenodo deposit metadata and DOIs.
+- The CHANGELOG narrative — written by you, with AI providing draft
+  bullet lists you edited.
+
+## Working loop (what the collaboration actually looks like)
+
+[TODO: 2–3 paragraphs on the *practice*. Suggested talking points:]
+
+- Sessions are conversational. You describe a goal; the model proposes
+  a design; you accept, redirect, or veto.
+- Every change lands as a reviewed commit. No silent autopilot.
+- The test suite is the gatekeeper. AI-generated tests are reviewed for
+  meaningful coverage, not just line-count.
+- Memory: persistent context across sessions captures user preferences
+  (semver rules, commit style, "don't bundle scope", help-on-missing
+  CLI UX) so the assistant doesn't repeat the same mistakes.
+- [TODO: anything about how this differs from a code-completion tool —
+  the agent runs tests, edits files, commits, asks clarifying questions.]
+
+## Acknowledgments
+
+[TODO: standard acknowledgments — Anthropic, the planetary-data
+community, NASA / NSSDC for the underlying data, JPL NAIF for SPICE,
+PDS for the archives. Whatever you'd write in a paper acknowledgments
+section.]

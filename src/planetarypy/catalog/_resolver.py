@@ -235,11 +235,12 @@ def default_product_dir(
     return config.storage_root / mission / instrument / product_type / safe_pid
 
 
-# Lazy-loaded resolver paths: maps key → (module, function_name)
-_STORAGE_RESOLVER_MODULES = {
-    "mro.hirise": ("planetarypy.instruments.mro.hirise", "_hirise_local_product_dir"),
-    "mro.ctx": ("planetarypy.instruments.mro.ctx.ctx_edr", "_ctx_local_product_dir"),
-}
+# Lazy-loaded resolver paths: maps key → (module, function_name).
+# Empty since the instrument packages moved out: planetarypy-hirise and
+# planetarypy-ctx call register_storage_resolver from their own import side
+# effects, which their CLI plugins trigger at startup. Core no longer names any
+# instrument module here. In-tree instruments may still use this map.
+_STORAGE_RESOLVER_MODULES: dict[str, tuple[str, str]] = {}
 
 
 def _local_product_dir(

@@ -1,0 +1,305 @@
+---
+title: "Cross-archive Mars: combining NASA PDS and ESA PSA over one area"
+subtitle: "Finding and working with multiple datasets over Jezero Crater"
+jupyter: python3
+---
+
+::: {.callout-note}
+## What this tutorial shows
+
+How to assemble data over **one Mars surface area** from **two archives** — NASA's
+PDS and ESA's PSA — and tie them together with the rest of planetarypy: per-body
+`constants`, planetary `crs`, `geo` footprints/overlaps, `spicer` illumination, and
+the (experimental) sun-direction plotting helper.
+
+It also documents, honestly, the **rough edges** you hit doing this today — they are
+called out in `callout-warning` boxes so you know what works, what doesn't yet, and
+the reliable path around each.
+:::
+
+We work over **Jezero Crater** (Perseverance's landing site), at about
+**77.4°E, 18.4°N**.
+
+```{python}
+LON, LAT = 77.4, 18.4   # Jezero Crater (degrees East, degrees North)
+TARGET = "Mars"
+```
+
+## 1. Ground truth: the body and a local CRS
+
+Before any data, anchor the work in the body's own numbers and a sensible
+coordinate system for the area.
+
+```{python}
+from planetarypy import constants as c
+
+mars = c.Mars
+mars.mean_radius   # a Constant with units + provenance
+```
+
+`planetarypy.crs` builds IAU-2015 CRSs straight from the body — radii come from the
+IAU code itself, nothing hardcoded. For a feature study you usually want a
+**local** azimuthal-equidistant CRS centred on the area (distance-true near the
+point), plus the body-wide geographic CRS.
+
+```{python}
+from planetarypy import crs
+
+body_geographic = crs.body_crs(TARGET)          # ('IAU_2015', '49900')
+local = crs.local_crs(LON, LAT, TARGET)         # azeqd centred on Jezero
+body_geographic.to_authority()
+```
+
+## 2. ESA PSA: spatially searching one area
+
+The PSA exposes an IVOA **EPN-TAP** table (`psa.epn_core`) where every granule is a
+directly downloadable product. The high-level helpers (`psa.missions`,
+`psa.instruments`, `psa.datasets`) are *non-spatial* — but the table itself carries
+spatial bounds, and `psa.query()` lets you run raw ADQL against them.
+
+```{python}
+from planetarypy import psa
+
+psa.instruments("Mars Express").head()
+```
+
+The spatial columns are `c1min/c1max` (longitude) and `c2min/c2max` (latitude).
+
+::: {.callout-warning}
+## Obstacle 1 — longitude is −180..180, and bounding boxes degenerate near the poles
+
+Two things will bite you:
+
+1. **Longitude is signed (−180..180)**, not 0–360 — undocumented in the API. Jezero
+   at "77.4°E" is `77.4` here, but a feature near the antimeridian needs care.
+2. **Orbital swaths that cross high latitudes get a degenerate bounding box** that
+   spans *all* longitudes (`lon[-180, 180]`). A naive "box contains my point" query
+   then returns lots of **false positives** that don't actually image your area.
+
+The fix: drop the wrap-around boxes by also requiring the box to be *small*
+(`(c1max - c1min) < 30`). For rigorous work, use the per-product geometry index
+(`psa.geometry_index`, which carries `CENTER_LAT/LON`) or the `s_region` polygon.
+:::
+
+```{python}
+hrsc = psa.query(
+    "SELECT TOP 10 granule_uid, c1min, c1max, c2min, c2max "
+    "FROM psa.epn_core "
+    "WHERE instrument_host_name LIKE '%Mars Express%' "
+    "  AND instrument_name LIKE '%HRSC%' "
+    f"  AND c1min <= {LON} AND c1max >= {LON} "
+    f"  AND c2min <= {LAT} AND c2max >= {LAT} "
+    "  AND (c1max - c1min) < 30 AND (c2max - c2min) < 30"   # <-- kill degenerate boxes
+)
+[r["granule_uid"].split(":DATA:")[-1] for r in hrsc]
+```
+
+Those are real HRSC scenes over Jezero. A `granule_uid`'s product-id segment is what
+you hand to `psa.fetch_psa_product`.
+
+## 3. NASA PDS: registry-wide discovery with a first-class bbox
+
+`planetarypy.search` wraps NASA's registry-wide search API (80M+ products). Spatial
+search is a **first-class `bbox=` parameter** — no raw query string needed.
+`bbox_from_point` builds a `(west, south, east, north)` box around a coordinate, and
+`count()` sizes a result set without fetching any rows.
+
+```{python}
+from planetarypy import search
+
+bbox = search.bbox_from_point(LON, LAT, 1.0)     # ±1° box around Jezero
+search.count(
+    target="urn:nasa:pds:context:target:planet.mars",
+    observationals=True,
+    bbox=bbox,
+)
+```
+
+That is every cart-indexed product whose footprint overlaps the box. Pull a page of
+them — `bbox=` replaces the old `cart:Bounding_Coordinates` query-string incantation:
+
+```{python}
+mars_box = search.search_products(
+    target="urn:nasa:pds:context:target:planet.mars",
+    observationals=True,
+    bbox=bbox,
+    fields=["ref_lid_instrument", "pds:Time_Coordinates.pds:start_date_time"],
+    limit=8,
+)
+mars_box["ref_lid_instrument"].dropna().head()
+```
+
+From the command line the same "what is here?" question is a one-liner:
+
+```bash
+plp search at Mars 77.4 18.4 -r 1.0          # list products overlapping the point
+plp search at Mars 77.4 18.4 --count         # just the number
+```
+
+::: {.callout-warning}
+## Obstacles on the NASA side (two real ones)
+
+1. **Spatial fields are not universal.** The `cart:Bounding_Coordinates` fields are
+   only populated when the instrument/archive team added them — common for
+   derived/calibrated products, often **absent for raw/EDR**. No coverage there means
+   no spatial hit, even if data exists.
+2. **`target=Mars` returns _every_ Mars-targeted product, across all missions and
+   nodes** — not just orbital imagery. For example, Hayabusa2 NIRS3 cruise-phase
+   spectra that observed Mars (remotely, during transit to Ryugu) are genuinely
+   Mars-targeted and sort first. They're not mislabeled; they're just not what you
+   want if you're after CTX/HiRISE/CaSSIS imagery. Narrow with an `instrument`/`lid`
+   constraint.
+
+(Historical note: a missing-outer-parenthesis bug in `search`'s query builder used to
+make *any* multi-filter query fail with HTTP 400; fixed — the registry requires the
+whole `q` wrapped in `(...)`.)
+:::
+
+### Alternative NASA spatial path: the index system
+
+Where `cart:` coverage is missing (e.g. CTX EDR), planetarypy's parsed PDS cumulative
+indexes carry real footprint corners. `get_index` reads them; filter on the corner
+lat/lon columns to select an area.
+
+```{python}
+#| eval: false
+from planetarypy import pds
+
+# CTX EDR index (large first download, then cached as parquet).
+ctx = pds.get_index("mro.ctx.edr")
+near = ctx[
+    (ctx["CENTER_LONGITUDE"].between(LON - 1, LON + 1))
+    & (ctx["CENTER_LATITUDE"].between(LAT - 1, LAT + 1))
+]
+near[["PRODUCT_ID", "CENTER_LONGITUDE", "CENTER_LATITUDE"]].head()
+```
+
+## 4. Ready-made reference rasters: windowed reads, no full download
+
+Discovery finds *products to fetch*. Often you also want a **ready-made global
+reference raster** over the area — a basemap or a DTM — without pulling the whole
+multi-gigabyte mosaic. `planetarypy.datasets` is a body-namespaced registry of remote
+cloud-optimised GeoTIFFs that reads just the window you ask for over `/vsicurl/`.
+
+```{python}
+from planetarypy import datasets
+
+datasets.bodies()                                   # ['mars', 'moon']
+[r.short for r in datasets.list_datasets("mars")]   # what's registered for Mars
+```
+
+```{python}
+# A 0.5°-wide patch of the HRSC level-3 global mosaic, centred on Jezero.
+# Only the bytes covering this window cross the network — the source COG is global.
+patch = datasets.mars.hrsc_level3.read_window(LON, LAT, size=0.5)
+patch                                                # georeferenced rioxarray DataArray
+```
+
+The result is a `rioxarray` `DataArray` in the mosaic's own IAU CRS (49910,
+equirectangular), so it composes with `crs`/`geo` and plots directly. The STAC-backed
+collections (THEMIS mosaics, CTX/LOLA DTMs) read the same way; pass `out="patch.tif"`
+to also write a GeoTIFF alongside the array.
+
+## 5. `geo`: footprints, anti-meridian, and overlaps
+
+Turn the PSA bounding boxes into polygons and reason about them with `geo`. This is
+also where the planetarypy anti-meridian helpers earn their keep — exactly the
+degeneracy from Obstacle 1.
+
+```{python}
+from shapely.geometry import box
+import geopandas as gpd
+
+polys = [box(r["c1min"], r["c2min"], r["c1max"], r["c2max"]) for r in hrsc]
+# NOTE: geo.overlaps expects the id column to be named exactly "id"
+# (it errors with a cryptic KeyError: 'id_left' otherwise).
+gdf = gpd.GeoDataFrame(
+    {"id": [r["granule_uid"].split(":DATA:")[-1] for r in hrsc]},
+    geometry=polys, crs="EPSG:4326",
+)
+gdf.head()
+```
+
+```{python}
+from planetarypy import geo
+
+# Which scenes overlap each other over the area? -> id_1, id_2, geometry, area
+geo.overlaps(gdf).head()
+```
+
+## 6. `spicer`: illumination at the area
+
+How was Jezero lit at a given time? `Spicer` computes full illumination geometry
+(needs the `[spice]` extra).
+
+```{python}
+#| eval: false
+from planetarypy.spice.spicer import Spicer
+
+s = Spicer("Mars")
+illum = s.illumination(LON, LAT, "2021-02-18T20:55:00")   # Perseverance landing
+sun_az_from_north = s.solar_azimuth_at(LON, LAT, "2021-02-18T20:55:00")
+illum, sun_az_from_north
+```
+
+::: {.callout-warning}
+## Obstacle 3 — solar azimuth conventions don't match between modules
+
+`Spicer.solar_azimuth_at` returns azimuth **clockwise from north** (geographic), but
+the plotting helper `add_sun_indicator` (below) expects **clockwise from image top**
+(the PDS `SUB_SOLAR_AZIMUTH` convention). They agree only when image-north points
+up. For a rotated/projected image you must convert (subtract the image's north
+azimuth) before plotting. This mismatch is why the sun helper is **experimental**.
+:::
+
+## 7. Fetch and open a product
+
+Both archives download into `{storage_root}` and open through the same
+`planetarypy.open()`.
+
+```{python}
+#| eval: false
+import planetarypy as plp
+
+# ESA PSA — direct FTP fetch by product id:
+paths = plp.psa.fetch_psa_product("H5270_0000_ND3")
+ds = plp.open(paths[0])     # rioxarray/pdr-backed reader
+ds
+```
+
+## 8. Plotting with the (experimental) sun indicator
+
+```{python}
+#| eval: false
+import planetarypy as plp
+
+# image = ds.squeeze().values   # a 2D array from the opened product
+# CW-from-top azimuth required (see Obstacle 3 — convert from Spicer if needed).
+plp.plotting.imshow_with_sun(image, sun_azimuth_deg=135, title="HRSC over Jezero")
+```
+
+::: {.callout-warning}
+## Obstacle 4 — `add_sun_indicator` / `imshow_with_sun` are experimental
+
+The placement was recently fixed (it no longer rescales the image), but the
+**azimuth-convention handoff (Obstacle 3) is not yet validated end-to-end**. Treat
+the sun arrow as indicative until that's resolved.
+:::
+
+## Summary
+
+- **Both archives support spatial discovery.** NASA is now a **first-class `bbox=`
+  parameter** on `search.search_products` / `search.count` (plus the `plp search at`
+  CLI); ESA is still an EPN-TAP bbox in a raw `psa.query` ADQL string. Both carry
+  data-quality traps (NASA: missing `cart` coverage + cross-mission products that
+  legitimately match `target=Mars`; PSA: degenerate polar bounding boxes).
+- Where registry spatial metadata is missing (e.g. CTX EDR), planetarypy's **PDS
+  index system** (`pds.get_index` + corner lat/lon) is the fallback.
+- For a **ready-made reference raster** over the area, `planetarypy.datasets` streams
+  a windowed read over `/vsicurl/` (`datasets.mars.hrsc_level3.read_window(...)`) — no
+  full-mosaic download.
+- `constants`, `crs`, `geo`, `spicer`, `open`, and `plotting` compose cleanly across
+  both archives — the cross-archive friction is in *discovery*, not in the analysis
+  layer.
+
+See the obstacles called out above; several are tracked for fixes.

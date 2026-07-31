@@ -27,12 +27,4 @@ def register_meta_handler(index_key: str, handler: Callable) -> None:
 
 def get_handler(index_key: str) -> Optional[Callable]:
     """Return the per-index meta-display function, or None for the generic path."""
-    if index_key in _META_HANDLERS:
-        return _META_HANDLERS[index_key]
-    # Transitional fallback (removed once HiRISE self-registers in the
-    # instrument-extraction work): keep current behavior for the in-tree module.
-    if index_key in ("mro.hirise.edr", "mro.hirise.rdr"):
-        from planetarypy.instruments.mro.hirise import format_meta
-
-        return format_meta
-    return None
+    return _META_HANDLERS.get(index_key)
