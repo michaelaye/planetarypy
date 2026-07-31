@@ -118,6 +118,22 @@ def _complete_product_id(ctx: click.Context, args: list[str], incomplete: str) -
     return []
 
 
+def _require_index_key(key: str) -> str:
+    """Validate a dotted index key, or exit cleanly.
+
+    Thin adapter over :func:`planetarypy.pds.utils.validate_index_key`: the
+    library raises, the CLI prints and exits without a traceback. Was open-coded
+    at five call sites and missing from a sixth.
+    """
+    from planetarypy.pds.utils import validate_index_key
+
+    try:
+        return validate_index_key(key)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+
 @app.command(rich_help_panel=_PANEL_FETCH)
 def fetch(
     ctx: typer.Context,
@@ -1501,11 +1517,7 @@ def indexes_peek(
         raise typer.Exit()
 
     from planetarypy.pds import get_index
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     full = get_index(key, allow_refresh=False)
     try:
@@ -1619,11 +1631,7 @@ def indexes_last(
         raise typer.Exit()
 
     from planetarypy.pds import get_index
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     df = get_index(key, allow_refresh=False)
     total_rows = len(df)
@@ -1735,11 +1743,7 @@ def indexes_counts(
         raise typer.Exit()
 
     from planetarypy.pds import get_index
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     col_list: list[str] = []
     if column:
@@ -1855,11 +1859,7 @@ def indexes_select(
         raise typer.Exit()
 
     from planetarypy.pds import get_index, pid_column, resolve_pids
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     pids = list(product_ids) if product_ids else []
 
@@ -2093,14 +2093,11 @@ def indexes_info(
 
     from planetarypy.pds import Index
     from planetarypy.pds.utils import (
-        _all_dotted_index_keys,
         _completion_id_col_for,
         _index_config_for,
     )
 
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     idx = Index(key)
     cfg = _index_config_for(key)
@@ -2110,10 +2107,23 @@ def indexes_info(
     table.add_column("value", overflow="fold")
 
     table.add_row("index_key", key)
-    try:
-        table.add_row("remote URL", str(idx.url) if idx.url else "(unresolved)")
-    except Exception as e:
-        table.add_row("remote URL", f"(error: {e})")
+    # Both URLs come from the access log, which already distinguishes them.
+    # `idx.url` is the freshly-resolved *available* URL — reading it here made
+    # every `info` call re-scrape a dynamic archive, and labelling it "remote
+    # URL" hid which of the two it was.
+    log = idx.remote.log
+    current_url = log.current_url
+    available_url = log.available_url
+    if current_url:
+        table.add_row("current URL", str(current_url))
+    elif idx.local_parq_path.exists():
+        # Cached before download() recorded current_url for static indexes.
+        # Don't claim provenance we never wrote down.
+        table.add_row("current URL", "(not recorded — cached before provenance logging)")
+    else:
+        table.add_row("current URL", "— (not downloaded)")
+    if available_url and str(available_url) != str(current_url):
+        table.add_row("available URL", str(available_url))
     table.add_row("remote type", idx.remote_type)
 
     parq = idx.local_parq_path
@@ -2126,7 +2136,6 @@ def indexes_info(
     # Freshness state from the access log (when did we last download the
     # parquet, when did we last check upstream, and is a newer one waiting).
     try:
-        log = idx.remote.log
         table.add_row("last updated", _format_when(log.last_update))
         table.add_row("last checked", _format_when(log.last_check))
         try:
@@ -2188,6 +2197,7 @@ def indexes_refresh(
 
     if cache:
         from planetarypy.pds import Index
+        _require_index_key(cache)
         idx = Index(cache, force_config_update=False)
         typer.echo(f"Re-downloading {cache} ...", err=True)
         idx.download(force=True)

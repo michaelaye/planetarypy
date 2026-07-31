@@ -27,6 +27,35 @@ A slimming release: MRO HiRISE and CTX behaviour now ships as separate distribut
 
 - `instruments/mro/hirise.py` and `instruments/mro/ctx/`, the `hibrowse` / `hiedr` / `himos` / `hitif` / `ctxqv` / `ctx-migrate` verbs and their completion helpers, and `_parse_ccds` (its only callers were `hiedr` and `himos`; the HiRISE package carries its own copy rather than coupling to a private core symbol).
 - The hard-coded HiRISE fallback in `pds/meta_display.get_handler`, and both `_STORAGE_RESOLVER_MODULES` lazy entries. Core no longer names any instrument module: the packages self-register through `register_meta_handler` and `register_storage_resolver` when their CLI plugin is loaded at `plp` startup.
+## [0.81.0] - 2026-07-31
+
+Makes our traffic identifiable to the archives we depend on, so their operators can help us when something breaks on their side.
+
+### Added
+
+- **`utils.user_agent()` and `utils.headers()`**, now sent on every outbound request. Previously only `get_remote_timestamp` set a User-Agent; `check_url_exists` and `url_retrieve` — the path every kernel and index download actually takes — went out as `python-requests/2.34.2`, indistinguishable from any other script on the internet. NAIF asked which requests were ours while debugging connection timeouts against our CI, and there was nothing for them to grep. Requests now carry `planetarypy/<version> (+https://github.com/planetarypy/planetarypy)`. Unlike an egress IP this survives the address rotation GitHub-hosted runners do on every job, which makes it the more durable identifier of the two.
+
+  The version is read from `planetarypy.__version__` on first use, not from `importlib.metadata` — the latter reports *installed distribution* metadata, which goes stale in an editable install and would advertise a version the running code isn't.
+
+- **The runner's egress IP is recorded in the network CI workflows** (`NAIF download smoke`, `PDS download smoke`, `Archive reachability`), alongside a UTC timestamp and the run URL, in the job summary. Always-run, so a failing job records it too. GitHub-hosted runners take a fresh address per job, so there is no static answer to give an archive operator — what helps is the address from the run that actually failed.
+
+## [0.80.1] - 2026-07-31
+
+A diagnostics release, prompted by a WUSTL permission change that 401'd the whole MSL SAM dataset: two failures that used to be silent or misattributed now say what actually happened, and a single node outage can no longer red the release gate.
+
+### Fixed
+
+- **A failed index download no longer reports a missing parquet file.** `Index.download()` logged the exception and returned, leaving callers to carry on and use files that were never written — so an upstream HTTP 401 surfaced as `FileNotFoundError: .../l0_index.parq` from `pandas.read_parquet`, three layers from the cause, with the explanatory log line invisible because library logging is disabled by default. It re-raises now, and you get the URL and the status code. All three call sites (`get_index`'s refresh path, `ensure_parquet`, `plp indexes refresh`) already assumed success.
+- **Losing the Kakadu accelerator in `plp hitif` is now visible.** The fallback to GDAL's OpenJPEG decoder announced itself through `logger.info`, which the library disables by default — so a machine without `kdu_expand` silently ran ~3.5× slower (81 s versus 23 s on a full RED product), single-threaded, with nothing on screen to explain it. It prints to stderr alongside the other echoed commands, and says what it costs.
+
+### Changed
+
+- **The index round-trip gate test tries three hosts instead of one.** It guards the pyarrow declared-dependency contract and needs *a* small index, not a particular one; pinning it to `msl.sam.l0` meant a single WUSTL outage blocked releases through a test that has nothing to do with WUSTL. It now walks `cassini.rss.profile_index` (SETI) → `msl.cmn.rdr` (WUSTL) → `mgs.moc.rdr` (JPL), ordered by measured payload, and skips only when every host fails transiently. The happy path got cheaper too — 0.01 MB against the previous 0.24 MB.
+
+### Added
+
+- **A six-hourly archive reachability probe** (`Archive reachability` workflow). One `HEAD` per registered index URL covers all 79 across 6 hosts in about 7 seconds, so the three nodes whose smallest cumulative index is 100 MB+ — which the download canary cannot afford — are watched too. Per-URL rather than per-host, because a host can serve most of its archive while single objects are unreadable. Results publish to an orphan `status` branch that README badges read through shields.io; nothing is committed to `main`. Its first run found seven broken URLs: five WUSTL 401s and two SETI 404s that look like stale registrations on our side.
+- **Self-closing GitHub issues for unreachable archives.** One issue per affected host, listing which index URLs fail with which status, closed automatically with the outage duration when the host recovers — so an open `upstream-outage` issue always means "still broken right now".
 
 ## [0.80.0] - 2026-07-30
 

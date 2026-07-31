@@ -1,10 +1,28 @@
 #!/usr/bin/env python
-import logging
-import sys
-from pathlib import Path
+"""Install the dev environment's dependencies with conda, pip for the rest.
 
-import sh
-import tomlkit
+Stdlib only, on purpose: this is the script that *creates* the environment, so
+it has to run in a bare one. It used to import ``sh`` and ``tomlkit``, so you
+needed those installed before you could run the installer — a chicken-and-egg
+that CI hid behind its own `install sh tomlkit` step and that nothing told a
+human about.
+
+``tomllib`` here is not a rejection of ``tomlkit``: the rest of the package uses
+tomlkit deliberately, because it round-trips a TOML file without flattening its
+comments and structure, and ``config.py`` / ``utils.py`` write user config files
+back. This script only *reads* three dependency lists out of pyproject and
+discards the document, so that fidelity buys nothing — and being stdlib is worth
+something, because this is the bootstrap. Both packages are still installed
+normally: tomlkit is a core dependency, sh is in the dev extra.
+
+conda rather than mamba: conda ships the libmamba solver, so the separate mamba
+binary is no longer needed.
+"""
+import logging
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
@@ -32,36 +50,43 @@ def get_package_name(dep):
     )
 
 
+def run(cmd, what, packages=()):
+    """Run an installer, streaming its output; exit(1) with context on failure."""
+    if packages:
+        logger.info("Packages: %s", " ".join(packages))
+    try:
+        subprocess.run(cmd, check=True)
+    except FileNotFoundError:
+        logger.error("Error installing %s: %r not found on PATH.", what, cmd[0])
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        logger.error("Error installing %s!", what)
+        logger.error("Exit code: %s", e.returncode)
+        logger.error("Command: %s", " ".join(cmd))
+        sys.exit(1)
+    logger.info("%s installed successfully!", what.capitalize())
+
+
+def conda_install(packages):
+    return ["conda", "install", "-y", "-c", "conda-forge", *packages]
+
+
+def pip_install(packages):
+    # sys.executable rather than a bare `pip`, so packages land in the
+    # interpreter running this script rather than whichever pip is on PATH.
+    return [sys.executable, "-m", "pip", "install", *packages]
+
+
 def install_deps():
     logger.info("\n=== Starting install_dev_deps.py ===")
 
-    # Install core packages first
-    logger.info("\nInstalling core dependencies via mamba...")
-    try:
-        sh.mamba(
-            "install",
-            "-y",
-            "-c",
-            "conda-forge",
-            *CORE_PACKAGES,
-            _err=sys.stderr,
-            _out=sys.stdout,
-        )
-        logger.info("Core dependencies installed successfully!")
-    except sh.ErrorReturnCode as e:
-        logger.error("Error installing core packages!")
-        logger.error("Exit code: %s", e.exit_code)
-        logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
-        logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
-        sys.exit(1)
+    logger.info("\nInstalling core dependencies via conda...")
+    run(conda_install(sorted(CORE_PACKAGES)), "core dependencies", sorted(CORE_PACKAGES))
 
-    # Read pyproject.toml
     logger.info("\nReading pyproject.toml...")
-    pyproject_path = Path("pyproject.toml")
-    with open(pyproject_path) as f:
-        pyproject = tomlkit.load(f)
+    with open(Path("pyproject.toml"), "rb") as f:
+        pyproject = tomllib.load(f)
 
-    # Get main, spice, and dev dependencies
     logger.info("\nCollecting dependencies from pyproject.toml...")
     main_deps = pyproject["project"]["dependencies"]
     dev_deps = pyproject["project"]["optional-dependencies"]["dev"]
@@ -73,9 +98,7 @@ def install_deps():
     logger.info("Found %d spice dependencies", len(spice_deps))
     logger.info("Total dependencies to process: %d", len(all_deps))
 
-    # Split dependencies into conda and pip packages
     logger.info("\nSplitting dependencies between conda and pip...")
-    # Remove core packages and pip-only packages from conda installation
     conda_deps = [
         dep
         for dep in all_deps
@@ -92,41 +115,13 @@ def install_deps():
     logger.info("Packages to install via conda: %d", len(conda_deps))
     logger.info("Packages to install via pip: %d", len(pip_deps))
 
-    # Install conda packages
     if conda_deps:
-        try:
-            logger.info("\nInstalling conda packages...")
-            logger.info("Packages: %s", " ".join(conda_deps))
-            sh.mamba(
-                "install",
-                "-y",
-                "-c",
-                "conda-forge",
-                *conda_deps,
-                _err=sys.stderr,
-                _out=sys.stdout,
-            )
-            logger.info("Conda installation completed successfully!")
-        except sh.ErrorReturnCode as e:
-            logger.error("Error installing conda packages!")
-            logger.error("Exit code: %s", e.exit_code)
-            logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
-            logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
-            sys.exit(1)
+        logger.info("\nInstalling conda packages...")
+        run(conda_install(conda_deps), "conda packages", conda_deps)
 
-    # Install pip packages
     if pip_deps:
-        try:
-            logger.info("\nInstalling pip packages...")
-            logger.info("Packages: %s", " ".join(pip_deps))
-            sh.pip("install", *pip_deps, _err=sys.stderr, _out=sys.stdout)
-            logger.info("Pip installation completed successfully!")
-        except sh.ErrorReturnCode as e:
-            logger.error("Error installing pip packages!")
-            logger.error("Exit code: %s", e.exit_code)
-            logger.error("Stdout: %s", e.stdout.decode() if e.stdout else "No stdout")
-            logger.error("Stderr: %s", e.stderr.decode() if e.stderr else "No stderr")
-            sys.exit(1)
+        logger.info("\nInstalling pip packages...")
+        run(pip_install(pip_deps), "pip packages", pip_deps)
 
     logger.info("\n=== install_dev_deps.py completed successfully ===")
 

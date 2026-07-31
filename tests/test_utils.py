@@ -83,3 +83,25 @@ def test_url_retrieve_writes_file_and_cleans_part(tmp_path, monkeypatch):
     assert list(tmp_path.glob("*.part")) == []
     # Reopen/replace must succeed (would raise on Windows if a handle leaked).
     outfile.replace(tmp_path / "data2.bin")
+
+
+class TestUserAgent:
+    """The UA is how archive operators identify our traffic in their logs."""
+
+    def test_reports_the_package_version_not_installed_metadata(self):
+        import planetarypy
+        from planetarypy.utils import user_agent
+
+        # importlib.metadata would report the *installed distribution* version,
+        # which goes stale in an editable install; the source is authoritative.
+        assert f"planetarypy/{planetarypy.__version__}" in user_agent()
+
+    def test_carries_a_contact_url(self):
+        from planetarypy.utils import user_agent
+
+        assert "github.com/planetarypy/planetarypy" in user_agent()
+
+    def test_headers_carry_it(self):
+        from planetarypy.utils import headers, user_agent
+
+        assert headers()["User-Agent"] == user_agent()
