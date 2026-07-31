@@ -24,6 +24,13 @@ LABEL = "upstream-outage"
 TITLE = "Archive unreachable: {host}"
 MARKER = "<!-- reachability-bot -->"
 
+# Where to report a confirmed node-side outage, so the address is in the issue
+# that announces the outage rather than in someone's mail archive. Given by the
+# WUSTL operators on 2026-07-31 after they fixed the msl.sam.l0/msl.cmn.rdr 401s.
+CONTACTS = {
+    "pds-geosciences.wustl.edu": "geosci@wunder.wustl.edu",
+}
+
 
 def gh(*args: str, check: bool = True) -> str:
     result = subprocess.run(
@@ -45,6 +52,10 @@ def body_for(host: str, failing: list[dict], checked: str) -> str:
     rows = "\n".join(
         f"| `{f['index_key']}` | **{f['status']}** | {f['url']} |" for f in failing
     )
+    contact = CONTACTS.get(host)
+    report_to = (
+        f"Report a node-side fault to **{contact}**.\n\n" if contact else ""
+    )
     return (
         f"{MARKER}\n"
         f"`{host}` is serving errors for {len(failing)} registered index "
@@ -54,6 +65,7 @@ def body_for(host: str, failing: list[dict], checked: str) -> str:
         "A **404** usually means the URL moved and our registration in "
         "`planetarypy_index_urls.toml` is stale — ours to fix. A **401/403** "
         "on a public archive is the node's to fix.\n\n"
+        f"{report_to}"
         "Opened automatically by the `Archive reachability` workflow; it will "
         "close this issue when the host recovers."
     )
