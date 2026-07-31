@@ -650,3 +650,26 @@ class TestIndexesPeekStillWorks:
         assert "showing 3 random" in result.output
         # Some product id MUST appear — which exact one is random.
         assert any(f"P_00{i}" in result.output for i in range(1, 6))
+
+
+class TestIndexesRefresh:
+    """`refresh --cache` was the site that never got the key check."""
+
+    def test_malformed_cache_key_no_traceback(self):
+        # Used to reach Index.__init__'s tuple unpack: "ValueError: not enough
+        # values to unpack (expected 3, got 2)", with a traceback.
+        result = runner.invoke(app, ["indexes", "refresh", "--cache", "foo.bar"])
+        assert result.exit_code == 1
+        assert "Malformed index key" in result.output
+        assert "Traceback" not in result.output
+
+    def test_unknown_cache_key_no_traceback(self):
+        # Used to die inside urllib as "unknown url type: 'None'".
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}):
+            result = runner.invoke(
+                app, ["indexes", "refresh", "--cache", "mro.hirise.nosuch"]
+            )
+        assert result.exit_code == 1
+        assert "Unknown index key" in result.output
+        assert "Traceback" not in result.output

@@ -2598,6 +2598,7 @@ def indexes_refresh(
 
     if cache:
         from planetarypy.pds import Index
+        _require_index_key(cache)
         idx = Index(cache, force_config_update=False)
         typer.echo(f"Re-downloading {cache} ...", err=True)
         idx.download(force=True)
