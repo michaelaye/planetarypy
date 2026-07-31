@@ -179,6 +179,26 @@ class StaticRemoteHandler:
         if self.log.update_available:  # already flagged → fast path
             return True
 
+        # URL-change detection. ``current_url`` is a contract: it names the URL
+        # the cached parquet was actually fetched from. The index-URL config is
+        # fetched from planetarypy_configs without a release gate and reaches
+        # users within a day, so it can be repointed underneath a cached file —
+        # and the timestamp comparison below cannot see that, because it reads
+        # Last-Modified from the *new* URL, which may well be older than our
+        # last download. Dynamic indexes never had this hole; they compare URLs
+        # by construction.
+        #
+        # A missing current_url means "no opinion", not "changed": indexes
+        # cached before provenance was logged must not all flag an update.
+        current_url = self.log.current_url
+        if current_url is not None and str(self.url) != str(current_url):
+            logger.info(
+                f"Configured URL for {self.index_key} changed since download: "
+                f"cached from {current_url}, config now names {self.url}"
+            )
+            self.log.log_available_url(str(self.url))
+            return True
+
         # Prefer the cached remote_timestamp (the one ``__init__`` wrote
         # on first instantiation). Only fetch fresh if nothing is cached
         # AND it's time for a new check.

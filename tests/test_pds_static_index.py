@@ -427,3 +427,57 @@ class TestStaticRemoteHandler:
         handler.log.log_update_available(False)
 
         assert handler.update_available is True
+
+
+class TestStaticUrlChangeDetection:
+    """A repointed config URL must count as an update.
+
+    The index-URL config is fetched from planetarypy_configs without a release
+    gate, so it can be changed underneath a cached parquet. Timestamp comparison
+    cannot see that — it reads Last-Modified from the *new* URL, which may be
+    older than our last download — so the cached file would silently be treated
+    as current forever. ``current_url`` is the contract that closes this: it
+    names the URL the cached file actually came from.
+    """
+
+    def _handler(self, key="mro.ctx.edr"):
+        handler = StaticRemoteHandler.__new__(StaticRemoteHandler)
+        handler.index_key = key
+        handler.config = ConfigHandler()
+        handler.log = AccessLog(key)
+        handler._remote_timestamp = None
+        return handler
+
+    def _seed(self, handler, *, current_url, remote_older_than_download=True):
+        key = handler.index_key
+        download = datetime.datetime(2025, 6, 20, 0, 0, 0)
+        remote = datetime.datetime(2025, 6, 10 if remote_older_than_download else 25, 0, 0, 0)
+        handler.log.set(key, "last_updated", download)
+        handler.log.set(key, "remote_timestamp", remote)
+        if current_url is not None:
+            handler.log.set(key, "current_url", current_url)
+        handler.log.save()
+        handler.log.log_update_available(False)
+
+    def test_repointed_url_flags_update_even_when_new_file_is_older(
+        self, config_env, monkeypatch
+    ):
+        monkeypatch.setattr(AccessLog, "should_check", property(lambda self: False))
+        h = self._handler()
+        self._seed(h, current_url="https://example.com/mro/ctx/OLD_index.lbl")
+        # config still names .../edr_index.lbl, so the logged URL differs.
+        assert str(h.url) != "https://example.com/mro/ctx/OLD_index.lbl"
+        assert h.update_available is True
+
+    def test_matching_url_and_older_remote_is_no_update(self, config_env, monkeypatch):
+        monkeypatch.setattr(AccessLog, "should_check", property(lambda self: False))
+        h = self._handler()
+        self._seed(h, current_url=str(h.url))
+        assert h.update_available is False
+
+    def test_unrecorded_url_expresses_no_opinion(self, config_env, monkeypatch):
+        """Caches predating provenance logging must not all flag an update."""
+        monkeypatch.setattr(AccessLog, "should_check", property(lambda self: False))
+        h = self._handler()
+        self._seed(h, current_url=None)
+        assert h.update_available is False
