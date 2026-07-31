@@ -31,7 +31,42 @@ from yarl import URL
 
 from planetarypy.datetime_format_converters import fromdoyformat
 
+
+_PROJECT_URL = "https://github.com/planetarypy/planetarypy"
+_USER_AGENT: str | None = None
+
+
+def user_agent() -> str:
+    """Identify our traffic to the archives we fetch from.
+
+    Bare ``requests`` sends ``python-requests/x.y.z``, indistinguishable from any
+    other script — so a node operator investigating a problem on their side (NAIF
+    connection timeouts, the WUSTL 401s) cannot pick our requests out of their
+    logs. Naming ourselves and the version makes that possible, and unlike an IP
+    it survives the rotation GitHub-hosted runners do on every job.
+
+    Computed on first use, not at import: ``utils`` is imported during package
+    init, so reading ``planetarypy.__version__`` at module level would be
+    circular. Deliberately *not* ``importlib.metadata.version`` — that reads
+    installed distribution metadata, which goes stale in an editable install and
+    would report a version the code isn't.
+    """
+    global _USER_AGENT
+    if _USER_AGENT is None:
+        try:
+            from planetarypy import __version__ as _v
+        except Exception:
+            _v = "unknown"
+        _USER_AGENT = f"planetarypy/{_v} (+{_PROJECT_URL})"
+    return _USER_AGENT
+
+
+def headers() -> dict[str, str]:
+    """Default request headers, carrying :func:`user_agent`."""
+    return {"User-Agent": user_agent()}
+
 __all__ = [
+    "user_agent",
     "replace_all_doy_times",
     "parse_http_date",
     "get_remote_timestamp",
@@ -180,7 +215,7 @@ def get_remote_timestamp(url: str) -> dt.datetime:
 
     Useful for checking if there's an updated file available.
     """
-    request = Request(str(url), headers={"User-Agent": "planetarypy"})
+    request = Request(str(url), headers=headers())
     with urlopen(request, timeout=10) as conn:
         t = parse_http_date(conn.headers["last-modified"])
     return t
@@ -188,7 +223,7 @@ def get_remote_timestamp(url: str) -> dt.datetime:
 
 def check_url_exists(url: str) -> bool:
     """Check if a URL exists."""
-    response = requests.head(url)
+    response = requests.head(url, headers=headers())
     return response.status_code < 400
 
 
@@ -326,7 +361,7 @@ def url_retrieve(
         auth = HTTPBasicAuth(user, passwd)
     else:
         auth = None
-    R = requests.get(url, stream=True, allow_redirects=True, auth=auth)
+    R = requests.get(url, stream=True, allow_redirects=True, auth=auth, headers=headers())
     if R.status_code != 200:
         raise ConnectionError(f"Could not download {url}\nError code: {R.status_code}")
     tqdm_kwargs = dict(
