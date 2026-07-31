@@ -27,6 +27,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # GitHub-hosted runners take a fresh Azure IP per job, so an archive
+      # operator investigating a blip needs the IP *from the failing run*, not a
+      # static one. Always-run so it is recorded on failures too.
+      - name: Record egress IP for upstream debugging
+        if: always()
+        run: |
+          {
+            echo "egress IP : $(curl -s --max-time 10 https://api.ipify.org || echo unavailable)"
+            echo "at        : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "run       : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
