@@ -1,5 +1,14 @@
 """Top-level package for planetarypy."""
 
+# Let sibling distributions contribute subpackages under `planetarypy.*`.
+# planetarypy-hirise and planetarypy-ctx ship `planetarypy/instruments/mro/...`
+# from their own source trees; without this, `planetarypy` is an ordinary package
+# whose __path__ is pinned to this directory alone, so those subtrees are never
+# scanned. `instruments/` and `mro/` are already PEP 420 namespace dirs, but that
+# only matters once the top-level package itself is extensible.
+# Measured cost: ~0.13 ms against an ~84 ms `import planetarypy`.
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
+
 __author__ = """PlanetaryPy Developers"""
 __email__ = "kmichael.aye@gmail.com"
 __version__ = "0.80.0"
