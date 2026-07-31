@@ -1,5 +1,5 @@
 {
-  "checked": "2026-07-31 04:06 UTC",
+  "checked": "2026-07-31 09:33 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -15,9 +15,9 @@
     },
     {
       "host": "pds-rings.seti.org",
-      "total": 44,
-      "failing": 2,
-      "up": false
+      "total": 42,
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -241,20 +241,6 @@
       "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_index.lbl",
       "status": "200",
       "up": true
-    },
-    {
-      "host": "pds-rings.seti.org",
-      "index_key": "go.ssi.jupiter_summary",
-      "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_jupiter_summary.lbl",
-      "status": "404",
-      "up": false
-    },
-    {
-      "host": "pds-rings.seti.org",
-      "index_key": "go.ssi.moon_summary",
-      "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_moon_summary.lbl",
-      "status": "404",
-      "up": false
     },
     {
       "host": "pds-rings.seti.org",
