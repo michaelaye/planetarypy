@@ -2520,10 +2520,23 @@ def indexes_info(
     table.add_column("value", overflow="fold")
 
     table.add_row("index_key", key)
-    try:
-        table.add_row("remote URL", str(idx.url) if idx.url else "(unresolved)")
-    except Exception as e:
-        table.add_row("remote URL", f"(error: {e})")
+    # Both URLs come from the access log, which already distinguishes them.
+    # `idx.url` is the freshly-resolved *available* URL — reading it here made
+    # every `info` call re-scrape a dynamic archive, and labelling it "remote
+    # URL" hid which of the two it was.
+    log = idx.remote.log
+    current_url = log.current_url
+    available_url = log.available_url
+    if current_url:
+        table.add_row("current URL", str(current_url))
+    elif idx.local_parq_path.exists():
+        # Cached before download() recorded current_url for static indexes.
+        # Don't claim provenance we never wrote down.
+        table.add_row("current URL", "(not recorded — cached before provenance logging)")
+    else:
+        table.add_row("current URL", "— (not downloaded)")
+    if available_url and str(available_url) != str(current_url):
+        table.add_row("available URL", str(available_url))
     table.add_row("remote type", idx.remote_type)
 
     parq = idx.local_parq_path
@@ -2536,7 +2549,6 @@ def indexes_info(
     # Freshness state from the access log (when did we last download the
     # parquet, when did we last check upstream, and is a newer one waiting).
     try:
-        log = idx.remote.log
         table.add_row("last updated", _format_when(log.last_update))
         table.add_row("last checked", _format_when(log.last_check))
         try:
