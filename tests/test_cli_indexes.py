@@ -255,12 +255,21 @@ class TestIndexesLastBasic:
         with patch("planetarypy.pds.utils._all_dotted_index_keys",
                    return_value={"mro.ctx.edr"}):
             result = runner.invoke(
-                app, ["indexes", "last", "definitely.not.a.key"]
+                # Three parts on purpose: this test is about an *unregistered*
+                # key. The previous fixture, "definitely.not.a.key", had four
+                # and so is malformed — it passed only because both paths used
+                # to emit the same message.
+                app, ["indexes", "last", "definitely.not.key"]
             )
         assert result.exit_code == 1
         # Error message goes to stderr — typer.echo(err=True). Typer's
         # CliRunner merges them by default into ``output``.
         assert "Unknown index key" in result.output
+
+    def test_malformed_key_is_reported_as_malformed(self):
+        result = runner.invoke(app, ["indexes", "last", "definitely.not.a.key"])
+        assert result.exit_code == 1
+        assert "Malformed index key" in result.output
 
     def test_default_shows_three_trailing_rows(self):
         df = _fake_df()

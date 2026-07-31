@@ -118,6 +118,22 @@ def _complete_product_id(ctx: click.Context, args: list[str], incomplete: str) -
     return []
 
 
+def _require_index_key(key: str) -> str:
+    """Validate a dotted index key, or exit cleanly.
+
+    Thin adapter over :func:`planetarypy.pds.utils.validate_index_key`: the
+    library raises, the CLI prints and exits without a traceback. Was open-coded
+    at five call sites and missing from a sixth.
+    """
+    from planetarypy.pds.utils import validate_index_key
+
+    try:
+        return validate_index_key(key)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+
 @app.command(rich_help_panel=_PANEL_FETCH)
 def fetch(
     ctx: typer.Context,
@@ -1879,11 +1895,7 @@ def indexes_peek(
         raise typer.Exit()
 
     from planetarypy.pds import get_index
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     full = get_index(key, allow_refresh=False)
     try:
@@ -1997,11 +2009,7 @@ def indexes_last(
         raise typer.Exit()
 
     from planetarypy.pds import get_index
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     df = get_index(key, allow_refresh=False)
     total_rows = len(df)
@@ -2113,11 +2121,7 @@ def indexes_counts(
         raise typer.Exit()
 
     from planetarypy.pds import get_index
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     col_list: list[str] = []
     if column:
@@ -2233,11 +2237,7 @@ def indexes_select(
         raise typer.Exit()
 
     from planetarypy.pds import get_index, pid_column, resolve_pids
-    from planetarypy.pds.utils import _all_dotted_index_keys
-
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     pids = list(product_ids) if product_ids else []
 
@@ -2506,14 +2506,11 @@ def indexes_info(
 
     from planetarypy.pds import Index
     from planetarypy.pds.utils import (
-        _all_dotted_index_keys,
         _completion_id_col_for,
         _index_config_for,
     )
 
-    if key not in _all_dotted_index_keys():
-        typer.echo(f"Unknown index key: {key!r}.", err=True)
-        raise typer.Exit(1)
+    _require_index_key(key)
 
     idx = Index(key)
     cfg = _index_config_for(key)
