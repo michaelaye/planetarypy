@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.81.0] - 2026-07-31
+
+Makes our traffic identifiable to the archives we depend on, so their operators can help us when something breaks on their side.
+
+### Added
+
+- **`utils.user_agent()` and `utils.headers()`**, now sent on every outbound request. Previously only `get_remote_timestamp` set a User-Agent; `check_url_exists` and `url_retrieve` — the path every kernel and index download actually takes — went out as `python-requests/2.34.2`, indistinguishable from any other script on the internet. NAIF asked which requests were ours while debugging connection timeouts against our CI, and there was nothing for them to grep. Requests now carry `planetarypy/<version> (+https://github.com/planetarypy/planetarypy)`. Unlike an egress IP this survives the address rotation GitHub-hosted runners do on every job, which makes it the more durable identifier of the two.
+
+  The version is read from `planetarypy.__version__` on first use, not from `importlib.metadata` — the latter reports *installed distribution* metadata, which goes stale in an editable install and would advertise a version the running code isn't.
+
+- **The runner's egress IP is recorded in the network CI workflows** (`NAIF download smoke`, `PDS download smoke`, `Archive reachability`), alongside a UTC timestamp and the run URL, in the job summary. Always-run, so a failing job records it too. GitHub-hosted runners take a fresh address per job, so there is no static answer to give an archive operator — what helps is the address from the run that actually failed.
+
 ## [0.80.1] - 2026-07-31
 
 A diagnostics release, prompted by a WUSTL permission change that 401'd the whole MSL SAM dataset: two failures that used to be silent or misattributed now say what actually happened, and a single node outage can no longer red the release gate.
