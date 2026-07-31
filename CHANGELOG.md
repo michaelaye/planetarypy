@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+A slimming release: MRO HiRISE and CTX behaviour now ships as separate distributions, so core carries no instrument-specific code and each instrument versions independently.
+
+### Changed
+
+- **HiRISE and CTX extracted into `planetarypy-hirise` and `planetarypy-ctx`.** Import paths are **unchanged** — `planetarypy.instruments` and `planetarypy.instruments.mro` are PEP 420 namespace packages, so `from planetarypy.instruments.mro.hirise import get_browse` keeps working once the package is installed. Install via the new `[hirise]`, `[ctx]` or `[instruments]` extras.
+- **Core keeps the declarative catalog knowledge.** The `INDEX_REGISTRY` entries for `mro.hirise.{edr,rdr,dtm}` and `mro.ctx.edr`, and the mission/instrument name maps, stay here — so a core-only install still runs `plp indexes peek mro.hirise.edr`, `plp fetch mro.hirise.edr`, tab-completes obsids and finds both instruments in the catalog, **without** either package.
+
+### Removed
+
+- `instruments/mro/hirise.py` and `instruments/mro/ctx/`, the `hibrowse` / `hiedr` / `himos` / `hitif` / `ctxqv` / `ctx-migrate` verbs and their completion helpers, and `_parse_ccds` (its only callers were `hiedr` and `himos`; the HiRISE package carries its own copy rather than coupling to a private core symbol).
+- The hard-coded HiRISE fallback in `pds/meta_display.get_handler`, and both `_STORAGE_RESOLVER_MODULES` lazy entries. Core no longer names any instrument module: the packages self-register through `register_meta_handler` and `register_storage_resolver` when their CLI plugin is loaded at `plp` startup.
+
 ## [0.80.0] - 2026-07-30
 
 A HiRISE-to-GeoTIFF release: projected HiRISE JP2s become GeoTIFFs carrying an official IAU 2015 code instead of the ISIS-style CRS the PDS ships, bit-exactly and roughly 3.6× faster than a plain `rio warp`. Every external command is echoed as it runs, so the equivalent `rio` one-liner is always on screen.

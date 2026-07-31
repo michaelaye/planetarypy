@@ -107,13 +107,17 @@ Supporting files: `_mission_map.py`, `_parser.py`, `_repo.py`, `_schema.py`, `_u
 
 ## Instruments (`instruments/`)
 
-- `mro/ctx/` — `ctx_edr.py`, `ctx_calib.py`. The latter's `process_parallel` is a thin shim over `planetarypy.utils.parallel_map` (kept for backward compatibility).
-- `mro/hirise.py` — `get_browse`, `get_metadata`, `sun_azimuth_from_top` (label-cheat: reads `SUB_SOLAR_AZIMUTH` + `NORTH_AZIMUTH` from the RDR cumulative index and converts the HiRISE CW-from-3-o'clock convention).
-- `go/ssi.py` — Galileo SSI.
+- `go/ssi.py` — Galileo SSI. The only instrument whose behaviour still lives in core.
+
+**MRO HiRISE and CTX ship separately** as `planetarypy-hirise` and `planetarypy-ctx`. Core keeps their *declarative* catalog knowledge — the `INDEX_REGISTRY` entries for `mro.hirise.{edr,rdr,dtm}` / `mro.ctx.edr` and the `_mission_map.py` / `_objects.py` names — so a core-only install still discovers, peeks and fetches them. What moved out is behaviour: the modules, the `hibrowse`/`hiedr`/`himos`/`hitif`/`ctxqv`/`ctx-migrate` verbs, and `_parse_ccds`. Install with `pip install planetarypy[hirise]`, `[ctx]`, or `[instruments]`.
 
 A duplicate of the `process_parallel` pattern still lives in `isis/projected.py`; treat it as out-of-scope debt until a real refactor cycle picks it up.
 
-**Namespace guard:** `instruments/` and `instruments/mro/` are PEP 420 **namespace packages** — they have *no* `__init__.py` on purpose, so the in-progress `planetarypy-hirise` split can ship `instruments/mro/hirise.py` from a separate distribution at the same import path. Never re-add an `__init__.py` at either level; doing so converts them back to regular packages and breaks that cross-distribution layout. (`mro/ctx/` and `go/` stay normal subpackages *inside* the namespace.)
+**Namespace guard:** `instruments/` and `instruments/mro/` are PEP 420 **namespace packages** — they have *no* `__init__.py` on purpose, so `planetarypy-hirise` and `planetarypy-ctx` can ship modules at the same import path from separate distributions. Never re-add an `__init__.py` at either level, **in core or in a plugin**; doing so converts them back to regular packages and breaks the cross-distribution layout. (`mro/ctx/` and `go/` stay normal subpackages *inside* the namespace — `mro/ctx/__init__.py` is correct and lives in the plugin.)
+
+**Extension seams.** Instrument packages register themselves on import; core names no instrument. Three seams carry it: `catalog.register_storage_resolver(key, fn)`, `catalog.register_index(m, i, k, IndexConfig)`, and `pds.meta_display.register_meta_handler(key, fn)`. The CLI seam is the `planetarypy.cli_plugins` entry-point group, whose `register(app)` core calls from `_load_cli_plugins` on every `plp` invocation.
+
+The load-bearing detail: a plugin's CLI module must **import its instrument module at load time**, not lazily inside its verbs. That import is what fires `register_meta_handler`, and `plp meta mro.hirise.edr` never touches the plugin's own code — so a lazy import silently regresses it to the generic two-column dump. Core removed the hard-coded fallback that used to paper over this.
 
 ## Constants (`constants/`)
 
