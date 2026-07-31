@@ -11,7 +11,7 @@ __path__ = __import__("pkgutil").extend_path(__path__, __name__)
 
 __author__ = """PlanetaryPy Developers"""
 __email__ = "kmichael.aye@gmail.com"
-__version__ = "0.81.0"
+__version__ = "0.82.0"
 
 __all__ = [
     "enable_logging",
