@@ -11,8 +11,17 @@ A slimming release: MRO HiRISE and CTX behaviour now ships as separate distribut
 
 ### Changed
 
-- **HiRISE and CTX extracted into `planetarypy-hirise` and `planetarypy-ctx`.** Import paths are **unchanged** — `planetarypy.instruments` and `planetarypy.instruments.mro` are PEP 420 namespace packages, so `from planetarypy.instruments.mro.hirise import get_browse` keeps working once the package is installed. Install via the new `[hirise]`, `[ctx]` or `[instruments]` extras.
+- **HiRISE and CTX extracted into `planetarypy-hirise` and `planetarypy-ctx`.** Import paths are **unchanged** — `planetarypy` extends its own `__path__` via `pkgutil.extend_path`, and `instruments/` and `mro/` are PEP 420 namespace dirs, so `from planetarypy.instruments.mro.hirise import get_browse` keeps working once the package is installed. Install via the new `[hirise]`, `[ctx]` or `[instruments]` extras.
+- **`plp --help` groups commands by their source.** Core verbs keep their existing panels and render first; each plugin's verbs follow under panels of their own (`HiRISE · Fetch & download`, `CTX · Visualize`). Core applies the prefix from the plugin's declared panel name, so whatever grouping a plugin chose for itself survives inside its section.
 - **Core keeps the declarative catalog knowledge.** The `INDEX_REGISTRY` entries for `mro.hirise.{edr,rdr,dtm}` and `mro.ctx.edr`, and the mission/instrument name maps, stay here — so a core-only install still runs `plp indexes peek mro.hirise.edr`, `plp fetch mro.hirise.edr`, tab-completes obsids and finds both instruments in the catalog, **without** either package.
+
+### Added
+
+- **Plugin contribution manifests.** A CLI plugin may declare a `CONTRIBUTES` dict naming the commands, storage resolvers and meta handlers it intends to provide; core verifies every entry once `register(app)` returns and reports anything missing on stderr. Entry-point loading alone cannot catch a plugin that imports and registers without error while contributing nothing — which is exactly how `planetarypy-ctx` behaved while its package resolved to an empty namespace directory. The manifest is optional; plugins without one load unchanged.
+
+### Fixed
+
+- **Sibling distributions can now actually extend `planetarypy`.** `planetarypy/__init__.py` makes the top level a regular package, which pinned `__path__` to core's own directory and left every `planetarypy/instruments/mro/...` subtree shipped by a plugin unreachable — regardless of `instruments/` and `mro/` being namespace dirs. `pkgutil.extend_path` restores extensibility at the level that was actually blocking it, for ~0.13 ms against an ~84 ms import.
 
 ### Removed
 

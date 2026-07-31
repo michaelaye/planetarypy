@@ -2977,6 +2977,74 @@ def constants_cmd(
     Console().print(table)
 
 
+def _command_name(info) -> str:
+    """The name Typer will expose for a registered command.
+
+    ``CommandInfo.name`` is usually ``None`` — Typer derives the verb from the
+    callback, turning underscores into dashes — so a manifest that names verbs
+    the way users type them has to be compared against the derived form.
+    """
+    return info.name or info.callback.__name__.replace("_", "-")
+
+
+def _plugin_manifest(ep):
+    """The ``CONTRIBUTES`` manifest for an entry point, or ``None``.
+
+    Looked up first on the module holding ``register`` (the natural place, right
+    next to the verbs it describes), then on the distribution's top-level
+    package, so a plugin can declare it wherever it reads best.
+    """
+    import importlib
+    import sys
+
+    # `module` is standard on importlib.metadata EntryPoint, but the loader is
+    # also driven by test doubles and by anything else that quacks like an entry
+    # point, so a missing attribute just means "no manifest" rather than a crash.
+    module_path = getattr(ep, "module", None)
+    if not module_path:
+        return None
+
+    candidates = [module_path, module_path.split(".")[0]]
+    for name in candidates:
+        module = sys.modules.get(name)
+        if module is None:
+            try:
+                module = importlib.import_module(name)
+            except Exception:
+                continue
+        manifest = getattr(module, "CONTRIBUTES", None)
+        if manifest is not None:
+            return manifest
+    return None
+
+
+def _verify_contributions(ep, manifest, added_commands: set[str]) -> list[str]:
+    """Compare what a plugin promised against what actually landed.
+
+    This is the check that a bare entry-point loader cannot do: a plugin whose
+    import silently no-ops still ``register``s without raising, so load success
+    says nothing about whether the plugin did its job. The CTX plugin shipped in
+    exactly that state — its module resolved to an empty namespace package, so
+    ``register_storage_resolver`` never ran and nothing anywhere noticed.
+
+    Returns a list of human-readable complaints; empty means fully satisfied.
+    """
+    from planetarypy.catalog._resolver import _STORAGE_RESOLVERS
+    from planetarypy.pds.meta_display import _META_HANDLERS
+
+    problems = []
+    for verb in manifest.get("commands", []):
+        if verb not in added_commands:
+            problems.append(f"command {verb!r} was declared but never registered")
+    for key in manifest.get("storage_resolvers", []):
+        if key not in _STORAGE_RESOLVERS:
+            problems.append(f"storage resolver {key!r} was declared but never registered")
+    for key in manifest.get("meta_handlers", []):
+        if key not in _META_HANDLERS:
+            problems.append(f"meta handler {key!r} was declared but never registered")
+    return problems
+
+
 def _load_cli_plugins(target: typer.Typer) -> None:
     """Discover and register external CLI plugins under ``plp``.
 
@@ -2989,6 +3057,23 @@ def _load_cli_plugins(target: typer.Typer) -> None:
     The callable receives the root Typer app and adds its sub-app or commands
     (e.g. ``app.add_typer(hirise_app, name="hirise")``). A plugin that fails to
     load is skipped with a warning so one broken package can't break ``plp``.
+
+    A plugin may also declare what it intends to contribute::
+
+        CONTRIBUTES = {
+            "panel": "HiRISE",
+            "commands": ["hibrowse", "hiedr", "himos", "hitif"],
+            "storage_resolvers": ["mro.hirise"],
+            "meta_handlers": ["mro.hirise"],
+        }
+
+    Everything listed is verified after ``register`` returns, and anything
+    missing is reported on stderr. The manifest is optional; a plugin without
+    one loads exactly as before.
+
+    Commands a plugin adds are also re-panelled into ``"{panel} · {original}"``
+    so ``plp --help`` shows the seam between core and each plugin. Prefixing
+    rather than replacing keeps whatever grouping the plugin chose for itself.
     """
     from importlib.metadata import entry_points
 
@@ -2997,12 +3082,28 @@ def _load_cli_plugins(target: typer.Typer) -> None:
     except TypeError:  # pragma: no cover - importlib.metadata < 3.10 API
         eps = entry_points().get("planetarypy.cli_plugins", [])
     for ep in eps:
+        before = {id(info) for info in target.registered_commands}
         try:
             ep.load()(target)
         except Exception as exc:  # never let a plugin break plp
             typer.echo(
                 f"Warning: failed to load CLI plugin {ep.name!r}: {exc}", err=True
             )
+            continue
+
+        new_infos = [i for i in target.registered_commands if id(i) not in before]
+        manifest = _plugin_manifest(ep) or {}
+        panel = manifest.get("panel") or ep.name
+
+        for info in new_infos:
+            base = info.rich_help_panel
+            info.rich_help_panel = f"{panel} · {base}" if base else panel
+
+        problems = _verify_contributions(
+            ep, manifest, {_command_name(i) for i in new_infos}
+        )
+        for problem in problems:
+            typer.echo(f"Warning: CLI plugin {ep.name!r}: {problem}", err=True)
 
 
 def main():
