@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.82.0] - 2026-08-01
+
 A slimming release: MRO HiRISE and CTX behaviour now ships as separate distributions, so core carries no instrument-specific code and each instrument versions independently.
+
+Cut in coordination with `planetarypy-hirise` 0.1.0 and `planetarypy-ctx` 0.1.0, which require **this** version specifically: the extensibility fix below is what makes them reachable at all, and no earlier release contains it.
 
 ### Changed
 

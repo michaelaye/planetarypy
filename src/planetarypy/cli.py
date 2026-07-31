@@ -2,9 +2,12 @@
 
 Usage:
     plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W
-    plp hifetch PSP_003092_0985 --browse
-    plp ctxqv J05_046771_1950
+    plp indexes peek mro.hirise.edr
     plp catalog build
+
+Instrument verbs (hibrowse, hiedr, himos, hitif, ctxqv, ctx-migrate) come from
+the planetarypy-hirise and planetarypy-ctx packages, which mount them here
+through the ``planetarypy.cli_plugins`` entry point.
 """
 
 from pathlib import Path

@@ -36,6 +36,30 @@ Full table, including which individual indexes are failing:
 pip install planetarypy
 ```
 
+### Instrument packages
+
+**As of 0.82.0, the MRO HiRISE and CTX processing code ships separately.** It was
+removed from core and now lives in its own distributions, so each instrument
+versions independently and a core install stays slim:
+
+```bash
+pip install planetarypy[hirise]      # or: pip install planetarypy-hirise
+pip install planetarypy[ctx]         # or: pip install planetarypy-ctx
+pip install planetarypy[instruments] # both
+```
+
+Import paths are unchanged — `from planetarypy.instruments.mro.hirise import
+get_browse` keeps working once the package is installed — and the CLI verbs each
+package provides (`hibrowse`, `hiedr`, `himos`, `hitif`, `ctxqv`, `ctx-migrate`)
+reappear under their own sections in `plp --help`.
+
+**Index and catalog access for both instruments stays in core** and needs no
+extra install: `pds.get_index("mro.ctx.edr")`, `fetch_product("mro.hirise.edr",
+...)`, `plp indexes peek mro.hirise.edr` and obsid tab-completion all work from
+`pip install planetarypy` alone. What moved out is the *processing* — browse and
+EDR download helpers, the JP2→GeoTIFF converter, the ISIS mosaic and calibration
+pipelines.
+
 ## Features
 
 ### PDS Index Retrieval
@@ -79,10 +103,18 @@ mk = ak.get_metakernel_and_files("mro", start="2024-01-01", stop="2024-01-31")
 
 ```bash
 plp fetch mro.ctx.edr P02_001916_2221_XI_42N027W   # download a product
-plp hibrowse PSP_003092_0985_RED                    # HiRISE browse JPEG
-plp hifetch PSP_003092_0985_RED                     # HiRISE full product
-plp ctxqv J05_046771_1950                           # CTX quickview
+plp indexes peek mro.hirise.edr                     # inspect an index
 plp catalog build                                   # build catalog DB
+```
+
+With the instrument packages installed (see above), their verbs join the same
+app:
+
+```bash
+plp hibrowse PSP_003092_0985_RED    # HiRISE browse JPEG   [planetarypy-hirise]
+plp hiedr PSP_003092_0985_RED       # HiRISE EDR channels  [planetarypy-hirise]
+plp hitif ESP_081720_2650_RED.JP2   # JP2 → IAU GeoTIFF    [planetarypy-hirise]
+plp ctxqv J05_046771_1950           # CTX quickview        [planetarypy-ctx]
 ```
 
 ## General scope
