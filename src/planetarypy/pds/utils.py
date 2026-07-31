@@ -60,6 +60,45 @@ def _all_dotted_index_keys() -> list[str]:
     return sorted(static_keys | dynamic_keys)
 
 
+class IndexKeyError(ValueError):
+    """Base for problems with a dotted index key.
+
+    Subclasses ``ValueError`` so existing ``except ValueError`` handlers keep
+    working; catch the subclasses when the two cases warrant different reactions.
+    """
+
+
+class MalformedIndexKeyError(IndexKeyError):
+    """The key is not shaped ``mission.instrument.index``.
+
+    A typo or a wrong-shaped string. Nothing to look up — there is no key of
+    this shape, registered or otherwise.
+    """
+
+
+class UnknownIndexKeyError(IndexKeyError):
+    """The key is well-formed but not in the registry.
+
+    Distinct from :class:`MalformedIndexKeyError` because it is *plausible*: the
+    caller wrote something that could be a real index, and often the most likely
+    explanation is a stale local config rather than a mistake. The upstream
+    ``planetarypy_index_urls.toml`` is cached and refreshed on a daily check, so
+    a key registered upstream today is unknown locally until then — which makes
+    "refresh and retry once" a sensible automatic reaction.
+
+    Carries :attr:`index_key` so a handler can suggest near-matches or retry.
+    """
+
+    def __init__(self, index_key: str):
+        self.index_key = index_key
+        super().__init__(
+            f"Unknown index key: {index_key!r}. Use "
+            "planetarypy.pds.print_available_indexes() to list valid keys, or "
+            "`plp indexes refresh --config` if it was registered upstream "
+            "recently."
+        )
+
+
 def check_index_key_shape(index_key: str) -> str:
     """Check that ``index_key`` looks like ``mission.instrument.index``.
 
@@ -71,11 +110,11 @@ def check_index_key_shape(index_key: str) -> str:
 
     Raises
     ------
-    ValueError
+    MalformedIndexKeyError
         If the key does not have exactly three dot-separated parts.
     """
     if len(index_key.split(".")) != 3:
-        raise ValueError(
+        raise MalformedIndexKeyError(
             f"Malformed index key: {index_key!r}. Expected "
             "'mission.instrument.index', e.g. 'mro.ctx.edr'."
         )
@@ -89,20 +128,20 @@ def validate_index_key(index_key: str) -> str:
     ``cli.py``, twice here — around a shared ``_all_dotted_index_keys()``
     primitive that nobody built a shared check on. An eighth site forgot it.
 
-    Use this at user-facing boundaries. For construction-time shape checking,
-    use :func:`check_index_key_shape`.
+    The two rejections are separate on purpose: a malformed key is never looked
+    up, and a well-formed-but-unregistered one raises a distinct type so callers
+    can respond to it differently.
 
     Raises
     ------
-    ValueError
-        If the key is malformed, or well-formed but not registered.
+    MalformedIndexKeyError
+        If the key is not ``mission.instrument.index``.
+    UnknownIndexKeyError
+        If it is well-formed but not registered.
     """
     check_index_key_shape(index_key)
     if index_key not in set(_all_dotted_index_keys()):
-        raise ValueError(
-            f"Unknown index key: {index_key!r}. "
-            "Use planetarypy.pds.print_available_indexes() to list valid keys."
-        )
+        raise UnknownIndexKeyError(index_key)
     return index_key
 
 

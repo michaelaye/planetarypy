@@ -113,12 +113,43 @@ class TestValidateIndexKey:
 
     @pytest.mark.parametrize("key", ["foo", "foo.bar", "a.b.c.d"])
     def test_malformed_key_names_the_shape_problem(self, key):
-        from planetarypy.pds.utils import validate_index_key
+        from planetarypy.pds.utils import MalformedIndexKeyError, validate_index_key
 
         # Previously these reached Index.__init__'s bare tuple unpack and came
         # back as "not enough values to unpack (expected 3, got 2)".
-        with pytest.raises(ValueError, match="Malformed index key"):
+        with pytest.raises(MalformedIndexKeyError, match="Malformed index key"):
             validate_index_key(key)
+
+    def test_malformed_key_is_never_looked_up(self, monkeypatch):
+        """A wrong-shaped key has no registry to be in, so don't consult it."""
+        from planetarypy.pds import utils as u
+
+        called = []
+        monkeypatch.setattr(u, "_all_dotted_index_keys",
+                            lambda: called.append(1) or [])
+        with pytest.raises(u.MalformedIndexKeyError):
+            u.validate_index_key("a.b.c.d")
+        assert called == []
+
+    def test_the_two_rejections_have_distinct_types(self):
+        from planetarypy.pds.utils import (
+            IndexKeyError, MalformedIndexKeyError, UnknownIndexKeyError,
+        )
+
+        # Both are IndexKeyError, and both remain ValueError so existing
+        # `except ValueError` handlers keep working.
+        for cls in (MalformedIndexKeyError, UnknownIndexKeyError):
+            assert issubclass(cls, IndexKeyError)
+            assert issubclass(cls, ValueError)
+        assert not issubclass(MalformedIndexKeyError, UnknownIndexKeyError)
+        assert not issubclass(UnknownIndexKeyError, MalformedIndexKeyError)
+
+    def test_unknown_key_error_carries_the_key_for_handlers(self):
+        from planetarypy.pds.utils import UnknownIndexKeyError, validate_index_key
+
+        with pytest.raises(UnknownIndexKeyError) as excinfo:
+            validate_index_key("definitely.not.key")
+        assert excinfo.value.index_key == "definitely.not.key"
 
     def test_well_formed_but_unregistered_key_is_unknown_not_malformed(self):
         from planetarypy.pds.utils import validate_index_key

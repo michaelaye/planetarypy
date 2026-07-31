@@ -10,6 +10,9 @@ from typing import Iterable
 from planetarypy.pds.index_main import Index, InventoryIndex
 from planetarypy.pds.meta_display import register_meta_handler
 from planetarypy.pds.utils import (
+    IndexKeyError,
+    MalformedIndexKeyError,
+    UnknownIndexKeyError,
     complete_pid,
     get_example_pid,
     get_index_names,
@@ -24,6 +27,9 @@ from planetarypy.pds.utils import (
 
 __all__ = [
     "Index",
+    "IndexKeyError",
+    "MalformedIndexKeyError",
+    "UnknownIndexKeyError",
     "InventoryIndex",
     "get_index",
     "missing_pids",
