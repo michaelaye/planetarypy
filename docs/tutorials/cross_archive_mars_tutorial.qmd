@@ -2,6 +2,12 @@
 title: "Cross-archive Mars: combining NASA PDS and ESA PSA over one area"
 subtitle: "Finding and working with multiple datasets over Jezero Crater"
 jupyter: python3
+execute:
+  # Not executed in the docs build, same as datasets_tutorial.qmd: this walks live
+  # PDS and PSA endpoints and the CI docs env has no Jupyter kernel. Executing it
+  # would also make the docs build fail whenever an archive is down — the very
+  # outages the reachability workflow exists to track.
+  enabled: false
 ---
 
 ::: {.callout-note}
