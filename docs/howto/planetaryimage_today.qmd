@@ -2,6 +2,12 @@
 title: "HOWTO planetaryimage functions today"
 ---
 
+::: {.callout-important}
+## Requires the HiRISE package
+
+This page uses functionality that ships separately as of planetarypy 0.82.0. Install it with `pip install "planetarypy[hirise]"` (or `pip install planetarypy-hirise`); a core-only install will not have it.
+:::
+
 The original
 [`planetaryimage`](https://github.com/planetarypy/planetaryimage) package
 filled an important gap years ago: a Python-native reader for PDS3

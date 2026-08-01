@@ -68,8 +68,14 @@ spice = [
 # $PATH for the wrappers below to do anything useful.
 isis = [
     "kalasiris",      # Python wrapper for ISIS3 CLI tools
+]
+# Vector geometry, on top of the GDAL stack already in the core dependencies
+# (rasterio, pyproj, rioxarray, shapely). geopandas is imported lazily inside
+# planetarypy.geo, so core imports fine without it — but it has nothing to do
+# with ISIS and used to live in the [isis] extra, which made `geo.overlaps`
+# look like it needed an ISIS install.
+geo = [
     "geopandas",      # Footprint shapefiles → GeoDataFrames
-    "hvplot",         # Interactive rasterized image display via .hvplot accessor
 ]
 # Instrument packages. Their behaviour ships separately so core stays lean and
 # each instrument versions independently; core keeps the declarative catalog

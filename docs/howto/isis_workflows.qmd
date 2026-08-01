@@ -2,6 +2,12 @@
 title: "HOWTO ISIS3 workflows with planetarypy"
 ---
 
+::: {.callout-important}
+## Requires the CTX package
+
+This page uses functionality that ships separately as of planetarypy 0.82.0. Install it with `pip install "planetarypy[ctx]"` (or `pip install planetarypy-ctx`); a core-only install will not have it.
+:::
+
 planetarypy can drive an ISIS3 calibration / projection pipeline —
 `ctx_calib`, `isis/projected.py`, and parts of the HiRISE module call
 out to ISIS3 binaries via a Python wrapper. **ISIS itself is not a
@@ -14,7 +20,7 @@ page explains the two-part install and how the failure modes look.
 | What | Source | Size | Who installs it |
 |---|---|---|---|
 | **ISIS3 binaries** (cube file tools, projection, calibration, …) | USGS / conda-forge or docker | Several GB | The user, separately, into its own environment |
-| **Python glue** (`kalasiris`, `geopandas`, `hvplot`) | `pip install planetarypy[isis]` | A few hundred MB | planetarypy's `[isis]` extra |
+| **Python glue** (`kalasiris`, `geopandas`, `hvplot`) | `pip install "planetarypy-ctx[isis]"` | A few hundred MB | the CTX package's `[isis]` extra — the pipeline itself lives there as of 0.82.0 |
 
 ### Step 1 — install ISIS itself (one time)
 
@@ -75,7 +81,7 @@ the container has the binaries on PATH.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ModuleNotFoundError: No module named 'kalasiris'` (or geopandas / hvplot) when calling a calibration function | You installed planetarypy without the `[isis]` extra | `pip install "planetarypy[isis]"` |
+| `ModuleNotFoundError: No module named 'kalasiris'` (or geopandas / hvplot) when calling a calibration function | You installed the CTX package without its `[isis]` extra | `pip install "planetarypy-ctx[isis]"` |
 | `FileNotFoundError: [Errno 2] No such file or directory: 'hi2isis'` (or similar ISIS-tool name) | ISIS binaries are not on `$PATH` | Activate your ISIS conda env, or `export PATH=...isis/bin:$PATH` |
 | ISIS subprocess returns a non-zero exit code | The tool ran but rejected its inputs (bad cube, missing kernel, wrong data dir) | The `ProcessError` printout from the wrapper shows the stdout/stderr — read it; the ISIS message is usually clear |
 

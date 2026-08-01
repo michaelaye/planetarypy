@@ -2,6 +2,12 @@
 title: "Command-Line Interface"
 ---
 
+::: {.callout-important}
+## Requires the CTX package
+
+This page uses functionality that ships separately as of planetarypy 0.82.0. Install it with `pip install "planetarypy[ctx]"` (or `pip install planetarypy-ctx`); a core-only install will not have it.
+:::
+
 PlanetaryPy provides a unified CLI via the `plp` command.
 
 ## Design philosophy: API first, CLI wraps thin

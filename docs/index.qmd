@@ -3,6 +3,12 @@ title: PlanetaryPy Documentation
 page-layout: article
 ---
 
+::: {.callout-important}
+## Requires the instrument packages
+
+This page uses HiRISE and CTX functionality, which ships separately as of planetarypy 0.82.0. Install both with `pip install "planetarypy[instruments]"`; a core-only install will not have them.
+:::
+
 Python tools for planetary science data access.
 
 **Key features:**

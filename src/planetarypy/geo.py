@@ -575,7 +575,7 @@ def footprints_to_gdf(sources, *, id_fn=None, simplify=None):
     Raises if the resulting ids aren't unique — duplicate ids would silently
     corrupt downstream id-keyed operations like :func:`overlaps`.
 
-    Requires geopandas (the ``[isis]`` extra).
+    Requires geopandas (the ``[geo]`` extra).
     """
     import os
     from collections import Counter
@@ -619,7 +619,7 @@ def overlaps(gdf):
     ``geometry`` (the intersection) and ``area`` (CRS units) per unordered
     intersecting pair. Edge-only touches (zero area) are dropped.
 
-    Requires geopandas (the ``[isis]`` extra).
+    Requires geopandas (the ``[geo]`` extra).
     """
     import geopandas as gpd
 
