@@ -140,12 +140,31 @@ jobs:
         )
         from planetarypy.constants import Mars, Earth, Moon
         from planetarypy import geo, utils, io, search, psa
-        from planetarypy.instruments.mro import hirise
-        from planetarypy.instruments.mro.ctx import ctx_edr, ctx_calib
         from planetarypy.instruments.go import ssi
         assert callable(planetarypy.open) and callable(planetarypy.read)
         assert callable(planetarypy.search_products) and callable(planetarypy.fetch_pds_product)
         print('All public imports OK')
+        "
+
+    - name: Assert the instrument packages are NOT in a core install
+      # The mirror image of the imports above: as of 0.82.0 the MRO HiRISE and
+      # CTX code lives in planetarypy-hirise / planetarypy-ctx, so a bare
+      # `pip install planetarypy` must NOT be able to import them. Without this,
+      # accidentally reintroducing instrument code to core would go unnoticed —
+      # every other check here only proves things are present.
+      run: |
+        source /tmp/minimal/bin/activate
+        python -c "
+        import importlib
+        for mod in ('planetarypy.instruments.mro.hirise',
+                    'planetarypy.instruments.mro.ctx'):
+            try:
+                importlib.import_module(mod)
+            except ModuleNotFoundError:
+                print(f'{mod}: correctly absent from core')
+            else:
+                raise SystemExit(f'{mod} is importable from a core-only install; '
+                                 'instrument code has leaked back into core')
         "
 
     - name: Run plp --help on every verb
