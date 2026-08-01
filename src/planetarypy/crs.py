@@ -22,10 +22,146 @@ Examples
 >>> local_crs(137.4, -4.6, "mars")     # azeqd centered on Gale crater
 """
 
+import contextlib
+import contextvars
+import warnings
+
 from pyproj import CRS
 from pyproj.exceptions import CRSError
 
-__all__ = ["body_crs", "local_crs", "get_crs", "projected_crs"]
+__all__ = [
+    "body_crs",
+    "local_crs",
+    "get_crs",
+    "projected_crs",
+    "set_target_crs",
+    "get_target_crs",
+    "clear_target_crs",
+    "target_crs",
+    "resolve_crs",
+    "announce_conversion",
+    "CRSConversionWarning",
+]
+
+
+class CRSConversionWarning(UserWarning):
+    """Emitted when data is reprojected without the caller asking explicitly.
+
+    Its own category so it can be silenced deliberately —
+    ``warnings.filterwarnings("ignore", category=CRSConversionWarning)`` —
+    without muting everything else.
+    """
+
+
+# A ContextVar rather than a plain module global: it makes the `target_crs`
+# context manager correct by construction (reset by token, so nesting and early
+# exceptions both unwind properly) and keeps threads and asyncio tasks from
+# stamping on each other's session setting.
+_TARGET_CRS: contextvars.ContextVar = contextvars.ContextVar(
+    "planetarypy_target_crs", default=None
+)
+
+
+def _as_crs(crs_like) -> CRS:
+    """Accept anything pyproj accepts — CRS, EPSG/IAU string, dict, WKT."""
+    return crs_like if isinstance(crs_like, CRS) else CRS.from_user_input(crs_like)
+
+
+def set_target_crs(crs_like):
+    """Set a session-wide CRS that later operations convert their output to.
+
+    Once set, helpers returning georeferenced data reproject to it instead of
+    handing back whatever their upstream source happened to use — so a session
+    mixing a USGS gazetteer shapefile (ESRI authority), a HiRISE GeoTIFF
+    (IAU_2015) and PSA footprints stays in one frame without restating it at
+    every call.
+
+    Returns the previous value, so it can be restored.
+
+    Parameters
+    ----------
+    crs_like : CRS or str or dict or None
+        Anything :meth:`pyproj.CRS.from_user_input` accepts. ``None`` clears it.
+    """
+    previous = _TARGET_CRS.get()
+    _TARGET_CRS.set(None if crs_like is None else _as_crs(crs_like))
+    return previous
+
+
+def get_target_crs():
+    """The session-wide target CRS, or ``None`` if unset."""
+    return _TARGET_CRS.get()
+
+
+def clear_target_crs() -> None:
+    """Forget the session-wide target CRS."""
+    _TARGET_CRS.set(None)
+
+
+@contextlib.contextmanager
+def target_crs(crs_like):
+    """Context manager form of :func:`set_target_crs`.
+
+    >>> with target_crs("IAU_2015:49900"):
+    ...     gdf = nomenclature.features("mars")   # arrives in 49900
+    >>> # previous setting restored here, even if the block raised
+
+    Nests correctly and restores on exception: the ContextVar token is reset in
+    a ``finally``.
+    """
+    token = _TARGET_CRS.set(None if crs_like is None else _as_crs(crs_like))
+    try:
+        yield get_target_crs()
+    finally:
+        _TARGET_CRS.reset(token)
+
+
+def resolve_crs(explicit=None, *, fallback=None):
+    """Pick the CRS an operation should produce, by precedence.
+
+    ``explicit`` (what the caller passed) beats the session target, which beats
+    ``fallback`` (usually the body's own IAU CRS). Returns ``None`` only when all
+    three are ``None`` — callers should read that as "leave the data alone".
+
+    Central so every consumer resolves precedence identically, and there is one
+    site to change if the rules ever grow.
+    """
+    if explicit is not None:
+        return _as_crs(explicit)
+    session = _TARGET_CRS.get()
+    if session is not None:
+        return session
+    return None if fallback is None else _as_crs(fallback)
+
+
+def announce_conversion(source, target, *, what: str = "data") -> None:
+    """Tell the user about a reprojection they did not explicitly request.
+
+    Silent reprojection is how authority mismatches become quiet wrongness — the
+    USGS gazetteer ships ``ESRI:104905`` while planetarypy standardises on
+    ``IAU_2015``, and those differ in more than their label.
+
+    Deliberately a ``warnings.warn`` rather than a log line: planetarypy disables
+    its loguru logger by default for library use, so ``logger.info`` here would
+    be invisible to exactly the people who need to see it.
+    """
+    if source is None or target is None:
+        return
+    src, tgt = _as_crs(source), _as_crs(target)
+    if src == tgt:
+        return
+
+    def _label(c):
+        auth = c.to_authority()
+        return ":".join(auth) if auth else (c.name or "unknown CRS")
+
+    warnings.warn(
+        f"{what} reprojected from {_label(src)} to {_label(tgt)} automatically. "
+        "Pass an explicit CRS, or set planetarypy.crs.set_target_crs(...), to "
+        "choose deliberately.",
+        CRSConversionWarning,
+        stacklevel=3,
+    )
 
 # IAU code = naif_id * 100 + variant offset. Offset 0 ("Sphere / Ocentric")
 # exists for every body; 1 ("Ographic") only for some (e.g. Mars, Jupiter —

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A session-wide target CRS.** `crs.set_target_crs(...)` fixes one frame for the rest of a session, so work that mixes a USGS gazetteer shapefile (ESRI authority), a HiRISE GeoTIFF (IAU_2015) and PSA footprints stays consistent without restating the CRS at every call. `crs.target_crs(...)` is the context-manager form — it nests, and restores the previous setting even if the block raises. Backed by a `ContextVar` rather than a module global, so threads and asyncio tasks don't stamp on each other.
+- **`crs.resolve_crs(explicit, fallback=...)`**, the single place precedence is decided: an explicit argument beats the session target, which beats the caller's fallback (usually the body's own IAU CRS). One implementation means every consumer resolves identically.
+- **`crs.announce_conversion(...)` and `CRSConversionWarning`.** A reprojection the caller did not ask for now says so, naming both authorities. Silent reprojection is how an authority mismatch becomes quiet wrongness. It is a `warnings.warn` rather than a log line on purpose: planetarypy disables its loguru logger by default for library use, so a `logger.info` would be invisible to exactly the people who need to see it. The dedicated category means it can be silenced on its own.
+
 ## [0.82.0] - 2026-08-01
 
 A slimming release: MRO HiRISE and CTX behaviour now ships as separate distributions, so core carries no instrument-specific code and each instrument versions independently.
