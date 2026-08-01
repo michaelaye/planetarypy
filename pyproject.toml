@@ -103,6 +103,7 @@ dev = [
     "ruff",          # Linter (replaces flake8)
     "build",
     "twine",
+    "bump-my-version", # drives [tool.bumpversion] below, and `make bump-*`
     "pip-tools",
     "sh",            # For running shell commands from Python
 ]

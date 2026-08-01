@@ -1,5 +1,12 @@
-.PHONY: clean clean-test clean-pyc clean-build docs docs-api docs-preview docs-clean help
+.PHONY: help clean clean-build clean-pyc clean-test lint fix test test-fast \
+        coverage docs docs-api docs-preview docs-clean dev-install install \
+        dist check-dist release bump-patch bump-minor bump-major
 .DEFAULT_GOAL := help
+
+# Every target runs through the *active* interpreter rather than bare console
+# scripts, so `make test` in one conda env can't silently pick up a `pytest` that
+# belongs to another env earlier on PATH.
+PY := python
 
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
@@ -21,10 +28,10 @@ for line in sys.stdin:
 endef
 export PRINT_HELP_PYSCRIPT
 
-BROWSER := python -c "$$BROWSER_PYSCRIPT"
+BROWSER := $(PY) -c "$$BROWSER_PYSCRIPT"
 
 help:
-	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
+	@$(PY) -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
 clean: clean-build clean-pyc clean-test ## remove all build, test, coverage and Python artifacts
 
@@ -46,19 +53,23 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr htmlcov/
 	rm -fr .pytest_cache
 
+# Deliberately `ruff check` only, no `ruff format --check`: the tree predates
+# ruff's formatter and 97 of 112 files would be rewritten by it. Adopting that is
+# a decision to make on purpose, not a side effect of a lint target.
 lint: ## check style with ruff
-	ruff check src/planetarypy tests
+	$(PY) -m ruff check src/planetarypy tests
 
-lintblack: ## check style with black
-	black --check src/planetarypy tests
+fix: ## apply ruff's safe autofixes
+	$(PY) -m ruff check --fix src/planetarypy tests
 
-test: ## run tests quickly with the default Python
-	pytest --cov
+test: ## run the test suite with coverage
+	$(PY) -m pytest --cov
 
-coverage: ## check code coverage quickly with the default Python
-	coverage run --source planetarypy -m pytest
-	coverage report -m
-	coverage html
+test-fast: ## run the test suite without coverage (noticeably quicker)
+	$(PY) -m pytest --no-cov
+
+coverage: ## write and open an HTML coverage report
+	$(PY) -m pytest --cov --cov-report=html
 	$(BROWSER) htmlcov/index.html
 
 docs: docs-api ## render full documentation locally
@@ -75,13 +86,31 @@ docs-clean: ## remove generated HTML (not reference/*.qmd)
 	rm -rf docs/_build
 	rm -rf docs/.quarto
 
-release: dist ## package and upload a release
-	twine upload dist/*
+dev-install: ## install runtime, dev and spice dependencies, then the package editable
+	$(PY) install_dev_deps.py
+	$(PY) -m pip install -e .
 
-dist: clean ## builds source and wheel package
-	python setup.py sdist
-	python setup.py bdist_wheel
+install: clean ## install the package into the active environment
+	$(PY) -m pip install .
+
+dist: clean ## build the sdist and wheel
+	$(PY) -m build
 	ls -l dist
 
-install: clean ## install the package to the active Python's site-packages
-	python setup.py install
+check-dist: dist ## build, then validate the artifacts' PyPI metadata
+	$(PY) -m twine check dist/*
+
+release: check-dist ## build, validate and upload a release to PyPI
+	$(PY) -m twine upload dist/*
+
+# Version lives in pyproject.toml and src/planetarypy/__init__.py; the mapping is
+# in [tool.bumpversion]. Each of these commits the change and tags it, so the
+# usual release is: make bump-minor && git push --follow-tags && make release
+bump-patch: ## bump the patch version, commit and tag
+	$(PY) -m bumpversion bump patch
+
+bump-minor: ## bump the minor version, commit and tag
+	$(PY) -m bumpversion bump minor
+
+bump-major: ## bump the major version, commit and tag
+	$(PY) -m bumpversion bump major

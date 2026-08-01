@@ -132,11 +132,13 @@ def test_stac_items_unpack_mocked(monkeypatch):
                 {"id": "mc28_hellas_dir", "bbox": [1, 2, 3, 4],
                  "assets": {"image": {"href": "https://s3/mc28.tif",
                      "type": "image/tiff; application=geotiff; profile=cloud-optimized"}}},
-                {"id": "no_cog", "assets": {"meta": {"href": "x.json", "type": "application/json"}}},
+                {"id": "no_cog", "assets": {"meta": {"href": "x.json",
+                    "type": "application/json"}}},
             ]}
 
     def fake_get(url, params=None, timeout=None):
-        captured["url"] = url; captured["params"] = params
+        captured["url"] = url
+        captured["params"] = params
         return FakeResp()
 
     monkeypatch.setattr(requests, "get", fake_get)
@@ -156,7 +158,8 @@ def test_stac_collections_discover_mocked(monkeypatch):
         def raise_for_status(self): pass
         def json(self):
             return {"collections": [
-                {"id": "lunar_orbiter_laser_altimeter", "title": "LOLA", "description": "  shots  "},
+                {"id": "lunar_orbiter_laser_altimeter", "title": "LOLA",
+                 "description": "  shots  "},
                 {"id": "mro_ctx_controlled_usgs_dtms", "title": "CTX DTMs"},
             ]}
 
@@ -167,7 +170,8 @@ def test_stac_collections_discover_mocked(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
     cols = datasets.stac_collections("https://stac.astrogeology.usgs.gov/api")
     assert captured["url"].endswith("/collections")
-    assert [c["id"] for c in cols] == ["lunar_orbiter_laser_altimeter", "mro_ctx_controlled_usgs_dtms"]
+    assert [c["id"] for c in cols] == [
+        "lunar_orbiter_laser_altimeter", "mro_ctx_controlled_usgs_dtms"]
     assert cols[0]["description"] == "shots"          # stripped
     assert cols[1]["description"] == ""               # missing -> empty
 
