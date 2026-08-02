@@ -1,0 +1,197 @@
+---
+title: "Surface features beside image footprints"
+subtitle: "Making a footprint map legible with IAU nomenclature, in one coordinate frame"
+jupyter: python3
+---
+
+::: {.callout-note}
+## What this tutorial shows
+
+A footprint map answers "where is there data?". It does not answer "data over
+*what*?" — for that you need the named geography. This walks through overlaying
+IAU-adopted feature names on real image footprints, and using a session-wide
+target CRS so the two layers are guaranteed to be in the same frame.
+
+Requires the `[geo]` extra: `pip install "planetarypy[geo]"`.
+:::
+
+The problem this solves is mundane and easy to get wrong. Footprints arrive from
+one archive in one convention, feature names come from the USGS Gazetteer in
+another, and nothing stops you from plotting them on the same axes while they
+quietly disagree.
+
+We work over **Jezero Crater**, Perseverance's landing site, at 77.4°E, 18.4°N.
+
+```{python}
+LON, LAT = 77.4, 18.4
+HALF = 4.0
+BBOX = (LON - HALF, LAT - HALF, LON + HALF, LAT + HALF)
+```
+
+## 1. Pin the frame first
+
+Do this before fetching anything. Everything that follows converts into it, so
+there is no moment where two layers are in different systems.
+
+```{python}
+from planetarypy import crs
+
+crs.set_target_crs(crs.body_crs("mars"))
+crs.get_target_crs().to_authority()
+```
+
+`body_crs("mars")` resolves to the IAU_2015 ocentric code for Mars — the radii
+come from the IAU code itself, nothing is hardcoded.
+
+## 2. The named geography
+
+`nomenclature.features` fetches the gazetteer for a body and caches it. Filters
+mirror how people actually narrow it: by feature class, by size, by area.
+
+```{python}
+from planetarypy import nomenclature
+
+near = nomenclature.features("mars", bbox=BBOX, min_diameter=3)
+near[["name", "type", "diameter", "center_lon", "center_lat"]].head(8)
+```
+
+::: {.callout-important}
+## You were just told about a conversion
+
+That call emitted a `CRSConversionWarning`. It is not noise — it is the whole
+point.
+
+The gazetteer ships Mars as **`ESRI:104905`** (`GCS_Mars_2000`, an ellipsoid).
+planetarypy standardises on **`IAU_2015`**. Those differ in more than their
+label, and a silent reprojection between them is exactly how two datasets end up
+subtly misaligned with nothing on screen to say so.
+
+Because we set a session target CRS in step 1, the data arrived in the frame we
+asked for — and said so on the way.
+:::
+
+```{python}
+near.crs.to_authority()
+```
+
+Pass an explicit `to_crs=` and the warning goes away: you made the decision
+yourself, so there is nothing to tell you.
+
+## 3. Real footprints from an archive
+
+HRSC coverage over the same box, straight from ESA's PSA.
+
+```{python}
+from planetarypy import psa
+
+hrsc = psa.query(
+    "SELECT TOP 25 granule_uid, c1min, c1max, c2min, c2max "
+    "FROM psa.epn_core "
+    "WHERE instrument_host_name LIKE '%Mars Express%' "
+    "  AND instrument_name LIKE '%HRSC%' "
+    f"  AND c1min <= {LON + HALF} AND c1max >= {LON - HALF} "
+    f"  AND c2min <= {LAT + HALF} AND c2max >= {LAT - HALF} "
+    "  AND (c1max - c1min) < 30 AND (c2max - c2min) < 30"
+)
+len(hrsc)
+```
+
+::: {.callout-warning}
+## Why the `< 30` clause
+
+Orbital swaths crossing high latitudes get a degenerate bounding box spanning
+*all* longitudes. Without that filter you collect scenes that never imaged your
+area. See the cross-archive tutorial for the full set of PSA rough edges.
+:::
+
+## 4. Put them on one plot
+
+`add_features` is the `coastlines()` move: it draws onto axes you already have,
+and with `bbox="auto"` (the default) it reads their limits rather than making you
+restate the area.
+
+```{python}
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
+fig, ax = plt.subplots(figsize=(9, 8))
+
+for row in hrsc:
+    ax.add_patch(Rectangle(
+        (row["c1min"], row["c2min"]),
+        row["c1max"] - row["c1min"], row["c2max"] - row["c2min"],
+        fill=False, ec="#1b9e77", lw=0.8, alpha=0.7, zorder=2,
+    ))
+
+ax.set_xlim(BBOX[0], BBOX[2])
+ax.set_ylim(BBOX[1], BBOX[3])
+
+drawn = nomenclature.add_features(ax, "mars", min_diameter=3)
+
+ax.plot(LON, LAT, marker="*", ms=15, color="#7570b3", zorder=7)
+ax.set_xlabel("east longitude (deg)")
+ax.set_ylabel("planetocentric latitude (deg)")
+ax.set_title("HRSC coverage over Jezero, with IAU nomenclature")
+ax.grid(alpha=0.3, ls=":")
+ax.set_aspect("equal")
+plt.show()
+```
+
+The dashed boxes are feature *extents*, drawn by default from the gazetteer's
+`min/max_lon` and `min/max_lat` columns. This is the difference that matters: a
+centre point tells you a name is somewhere nearby, the box tells you whether a
+given footprint actually covers Jezero or merely passes near it. Pass
+`extent=False` for centre points only.
+
+Labels are placed largest-feature-first and decluttered — a later label that
+would collide with one already placed is dropped rather than smeared over it.
+
+```{python}
+drawn[["name", "diameter"]].sort_values("diameter", ascending=False).head(6)
+```
+
+## 5. Borrowing a different frame for one block
+
+Distances are the usual reason. A geographic CRS measures in degrees, which are
+not a length; for "how far is this feature from the rover?" you want a local
+projection in metres. `crs.target_crs` swaps the frame for a block and puts it
+back afterwards.
+
+```{python}
+local = crs.local_crs(LON, LAT, "mars")     # azimuthal equidistant on Jezero
+
+with crs.target_crs(local):
+    metric = nomenclature.features("mars", bbox=BBOX, min_diameter=3)
+    print("inside the block:", metric.crs.to_authority() or metric.crs.name)
+
+print("after the block:  ", crs.get_target_crs().to_authority())
+```
+
+The session setting is restored on exit — and would be even if the block had
+raised. Now distances are real:
+
+```{python}
+from shapely.geometry import Point
+
+origin = Point(0, 0)   # the projection is centred on Jezero, so this is the site
+metric["km_from_site"] = metric.geometry.distance(origin) / 1000
+metric.nsmallest(6, "km_from_site")[["name", "km_from_site"]]
+```
+
+## 6. Tidy up
+
+```{python}
+crs.clear_target_crs()
+crs.get_target_crs() is None
+```
+
+Leaving a session CRS set is harmless in a notebook, but a library function that
+sets one and never clears it would surprise its caller. Prefer the context
+manager where the scope is known.
+
+## Where to go next
+
+- `planetarypy.nomenclature.bodies()` lists all 47 bodies the gazetteer covers —
+  the Moon has 9086 named features, Mercury 606, Europa 129.
+- The HOWTO on session CRS covers precedence and silencing the conversion notice.
+- The cross-archive tutorial combines PDS and PSA discovery over one area.

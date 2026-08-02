@@ -49,6 +49,7 @@ website:
         - tutorials/geospatial_tutorial.ipynb
         - tutorials/datasets_tutorial.qmd
         - tutorials/planetary_crs_tutorial.ipynb
+        - tutorials/surface_features_tutorial.qmd
         - tutorials/spicer_tutorial.ipynb
         - tutorials/spice_kernel_examples.ipynb
     - title: "How-To"
@@ -60,6 +61,7 @@ website:
         - howto/psa.qmd
         - howto/datasets.qmd
         - howto/footprints_and_overlaps.qmd
+        - howto/session_crs.qmd
         - howto/howto_spice_archived.ipynb
         - howto/ctx_edr.ipynb
         - howto/ctx_calib.ipynb
@@ -129,6 +131,7 @@ quartodoc:
         - cli
         - geo
         - crs
+        - nomenclature
         - plotting
         - datetime_format_converters
         - utils

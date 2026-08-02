@@ -1,0 +1,113 @@
+---
+title: "HOWTO pin one CRS for a whole session"
+---
+
+Planetary work spans archives, and archives disagree about coordinate reference
+systems. A USGS gazetteer shapefile arrives as `ESRI:104905`, a HiRISE product
+carries an `IAU_2015` code, ESA PSA hands you bare degrees. Restating the frame
+you want at every call is tedious, and forgetting once is how two datasets end up
+silently in different systems.
+
+Set it once instead.
+
+```python
+from planetarypy import crs
+
+crs.set_target_crs("IAU_2015:49900")     # Mars, ocentric
+```
+
+From here on, helpers that return georeferenced data convert to that frame rather
+than handing back whatever their upstream source happened to use.
+
+## Just for a block
+
+`crs.target_crs` is the context-manager form. Use it when one section of an
+analysis needs a different frame — a local projection for a distance
+calculation, say — without disturbing the session setting.
+
+```python
+local = crs.local_crs(77.4, 18.4, "mars")     # azeqd centred on Jezero
+
+with crs.target_crs(local):
+    ...                                        # metres, centred on Jezero
+
+# the previous setting is back here, even if the block raised
+```
+
+It nests, and it restores on exception. Passing `None` suspends the session
+setting for the block:
+
+```python
+with crs.target_crs(None):
+    ...                                        # no automatic conversion at all
+```
+
+## Who wins
+
+Three things can name a CRS, so the order is fixed and lives in one function:
+
+```python
+crs.resolve_crs(explicit, fallback=crs.body_crs("mars"))
+```
+
+1. **`explicit`** — what the caller passed to this specific call.
+2. **the session target** — `set_target_crs`, or the enclosing `target_crs` block.
+3. **`fallback`** — usually the body's own IAU CRS.
+
+If all three are `None`, `resolve_crs` returns `None`, which callers read as
+"leave the data alone".
+
+## You are told when it happens
+
+A conversion you did not ask for announces itself:
+
+```
+CRSConversionWarning: mars nomenclature reprojected from ESRI:104905 to
+IAU_2015:49900 automatically. Pass an explicit CRS, or set
+planetarypy.crs.set_target_crs(...), to choose deliberately.
+```
+
+Both authorities are named, because that is the information you need to judge
+whether the conversion was the one you wanted. `ESRI:104905` and `IAU_2015:49900`
+differ in more than their label.
+
+The notice is a warning rather than a log line on purpose: planetarypy disables
+its logger by default for library use, so a log message here would be invisible
+to exactly the people who need to see it.
+
+Conversions you *did* ask for — by passing an explicit CRS — stay quiet. You
+already made the decision.
+
+### Silencing it
+
+It has its own category, so you can turn it off without muting anything else:
+
+```python
+import warnings
+from planetarypy.crs import CRSConversionWarning
+
+warnings.filterwarnings("ignore", category=CRSConversionWarning)
+```
+
+## Threads and async
+
+The setting is held in a `contextvars.ContextVar`, not a module global. A worker
+thread does not inherit the main thread's target CRS, and concurrent tasks cannot
+overwrite each other's. If you want a thread to share the setting, set it inside
+that thread.
+
+## Clearing up
+
+```python
+crs.clear_target_crs()          # forget it
+crs.get_target_crs()            # -> None
+```
+
+`set_target_crs` also returns the previous value, if you would rather restore it
+by hand than use the context manager:
+
+```python
+previous = crs.set_target_crs("IAU_2015:49901")
+...
+crs.set_target_crs(previous)
+```
