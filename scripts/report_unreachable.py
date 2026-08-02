@@ -41,11 +41,48 @@ def gh(*args: str, check: bool = True) -> str:
     return result.stdout.strip()
 
 
+def issues_enabled() -> bool:
+    """Whether the current repo accepts issues at all.
+
+    Forks routinely have issues switched off, and the whole issue layer is a
+    bonus on top of the probe: reachability results and the README badges are
+    published a step earlier and do not need it. Without this check a fork with
+    issues disabled turns every six-hourly run red, which trains everyone to
+    ignore a monitor that is otherwise working perfectly.
+    """
+    raw = gh("repo", "view", "--json", "hasIssuesEnabled", check=False)
+    if not raw:
+        return False
+    try:
+        return bool(json.loads(raw).get("hasIssuesEnabled"))
+    except json.JSONDecodeError:
+        return False
+
+
 def open_issues() -> dict[str, dict]:
     raw = gh("issue", "list", "--label", LABEL, "--state", "open",
              "--json", "number,title,body,createdAt", "--limit", "100")
     issues = json.loads(raw) if raw else []
     return {i["title"]: i for i in issues}
+
+
+def report_without_issues(failing_by_host: dict, checked: str) -> None:
+    """Log what would have been filed, when issues aren't available.
+
+    The information still reaches the run log and the job summary, so an outage
+    is visible to anyone looking — it just isn't durable or assignable.
+    """
+    if not failing_by_host:
+        print("all hosts reachable")
+        return
+    print(f"Issues are disabled on this repository; reporting inline instead "
+          f"(checked {checked}).")
+    for host, failing in sorted(failing_by_host.items()):
+        contact = CONTACTS.get(host)
+        suffix = f"  [report to {contact}]" if contact else ""
+        print(f"  {host}: {len(failing)} failing URL(s){suffix}")
+        for f in failing:
+            print(f"    {f['status']}  {f['index_key']}  {f['url']}")
 
 
 def body_for(host: str, failing: list[dict], checked: str) -> str:
@@ -87,6 +124,9 @@ def main() -> int:
     if args.dry_run:
         existing: dict[str, dict] = {}
     else:
+        if not issues_enabled():
+            report_without_issues(failing_by_host, checked)
+            return 0
         gh("label", "create", LABEL, "--color", "B60205",
            "--description", "An upstream archive is unreachable", check=False)
         existing = open_issues()
