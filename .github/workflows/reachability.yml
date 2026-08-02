@@ -46,6 +46,15 @@ jobs:
       - name: Install planetarypy
         run: pip install -e "."
 
+      # Grab the last run's results before the publish step overwrites them, so
+      # the Capacities note can fire on change rather than every six hours.
+      # 404 on the very first run is expected and must not fail the job.
+      - name: Fetch previous reachability state
+        run: |
+          curl -sfL -o previous_summary.json \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/status/summary.json" \
+            || echo "no previous summary (first run?)"
+
       - name: Probe
         run: python scripts/check_node_reachability.py --outdir status
 
@@ -77,10 +86,14 @@ jobs:
 
       # One self-closing issue per affected host. Runs after publishing so a
       # gh outage can't cost us the status update.
-      - name: Open or close outage issues
+      - name: Report outages (GitHub issues, or a Capacities daily note)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python scripts/report_unreachable.py status/summary.json
+          CAPACITIES_API_TOKEN: ${{ secrets.CAPACITIES_API_TOKEN }}
+          CAPACITIES_SPACE_ID: ${{ secrets.CAPACITIES_SPACE_ID }}
+        run: |
+          python scripts/report_unreachable.py status/summary.json \
+            --previous previous_summary.json
 
       - name: Summary
         if: always()

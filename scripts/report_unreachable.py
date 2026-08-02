@@ -7,6 +7,10 @@ Self-closing is the point: without it a monitor that files issues becomes noise
 nobody reads. A host that recovers gets its issue closed with how long it was
 down, so an open ``upstream-outage`` issue always means "still broken now".
 
+Where issues are unavailable — the working repo is a fork with them switched off
+— the outage is instead noted in a Capacities daily note, so it still lands
+somewhere a human reads. See :func:`notify_capacities`.
+
 Reads the ``summary.json`` written by ``check_node_reachability.py``. Requires
 ``gh`` on PATH and authenticated (``GH_TOKEN`` on a runner). ``--dry-run``
 prints what it would do and touches nothing.
@@ -16,13 +20,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
+import urllib.error
+import urllib.request
 from datetime import date
 from pathlib import Path
 
 LABEL = "upstream-outage"
 TITLE = "Archive unreachable: {host}"
 MARKER = "<!-- reachability-bot -->"
+
+# Capacities' documented daily-note endpoint.
+#
+# NOTE: this API is deprecated and stops working 2026-09-01; the successor lives
+# at developers.capacities.io. Everything version-specific is confined to
+# _post_to_capacities so the migration is a one-function change.
+CAPACITIES_URL = "https://api.capacities.io/save-to-daily-note"
 
 # Where to report a confirmed node-side outage, so the address is in the issue
 # that announces the outage rather than in someone's mail archive. Given by the
@@ -64,6 +78,100 @@ def open_issues() -> dict[str, dict]:
              "--json", "number,title,body,createdAt", "--limit", "100")
     issues = json.loads(raw) if raw else []
     return {i["title"]: i for i in issues}
+
+
+def _post_to_capacities(md_text: str, *, token: str, space_id: str) -> None:
+    """POST one markdown block to today's daily note.
+
+    The only place the Capacities API shape appears, so the 2026-09-01 migration
+    to developers.capacities.io touches this function alone.
+    """
+    payload = json.dumps({"spaceId": space_id, "mdText": md_text}).encode()
+    request = urllib.request.Request(
+        CAPACITIES_URL,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        response.read()
+
+
+def capacities_note(failing_by_host: dict, recovered: set, checked: str) -> str:
+    """The daily-note entry: what broke, what came back, and who to tell."""
+    lines = [f"**Archive reachability** — checked {checked} #planetarypy #failed_server", ""]
+    if failing_by_host:
+        for host, failing in sorted(failing_by_host.items()):
+            contact = CONTACTS.get(host)
+            lines.append(f"- **{host}** — {len(failing)} failing URL(s)")
+            for f in sorted(failing, key=lambda r: r["index_key"])[:6]:
+                lines.append(f"    - `{f['index_key']}` → {f['status']}")
+            if len(failing) > 6:
+                lines.append(f"    - …and {len(failing) - 6} more")
+            if contact:
+                lines.append(f"    - report to **{contact}**")
+    for host in sorted(recovered):
+        lines.append(f"- ✅ **{host}** is reachable again")
+    lines.append("")
+    lines.append(
+        "A **401/403** on a public archive is the node's to fix; a **404** usually "
+        "means our registration in `planetarypy_index_urls.toml` is stale."
+    )
+    return "\n".join(lines)
+
+
+def notify_capacities(failing_by_host: dict, previous: Path | None, checked: str,
+                      *, dry_run: bool = False) -> bool:
+    """Note an outage in the Capacities daily note — but only when it changed.
+
+    This job runs every six hours. Posting each time would bury the daily note in
+    identical entries and make the signal worthless, so a note goes out only when
+    the set of failing hosts differs from the previous run: a host newly down, or
+    one that recovered.
+
+    Needs ``CAPACITIES_API_TOKEN`` and ``CAPACITIES_SPACE_ID`` in the environment;
+    silently does nothing without them, so the workflow stays green for anyone
+    who has not configured it.
+    """
+    token = os.environ.get("CAPACITIES_API_TOKEN")
+    space_id = os.environ.get("CAPACITIES_SPACE_ID")
+    if not (token and space_id):
+        print("Capacities not configured (no token/space id); skipping note")
+        return False
+
+    now_failing = set(failing_by_host)
+    was_failing: set[str] = set()
+    if previous is not None and previous.exists():
+        try:
+            old = json.loads(previous.read_text())
+            was_failing = {r["host"] for r in old.get("results", []) if not r["up"]}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            print(f"{previous} unreadable; treating as no prior state")
+
+    recovered = was_failing - now_failing
+    newly_down = now_failing - was_failing
+    if not (recovered or newly_down):
+        print("no reachability change since the last run; no Capacities note")
+        return False
+
+    text = capacities_note(failing_by_host, recovered, checked)
+    if dry_run:
+        print("--- would post to Capacities ---")
+        print(text)
+        return True
+    try:
+        _post_to_capacities(text, token=token, space_id=space_id)
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
+        # Never let the notifier redden a run whose actual job — probing and
+        # publishing — already succeeded.
+        print(f"Capacities note failed ({exc}); continuing")
+        return False
+    print(f"posted a Capacities note ({len(newly_down)} newly down, "
+          f"{len(recovered)} recovered)")
+    return True
 
 
 def report_without_issues(failing_by_host: dict, checked: str) -> None:
@@ -111,6 +219,9 @@ def body_for(host: str, failing: list[dict], checked: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("summary", type=Path)
+    parser.add_argument("--previous", type=Path, default=None,
+                        help="the prior run's summary.json, used to notify only "
+                             "on change rather than every six hours")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -124,6 +235,8 @@ def main() -> int:
     if args.dry_run:
         existing: dict[str, dict] = {}
     else:
+        notify_capacities(failing_by_host, args.previous, checked,
+                          dry_run=args.dry_run)
         if not issues_enabled():
             report_without_issues(failing_by_host, checked)
             return 0
