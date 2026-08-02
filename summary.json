@@ -1,5 +1,5 @@
 {
-  "checked": "2026-08-02 08:59 UTC",
+  "checked": "2026-08-02 10:59 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -34,8 +34,8 @@
     {
       "host": "sbnarchive.psi.edu",
       "total": 1,
-      "failing": 0,
-      "up": true
+      "failing": 1,
+      "up": false
     }
   ],
   "results": [
@@ -43,8 +43,8 @@
       "host": "sbnarchive.psi.edu",
       "index_key": "cassini.cda.index",
       "url": "https://sbnarchive.psi.edu/pds3/cassini/cda/COCDA_0101/INDEX/INDEX.LBL",
-      "status": "200",
-      "up": true
+      "status": "522",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
