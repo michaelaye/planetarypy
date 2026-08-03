@@ -17,7 +17,7 @@ download that ``planetarypy.constants`` performs.
 Examples
 --------
 >>> from planetarypy.crs import body_crs, local_crs
->>> body_crs("mars")                   # Mars ocentric geographic CRS
+>>> body_crs("mars")                   # Mars IAU sphere (a == b)
 >>> body_crs(499, system="ographic")   # by NAIF id
 >>> local_crs(137.4, -4.6, "mars")     # azeqd centered on Gale crater
 """
@@ -27,10 +27,19 @@ from pyproj.exceptions import CRSError
 
 __all__ = ["body_crs", "local_crs", "get_crs", "projected_crs"]
 
-# IAU code = naif_id * 100 + variant offset. Offset 0 ("Sphere / Ocentric")
-# exists for every body; 1 ("Ographic") only for some (e.g. Mars, Jupiter —
-# not the Moon or Vesta).
-_SYSTEM_OFFSET = {"ocentric": 0, "ographic": 1}
+# IAU code = naif_id * 100 + variant offset, and the geographic triple is the
+# SAME as the projected one below: 0 is the sphere, 1 ographic, 2 ocentric.
+#
+# This used to read {"ocentric": 0, "ographic": 1}, which quietly handed back a
+# sphere to anyone asking for "ocentric" — IAU_2015:49900 is named
+# "Mars (2015) - Sphere / Ocentric" and has a == b == 3396190, while the real
+# ocentric ellipsoid is 49902 (b = 3376200) and was unreachable through this API
+# entirely. Doing geodesy on a sphere while believing you asked for an ellipsoid
+# is exactly the class of error this module exists to prevent.
+#
+# Offset 0 exists for every body. Offsets 1 and 2 exist only where the body
+# defines an ellipsoid (Mars, Mercury, Jupiter — not the Moon, Venus, Europa).
+_SYSTEM_OFFSET = {"sphere": 0, "ographic": 1, "ocentric": 2}
 
 # Projected variants sit at offsets 10..90 in steps of 5, each followed by a
 # 3-slot system triple. Note the triple differs from _SYSTEM_OFFSET above:
@@ -79,22 +88,41 @@ def _resolve_naif_id(body) -> int:
     return found.naif_id
 
 
-def body_crs(body, system: str = "ocentric") -> CRS:
+def body_crs(body, system: str = "sphere") -> CRS:
     """Return a body's geographic CRS from the IAU 2015 authority.
 
     Parameters
     ----------
     body : str or int
         Body name (resolved via :mod:`planetarypy.constants`) or NAIF id.
-    system : {"ocentric", "ographic"}
-        Latitude convention. ``"ocentric"`` (the spherical IAU definition) is
-        available for every body; ``"ographic"`` only for bodies that define
-        it (e.g. Mars, Jupiter — not the Moon or Vesta).
+    system : {"sphere", "ocentric", "ographic"}
+        Which figure of the body to use.
+
+        - ``"sphere"`` (default) — the IAU sphere, ``a == b``. Defined for every
+          body, and the common currency in planetary work: ISIS operates on
+          spheres, many published products are on one, and a shared sphere
+          avoids datum-shift surprises when stacking heterogeneous datasets in
+          GIS. This is what earlier versions returned for ``"ocentric"``.
+        - ``"ocentric"`` — planetocentric latitudes on the body's *ellipsoid*.
+        - ``"ographic"`` — planetographic latitudes on the body's ellipsoid.
+
+        The two ellipsoidal systems exist only for bodies that define an
+        ellipsoid (Mars, Mercury, Jupiter — not the Moon, Venus or Europa).
 
     Returns
     -------
     pyproj.CRS
-        The ellipsoid/radii come from the IAU code itself.
+        The figure and radii come from the IAU code itself; nothing is
+        hardcoded here.
+
+    Examples
+    --------
+    >>> body_crs("mars").to_authority()              # sphere, a == b
+    ('IAU_2015', '49900')
+    >>> body_crs("mars", system="ocentric").to_authority()
+    ('IAU_2015', '49902')
+    >>> body_crs("mars", system="ographic").to_authority()
+    ('IAU_2015', '49901')
     """
     try:
         offset = _SYSTEM_OFFSET[system]
@@ -107,14 +135,19 @@ def body_crs(body, system: str = "ocentric") -> CRS:
     try:
         return CRS.from_authority(_IAU_AUTHORITY, code)
     except CRSError:
+        extra = (
+            " Only bodies with a defined ellipsoid have 'ocentric' and "
+            "'ographic' variants; try system='sphere'."
+            if system in ("ocentric", "ographic")
+            else ""
+        )
         raise ValueError(
             f"No {_IAU_AUTHORITY} {system!r} CRS for body {body!r} "
-            f"(code {code}). The body may only define an 'ocentric' system, "
-            f"or be absent from {_IAU_AUTHORITY}."
+            f"(code {code}).{extra}"
         ) from None
 
 
-def local_crs(lon: float, lat: float, body, *, system: str = "ocentric") -> CRS:
+def local_crs(lon: float, lat: float, body, *, system: str = "sphere") -> CRS:
     """Azimuthal-Equidistant CRS centered on ``(lon, lat)`` for ``body``.
 
     Built on the body's IAU geodetic CRS, so its sphere/ellipsoid comes from
@@ -201,10 +234,15 @@ def projected_crs(body, projection: str, system: str = "sphere") -> CRS:
 def get_crs(body, system: str = "default") -> CRS:
     """craterpy-compatible alias for :func:`body_crs`.
 
-    ``system="default"`` maps to ``"ocentric"``. Unlike craterpy's original,
-    this does NOT accept an arbitrary CRS string as ``system`` (no
-    exception-driven passthrough) — construct such CRS with pyproj directly.
+    ``system="default"`` maps to ``"sphere"`` — the IAU sphere, which is what
+    this alias has always returned. It is spelled ``"sphere"`` rather than
+    ``"ocentric"`` since the offset tables were corrected: offset 0 is the
+    sphere, and ``"ocentric"`` now means the ellipsoid at offset 2.
+
+    Unlike craterpy's original, this does NOT accept an arbitrary CRS string as
+    ``system`` (no exception-driven passthrough) — construct such CRS with
+    pyproj directly.
     """
     if system == "default":
-        system = "ocentric"
+        system = "sphere"
     return body_crs(body, system)

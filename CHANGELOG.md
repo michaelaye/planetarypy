@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.82.1] - 2026-08-04
+
+A correctness fix for planetary CRS selection.
+
+### Fixed
+
+- **`body_crs(body, system="ocentric")` returned a sphere.** The geographic offset table read `{"ocentric": 0, "ographic": 1}`, but IAU offset 0 is `"<Body> (2015) - Sphere / Ocentric"` — for Mars that is `IAU_2015:49900` with `a == b == 3396190`. The real ocentric ellipsoid is offset 2 (`49902`, `b = 3376200`) and was **unreachable through the API entirely**. The projected table twenty lines below had the same triple correct all along. `system` now takes `"sphere"`, `"ographic"` and `"ocentric"` mapping to +0/+1/+2, and bodies with no ellipsoid (Moon, Venus, Europa) raise rather than silently handing back the sphere.
+
+  The **default is unchanged**: `body_crs("mars")` still returns the sphere, now spelled `system="sphere"`. Spheres are the working currency in planetary practice — ISIS operates on them, many published products use them, and a shared sphere avoids datum-shift surprises when stacking heterogeneous data in GIS. What changed is that it no longer arrives mislabelled. `get_crs`'s `"default"` likewise still resolves to the sphere.
+
 ## [0.82.0] - 2026-08-01
 
 A slimming release: MRO HiRISE and CTX behaviour now ships as separate distributions, so core carries no instrument-specific code and each instrument versions independently.
