@@ -14,7 +14,7 @@ from planetarypy.crs import body_crs, get_crs, local_crs
 
 class TestBodyCrs:
     def test_mars_by_naif_id_is_geographic_with_radius(self):
-        crs = body_crs(499)  # Mars, ocentric — radii come from the IAU code
+        crs = body_crs(499)  # Mars, IAU sphere — radii come from the IAU code
         assert crs.is_geographic
         assert crs.ellipsoid.semi_major_metre == pytest.approx(3396190.0)
 
@@ -53,8 +53,18 @@ class TestLocalCrs:
 
 
 class TestGetCrs:
-    def test_default_is_ocentric(self):
-        assert get_crs(499).to_wkt() == body_crs(499, "ocentric").to_wkt()
+    def test_default_is_the_sphere(self):
+        """Was `test_default_is_ocentric`, and it encoded the bug.
+
+        It asserted get_crs(499) == body_crs(499, "ocentric") and passed only
+        because "ocentric" wrongly resolved to offset 0, the sphere. Comparing
+        two names without checking the figure is precisely how that survived;
+        see tests/test_crs_figure.py.
+        """
+        assert get_crs(499).to_wkt() == body_crs(499, "sphere").to_wkt()
+
+    def test_default_is_not_the_ocentric_ellipsoid(self):
+        assert get_crs(499).to_authority() != body_crs(499, "ocentric").to_authority()
 
 
 class TestProjectedCrs:
