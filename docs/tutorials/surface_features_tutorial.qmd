@@ -20,13 +20,7 @@ one archive in one convention, feature names come from the USGS Gazetteer in
 another, and nothing stops you from plotting them on the same axes while they
 quietly disagree.
 
-We work over **Jezero Crater**, Perseverance's landing site, at 77.4°E, 18.4°N.
-
-```{python}
-LON, LAT = 77.4, 18.4
-HALF = 4.0
-BBOX = (LON - HALF, LAT - HALF, LON + HALF, LAT + HALF)
-```
+We work over **Jezero Crater**, Perseverance's landing site.
 
 ## 1. Pin the frame first
 
@@ -43,7 +37,74 @@ crs.get_target_crs().to_authority()
 `body_crs("mars")` resolves to the IAU_2015 ocentric code for Mars — the radii
 come from the IAU code itself, nothing is hardcoded.
 
-## 2. The named geography
+## 2. Ask where Jezero is
+
+Don't type the coordinates. `nomenclature.find` returns the IAU record for a
+named feature, so the location is sourced rather than remembered.
+
+```{python}
+from planetarypy import nomenclature
+
+jezero = nomenclature.find("mars", "Jezero")
+LON = jezero.center_lon.to_value("deg")
+LAT = jezero.center_lat.to_value("deg")
+LON, LAT, jezero.diameter
+```
+
+The record carries the feature's own extent too, and the numbers arrive as
+astropy quantities, so their units travel with them:
+
+```{python}
+jezero[["min_lon", "max_lon", "min_lat", "max_lat", "diameter"]]
+```
+
+So the area of interest can be built from the feature rather than from a number
+someone guessed. We take Jezero's own bounding box and pad it by a few crater
+diameters of context, converting km to degrees through the body's own radius:
+
+```{python}
+import numpy as np
+from astropy import units as u
+
+from planetarypy import constants
+
+radius = constants.Mars.mean_radius            # a Quantity, in km
+deg_per_length = (360 * u.deg) / (2 * np.pi * radius)
+
+pad = (4 * jezero.diameter * deg_per_length).to(u.deg)
+pad
+```
+
+::: {.callout-tip}
+## Why units earn their keep here
+
+`radius` is in **km**. Had it been metres and this code assumed otherwise, the
+box would have come out 1000× too large — and nothing would have complained.
+Because both `diameter` and `radius` carry their units, the conversion either
+works or raises; it cannot quietly produce a wrong number.
+
+Units are on by default. `units.set_units(False)`, or
+`with units.use_units(False):`, hands back plain floats for code that wants them.
+:::
+
+`features` takes plain degrees, so strip the unit at the boundary:
+
+```{python}
+pad_deg = pad.to_value(u.deg)
+
+BBOX = (jezero.min_lon.to_value(u.deg) - pad_deg,
+        jezero.min_lat.to_value(u.deg) - pad_deg,
+        jezero.max_lon.to_value(u.deg) + pad_deg,
+        jezero.max_lat.to_value(u.deg) + pad_deg)
+WEST_EAST = (BBOX[0], BBOX[2])
+SOUTH_NORTH = (BBOX[1], BBOX[3])
+BBOX
+```
+
+Nothing above is typed from memory: the location, the size and the body radius
+are all looked up.
+
+## 3. The named geography
 
 `nomenclature.features` fetches the gazetteer for a body and caches it. Filters
 mirror how people actually narrow it: by feature class, by size, by area.
@@ -52,7 +113,6 @@ mirror how people actually narrow it: by feature class, by size, by area.
 import textwrap
 import warnings
 
-from planetarypy import nomenclature
 from planetarypy.crs import CRSConversionWarning
 
 with warnings.catch_warnings(record=True) as caught:
@@ -89,7 +149,7 @@ near.crs.to_authority()
 Pass an explicit `to_crs=` and the warning goes away: you made the decision
 yourself, so there is nothing to tell you.
 
-## 3. Real footprints from an archive
+## 4. Real footprints from an archive
 
 HRSC coverage over the same box, straight from ESA's PSA.
 
@@ -101,8 +161,8 @@ hrsc = psa.query(
     "FROM psa.epn_core "
     "WHERE instrument_host_name LIKE '%Mars Express%' "
     "  AND instrument_name LIKE '%HRSC%' "
-    f"  AND c1min <= {LON + HALF} AND c1max >= {LON - HALF} "
-    f"  AND c2min <= {LAT + HALF} AND c2max >= {LAT - HALF} "
+    f"  AND c1min <= {WEST_EAST[1]} AND c1max >= {WEST_EAST[0]} "
+    f"  AND c2min <= {SOUTH_NORTH[1]} AND c2max >= {SOUTH_NORTH[0]} "
     "  AND (c1max - c1min) < 30 AND (c2max - c2min) < 30"
 )
 len(hrsc)
@@ -116,7 +176,7 @@ Orbital swaths crossing high latitudes get a degenerate bounding box spanning
 area. See the cross-archive tutorial for the full set of PSA rough edges.
 :::
 
-## 4. Put them on one plot
+## 5. Put them on one plot
 
 `add_features` is the `coastlines()` move: it draws onto axes you already have,
 and with `bbox="auto"` (the default) it reads their limits rather than making you
@@ -162,7 +222,7 @@ would collide with one already placed is dropped rather than smeared over it.
 drawn[["name", "diameter"]].sort_values("diameter", ascending=False).head(6)
 ```
 
-## 5. Borrowing a different frame for one block
+## 6. Borrowing a different frame for one block
 
 Distances are the usual reason. A geographic CRS measures in degrees, which are
 not a length; for "how far is this feature from the rover?" you want a local
@@ -190,7 +250,7 @@ metric["km_from_site"] = metric.geometry.distance(origin) / 1000
 metric.nsmallest(6, "km_from_site")[["name", "km_from_site"]]
 ```
 
-## 6. Tidy up
+## 7. Tidy up
 
 ```{python}
 crs.clear_target_crs()
@@ -205,5 +265,7 @@ manager where the scope is known.
 
 - `planetarypy.nomenclature.bodies()` lists all 47 bodies the gazetteer covers —
   the Moon has 9086 named features, Mercury 606, Europa 129.
+- `planetarypy.units` toggles astropy units project-wide, with the same
+  set/context-manager pair as the target CRS.
 - The HOWTO on session CRS covers precedence and silencing the conversion notice.
 - The cross-archive tutorial combines PDS and PSA discovery over one area.

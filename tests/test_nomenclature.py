@@ -228,3 +228,93 @@ def test_bodies_listing_is_lowercase_and_includes_mars():
 ])
 def test_gazetteer_name_normalisation(given, expected):
     assert nom._gazetteer_name(given) == expected
+
+
+# --- find() -----------------------------------------------------------------
+
+
+def test_find_returns_a_single_row(fake_gazetteer):
+    got = _quiet(nom.find, "mars", "Jezero")
+    assert got["name"] == "Jezero"
+    assert got["diameter"].to_value("km") == 45.0
+
+
+def test_find_attaches_units_by_default(fake_gazetteer):
+    from astropy import units as u
+
+    got = _quiet(nom.find, "mars", "Jezero")
+    assert got["diameter"].unit == u.km
+    assert got["center_lon"].unit == u.deg
+
+
+def test_find_returns_plain_floats_when_units_are_off(fake_gazetteer):
+    from astropy import units as u
+
+    from planetarypy import units as punits
+
+    with punits.use_units(False):
+        got = _quiet(nom.find, "mars", "Jezero")
+    assert not isinstance(got["diameter"], u.Quantity)
+    assert got["diameter"] == 45.0
+
+
+def test_features_frame_records_its_column_units(fake_gazetteer):
+    from planetarypy import units as punits
+
+    frame = _quiet(nom.features, "mars")
+    assert punits.units_of(frame)["diameter"] == "km"
+    assert punits.units_of(frame)["center_lat"] == "deg"
+
+
+def test_frame_columns_stay_numeric_not_object(fake_gazetteer):
+    """Units live in .attrs; wrapping a whole column would kill vectorisation."""
+    frame = _quiet(nom.features, "mars")
+    assert frame["diameter"].dtype.kind == "f"
+
+
+def test_find_is_case_insensitive(fake_gazetteer):
+    assert _quiet(nom.find, "mars", "jEzErO")["name"] == "Jezero"
+
+
+def test_find_is_exact_not_substring(fake_gazetteer):
+    """'Jezero' must not also match a hypothetical 'Jezero Mons'."""
+    got = _quiet(nom.features, "mars", name="Jezero")
+    assert list(got["name"]) == ["Jezero"]
+
+
+def test_find_raises_lookuperror_when_absent(fake_gazetteer):
+    with pytest.raises(LookupError, match="Nonesuch"):
+        _quiet(nom.find, "mars", "Nonesuch")
+
+
+def test_find_raises_valueerror_when_ambiguous(fake_gazetteer, tmp_path, monkeypatch):
+    """Two features sharing a name must not silently resolve to the first."""
+    twins = gpd.GeoDataFrame(
+        [
+            {"name": "Twin", "clean_name": "Twin", "type": "Crater, craters",
+             "diameter": 5.0, "center_lon": 1.0, "center_lat": 1.0,
+             "min_lon": 0.5, "max_lon": 1.5, "min_lat": 0.5, "max_lat": 1.5,
+             "approval": "Adopted by IAU", "geometry": Point(1, 1)},
+            {"name": "Twin", "clean_name": "Twin", "type": "Mons, montes",
+             "diameter": 9.0, "center_lon": 2.0, "center_lat": 2.0,
+             "min_lon": 1.5, "max_lon": 2.5, "min_lat": 1.5, "max_lat": 2.5,
+             "approval": "Adopted by IAU", "geometry": Point(2, 2)},
+        ],
+        crs=GAZETTEER_CRS,
+    )
+    shp = tmp_path / "TWINS_nomenclature_center_pts.shp"
+    twins.to_file(shp)
+    monkeypatch.setattr(nom, "download", lambda body, **kw: shp)
+    with pytest.raises(ValueError, match="ambiguous"):
+        _quiet(nom.find, "mars", "Twin")
+
+
+def test_find_disambiguates_by_type(fake_gazetteer):
+    got = _quiet(nom.find, "mars", "Jezero", type="Crater")
+    assert got["name"] == "Jezero"
+
+
+def test_find_result_carries_the_session_crs(fake_gazetteer):
+    with pcrs.target_crs("IAU_2015:49901"):
+        got = _quiet(nom.find, "mars", "Jezero")
+    assert got.geometry is not None

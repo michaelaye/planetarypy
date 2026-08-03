@@ -132,6 +132,7 @@ quartodoc:
         - geo
         - crs
         - nomenclature
+        - units
         - plotting
         - datetime_format_converters
         - utils

@@ -29,7 +29,7 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-__all__ = ["features", "add_features", "download", "bodies", "BODIES"]
+__all__ = ["features", "find", "add_features", "download", "bodies", "BODIES"]
 
 BASE = "https://asc-planetarynames-data.s3.us-west-2.amazonaws.com"
 
@@ -46,6 +46,19 @@ BODIES = (
 
 #: Where planetarypy's body spelling differs from the gazetteer's file naming.
 _BODY_ALIASES = {"luna": "MOON"}
+
+#: Physical units of the gazetteer's numeric columns. Recorded on every returned
+#: frame's ``.attrs["units"]`` and used to attach astropy units to :func:`find`
+#: results, subject to :func:`planetarypy.units.get_units`.
+COLUMN_UNITS = {
+    "diameter": "km",
+    "center_lon": "deg",
+    "center_lat": "deg",
+    "min_lon": "deg",
+    "max_lon": "deg",
+    "min_lat": "deg",
+    "max_lat": "deg",
+}
 
 
 def bodies() -> tuple[str, ...]:
@@ -105,6 +118,7 @@ def download(body, *, refresh: bool = False) -> Path:
 def features(
     body,
     *,
+    name: str | None = None,
     type: str | None = None,
     min_diameter: float | None = None,
     bbox: tuple[float, float, float, float] | None = None,
@@ -117,6 +131,9 @@ def features(
     ----------
     body : str
         Body name, e.g. ``"mars"``. See :func:`bodies`.
+    name : str, optional
+        Exact feature name, case-insensitive. Exact rather than substring so
+        ``"Jezero"`` does not also return ``"Jezero Mons"``.
     type : str, optional
         Feature class, matched against the leading singular of the gazetteer's
         ``type`` column — pass ``"Crater"``, not ``"Crater, craters"``.
@@ -154,6 +171,8 @@ def features(
     gdf = gpd.read_file(download(body, refresh=refresh))
     shipped = gdf.crs
 
+    if name is not None:
+        gdf = gdf[gdf["name"].str.casefold() == name.casefold()]
     if type is not None:
         leading = gdf["type"].str.split(",").str[0].str.casefold()
         gdf = gdf[leading == type.casefold()]
@@ -171,7 +190,65 @@ def features(
         if to_crs is None:  # not asked for -> say so
             pcrs.announce_conversion(shipped, target, what=f"{body} nomenclature")
         gdf = gdf.to_crs(target)
-    return gdf.reset_index(drop=True)
+
+    # Units go on the frame itself, not into the columns: a pandas column of
+    # Quantity objects degrades to dtype=object and loses vectorised maths. The
+    # map travels with the frame so callers (and `find`) can apply it.
+    from planetarypy.units import attach_units
+
+    return attach_units(gdf.reset_index(drop=True), COLUMN_UNITS)
+
+
+def find(body, name, **kwargs):
+    """One named feature, so coordinates come from the IAU rather than memory.
+
+    >>> jezero = find("mars", "Jezero")
+    >>> jezero.center_lon, jezero.center_lat
+    (77.6873, 18.4082)
+
+    Hardcoding a feature's coordinates is easy and quietly wrong: the value most
+    people carry around for Jezero is about 17 km off the IAU one. This looks it
+    up instead.
+
+    Raises
+    ------
+    LookupError
+        If no feature on ``body`` has that exact name.
+    ValueError
+        If the name is ambiguous — the gazetteer does reuse names across feature
+        classes on some bodies.
+
+    Returns
+    -------
+    pandas.Series
+        The single matching row, with ``center_lon``/``center_lat``,
+        ``diameter``, the bounding box and the rest of the schema.
+    """
+    matches = features(body, name=name, **kwargs)
+    if matches.empty:
+        raise LookupError(
+            f"No IAU-named feature {name!r} on {body}. "
+            f"Names are exact and case-insensitive; try "
+            f"features({body!r}) to browse."
+        )
+    if len(matches) > 1:
+        kinds = ", ".join(sorted(matches["type"].unique()))
+        raise ValueError(
+            f"{name!r} is ambiguous on {body} ({len(matches)} matches: {kinds}). "
+            "Narrow it with type=."
+        )
+    from planetarypy.units import get_units, maybe_quantity
+
+    row = matches.iloc[0]
+    if not get_units():
+        return row
+    # A single row is object-dtype anyway, so wrapping is free here — unlike a
+    # whole column, where it would cost vectorisation.
+    row = row.copy()
+    for column, unit in COLUMN_UNITS.items():
+        if column in row.index:
+            row[column] = maybe_quantity(row[column], unit)
+    return row
 
 
 def _place_labels(ax, rows, text_kw, max_labels):
