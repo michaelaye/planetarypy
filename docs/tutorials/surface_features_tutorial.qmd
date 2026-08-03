@@ -49,9 +49,21 @@ come from the IAU code itself, nothing is hardcoded.
 mirror how people actually narrow it: by feature class, by size, by area.
 
 ```{python}
-from planetarypy import nomenclature
+import textwrap
+import warnings
 
-near = nomenclature.features("mars", bbox=BBOX, min_diameter=3)
+from planetarypy import nomenclature
+from planetarypy.crs import CRSConversionWarning
+
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always", CRSConversionWarning)
+    near = nomenclature.features("mars", bbox=BBOX, min_diameter=3)
+
+for w in caught:
+    print(textwrap.fill(str(w.message), 78))
+```
+
+```{python}
 near[["name", "type", "diameter", "center_lon", "center_lat"]].head(8)
 ```
 
@@ -134,7 +146,7 @@ ax.set_ylabel("planetocentric latitude (deg)")
 ax.set_title("HRSC coverage over Jezero, with IAU nomenclature")
 ax.grid(alpha=0.3, ls=":")
 ax.set_aspect("equal")
-plt.show()
+plt.show();
 ```
 
 The dashed boxes are feature *extents*, drawn by default from the gazetteer's
