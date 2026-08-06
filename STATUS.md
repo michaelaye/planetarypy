@@ -1,6 +1,6 @@
 # PDS archive reachability
 
-Last checked: 2026-08-06 09:30 UTC
+Last checked: 2026-08-06 15:00 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
