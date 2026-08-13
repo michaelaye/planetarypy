@@ -298,20 +298,16 @@ Triggered by "do a release cycle":
      --title "v$V — <short subject from the CHANGELOG opening paragraph>" \
      --notes-file /tmp/release_notes.md
    ```
-8. Update `conda/meta.yaml`:
-   - Bump `{% set version = "X.Y.Z" %}`.
-   - Replace `sha256:` with the new sdist hash:
-     `curl -s https://pypi.org/pypi/planetarypy/X.Y.Z/json | jq -r '.urls[] | select(.packagetype=="sdist") | .digests.sha256'`
-9. `conda-build conda/ --output-folder /tmp/conda-output --no-anaconda-upload` (recipe is edited in place — no grayskull regeneration).
-10. `anaconda --site anaconda upload /tmp/conda-output/noarch/planetarypy-X.Y.Z-*.conda` (glob the build string — hash suffix varies).
+8. **conda: nothing to do.** planetarypy is on conda-forge (`conda-forge/planetarypy-feedstock`, merged 2026-08-10). The **autotick bot** notices the new PyPI sdist, opens a version-bump PR on the feedstock, and merges it on green — usually within a few hours. Do not build or upload a conda package by hand.
 
 **Notes:**
-- `--site anaconda` required (bypasses an interactive prompt that fails in non-TTY).
-- `grayskull`, `conda-build`, `anaconda-client` live in the `py314` conda env.
-- Dep name mapping: `duckdb` (pip) → `python-duckdb` (conda-forge); others 1:1.
-- `noarch: python` — one build for all platforms.
+- **When the feedstock does need a human:** a release that **changes dependencies** — the bot bumps version + sha256 only, it does not sync `requirements`. Edit `recipe/recipe.yaml` on the bot's PR *before* merging. Same for a Python-floor change (`python_min` lives in the recipe's `context:` block, because planetarypy's floor is above conda-forge's global default). Both maintainers (`michaelaye`, `cjtu`) can merge.
+- The feedstock recipe is **v1** (`recipe/recipe.yaml`, rattler-build), not v0 `meta.yaml`. Validate any hand edit with `rattler-build build --recipe recipe.yaml --render-only` (rc=0 = good). rattler-build is not installed globally — `mamba create -p ./rbenv -c conda-forge rattler-build`.
+- Dep name mapping for recipe edits: `duckdb` (pip) → `python-duckdb`, `astropy` → `astropy-base`, `matplotlib` → `matplotlib-base`, `pdr[pillow]` → `pdr` + `pillow`; others 1:1. SPICE has no conda "extras" mechanism, so `spiceypy` + `scipy` ship in the conda package directly.
+- `noarch: python` — one build serves every platform, Windows included. A red `win_64` job in staged-recipes is therefore never a reason to hold a noarch package.
 - The CI gate at step 5 deliberately waits on the **tag** ref, not `main`. The same code can produce different results because external prefetch hits flaky upstreams; only the tag's run represents the artifact we're about to publish.
-- **Four publishing surfaces — git tag, PyPI, anaconda.org, GitHub Releases — are one indivisible release.** None is "done" until all four are. If a release cycle is interrupted between `twine upload` and `gh release create`, treat it as incomplete; do the missing step retroactively before considering the cycle closed.
+- **Three publishing surfaces — git tag, PyPI, GitHub Releases — are one indivisible release.** None is "done" until all three are. If a release cycle is interrupted between `twine upload` and `gh release create`, treat it as incomplete; do the missing step retroactively before considering the cycle closed. conda-forge is *not* on this list — it follows PyPI automatically.
+- **The personal `anaconda.org/michaelaye` channel is retired** as of 2026-08-10; conda-forge is the only conda surface. Packages already published there stay (removing them would break anyone pinned to `-c michaelaye`), but nothing new is uploaded. `grayskull` / `conda-build` / `anaconda-client` in the `py314` env are no longer part of any release step.
 
 ### NSSDC Zenodo Dataset Updates
 

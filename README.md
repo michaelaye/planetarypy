@@ -36,6 +36,15 @@ Full table, including which individual indexes are failing:
 pip install planetarypy
 ```
 
+or, with conda:
+
+```bash
+conda install -c conda-forge planetarypy
+```
+
+The conda package bundles the SPICE support (`spiceypy`, `scipy`) that pip keeps
+behind the `[spice]` extra, since conda has no extras mechanism.
+
 ### Instrument packages
 
 **As of 0.82.0, the MRO HiRISE and CTX processing code ships separately.** It was

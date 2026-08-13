@@ -22,9 +22,12 @@ Python tools for planetary science data access.
 
 ```bash
 pip install planetarypy
+# or
+conda install -c conda-forge planetarypy
 ```
 
 - Project repository: <https://github.com/planetarypy/planetarypy>
+- conda-forge: <https://anaconda.org/conda-forge/planetarypy>
 - PyPI: <https://pypi.org/project/planetarypy/>
 - Part of the [PlanetaryPy](https://planetarypy.org/) Organisation
 
