@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.83.0] - 2026-08-13
+
+Naming things and knowing where they are: IAU feature names become a plottable
+layer, a session can fix one CRS and one unit convention for everything that
+follows, and planetarypy is installable from conda-forge.
+
 ### Added
 
-- **`planetarypy.units`** — a project-wide switch for astropy units, with the same setter / context-manager pair as the target CRS: `units.set_units(False)` for a session, `with units.use_units(False):` for a block. Units are **on** by default, matching what `constants` already did. Previously the only precedent was a private `_maybe_quantity` in the SPICE layer that no caller could reach.
+- **`planetarypy.units`** — units are not new (`constants` has returned astropy quantities all along); what is new is a shared, switchable convention for them. `units.set_units(False)` for a session, `with units.use_units(False):` for a block, and `maybe_quantity` / `units_of` / `attach_units` for modules that opt in. The toggle is **on** by default. Being honest about reach: `nomenclature` is so far the only consumer — `Spicer` keeps its own per-instance `units=` flag (default off) and `constants` returns quantities unconditionally. This release provides the mechanism and the first adopter; the rest is migration still to come.
 - **`nomenclature.find(body, name)`** — the IAU record for one named feature, so coordinates are looked up rather than remembered. The value commonly quoted for Jezero sits ~17 km east of the gazetteer's. Raises `LookupError` when absent and `ValueError` when ambiguous rather than silently returning the first match; `features(name=...)` does the same filtering for frames.
 - **Nomenclature results carry their units.** Numeric columns are documented in `.attrs["units"]` on every returned frame, and `find` returns astropy quantities for `diameter` and the lat/lon fields, subject to the toggle above. Columns stay float dtype on purpose — wrapping a whole column would make it object dtype and lose vectorised maths.
 
@@ -18,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A session-wide target CRS.** `crs.set_target_crs(...)` fixes one frame for the rest of a session, so work that mixes a USGS gazetteer shapefile (ESRI authority), a HiRISE GeoTIFF (IAU_2015) and PSA footprints stays consistent without restating the CRS at every call. `crs.target_crs(...)` is the context-manager form — it nests, and restores the previous setting even if the block raises. Backed by a `ContextVar` rather than a module global, so threads and asyncio tasks don't stamp on each other.
 - **`crs.resolve_crs(explicit, fallback=...)`**, the single place precedence is decided: an explicit argument beats the session target, which beats the caller's fallback (usually the body's own IAU CRS). One implementation means every consumer resolves identically.
 - **`crs.announce_conversion(...)` and `CRSConversionWarning`.** A reprojection the caller did not ask for now says so, naming both authorities. Silent reprojection is how an authority mismatch becomes quiet wrongness. It is a `warnings.warn` rather than a log line on purpose: planetarypy disables its loguru logger by default for library use, so a `logger.info` would be invisible to exactly the people who need to see it. The dedicated category means it can be silenced on its own.
+
+- **Installable from conda-forge** — `conda install -c conda-forge planetarypy`. The conda package bundles the SPICE stack (`spiceypy`, `scipy`) that pip keeps behind the `[spice]` extra, because conda has no extras mechanism. The personal `anaconda.org/michaelaye` channel is retired; packages already published there stay, so nothing breaks for anyone pinned to it.
+
+### Fixed
+
+- **A missing `[spice]` extra no longer answers with a traceback.** `plp spice missions` and its five siblings ended in ~70 lines of Rich traceback whose last line carried the actual advice. They now print that one line — which names the extra and the pip command — and exit 1. Tab completion on those arguments degrades to no suggestions instead of raising. This only ever affected `pip install planetarypy` without the extra; conda users and anyone with spiceypy see no change.
 
 ## [0.82.1] - 2026-08-04
 
