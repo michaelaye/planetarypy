@@ -12,11 +12,16 @@ Three verbs are CLI-ready against the existing
 Tests use Typer's ``CliRunner`` to capture stdout + stderr per stream.
 """
 
+import sys
 from unittest.mock import patch
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
+from planetarypy import cli
 from planetarypy.cli import app
+from planetarypy.spice._deps import SPICE_INSTALL_HINT
 
 
 runner = CliRunner()
@@ -221,3 +226,60 @@ class TestTabCompletion:
         out = self._complete_generic("")
         for alias in ("lsk", "pck", "de430", "mar099s", "masses"):
             assert alias in out
+
+
+class TestSpiceExtraMissing:
+    """Without the ``[spice]`` extra, the CLI owes the user one actionable line.
+
+    The import chain raises several frames deep inside ``spice/_deps.py``.
+    Unhandled, typer renders that as ~70 lines of Rich traceback with the
+    install hint at the very bottom — see ``cli._spice_deps``.
+    """
+
+    SPICE_MODULES = (
+        "planetarypy.spice",
+        "planetarypy.spice.archived_kernels",
+        "planetarypy.spice.generic_kernels",
+        "planetarypy.spice.config",
+        "planetarypy.spice.spicer",
+    )
+
+    def _without_spice(self, monkeypatch):
+        """Make every ``from planetarypy.spice... import x`` raise ImportError."""
+        for name in self.SPICE_MODULES:
+            monkeypatch.setitem(sys.modules, name, None)
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["spice", "missions"],
+            ["spice", "info", "cassini"],
+            ["spice", "cached"],
+            ["spice", "generic", "lsk"],
+            ["spice", "fetch", "cassini", "--start", "2006-06-01",
+             "--stop", "2006-06-30"],
+            ["spicer", "Mars"],
+        ],
+        ids=lambda a: " ".join(a[:2]),
+    )
+    def test_exits_one_without_a_traceback(self, monkeypatch, argv):
+        self._without_spice(monkeypatch)
+        result = runner.invoke(app, argv)
+        assert result.exit_code == 1
+        # the hint belongs on stderr, on the first line, with no traceback
+        assert "Traceback" not in result.stderr
+        assert result.stderr.lstrip().startswith("Error:")
+
+    def test_hint_text_reaches_the_user(self, capsys):
+        """``_spice_deps`` must echo the guard's message, not swallow it."""
+        with pytest.raises(typer.Exit) as excinfo:
+            with cli._spice_deps():
+                raise ImportError(SPICE_INSTALL_HINT)
+        assert excinfo.value.exit_code == 1
+        assert "pip install 'planetarypy[spice]'" in capsys.readouterr().err
+
+    def test_completion_degrades_to_empty(self, monkeypatch):
+        """Tab completion must not explode on a missing extra."""
+        self._without_spice(monkeypatch)
+        assert cli._complete_spice_mission("ca") == []
+        assert cli._complete_generic_alias("l") == []

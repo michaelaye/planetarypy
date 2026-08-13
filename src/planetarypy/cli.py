@@ -10,6 +10,7 @@ the planetarypy-hirise and planetarypy-ctx packages, which mount them here
 through the ``planetarypy.cli_plugins`` entry point.
 """
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import click
@@ -2235,7 +2236,8 @@ def spicer(
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
-    from planetarypy.spice.spicer import Spicer
+    with _spice_deps():
+        from planetarypy.spice.spicer import Spicer
 
     try:
         s = Spicer(body)
@@ -2300,9 +2302,27 @@ spice_app = typer.Typer(
 app.add_typer(spice_app, name="spice", rich_help_panel=_PANEL_DISCOVERY)
 
 
+@contextmanager
+def _spice_deps():
+    """Report a missing ``[spice]`` extra as one line instead of a traceback.
+
+    ``spice/_deps.py`` raises an ImportError carrying an actionable install
+    hint, but it fires several frames deep; unhandled, typer renders it as
+    ~70 lines of Rich traceback with the hint buried at the bottom.
+    """
+    try:
+        yield
+    except ImportError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+
+
 def _complete_spice_mission(incomplete: str) -> list[str]:
     """Tab completion for the NAIF mission shorthand argument."""
-    from planetarypy.spice.archived_kernels import datasets
+    try:
+        from planetarypy.spice.archived_kernels import datasets
+    except ImportError:
+        return []
     return sorted(m for m in datasets.index
                   if m.lower().startswith(incomplete.lower()))
 
@@ -2323,7 +2343,8 @@ def spice_missions():
     from rich.console import Console
     from rich.table import Table
 
-    from planetarypy.spice.archived_kernels import datasets
+    with _spice_deps():
+        from planetarypy.spice.archived_kernels import datasets
 
     table = Table(
         title=f"NAIF mission kernel archives ({len(datasets)})",
@@ -2372,7 +2393,8 @@ def spice_info(
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
-    from planetarypy.spice.archived_kernels import datasets
+    with _spice_deps():
+        from planetarypy.spice.archived_kernels import datasets
 
     if mission not in datasets.index:
         _suggest_and_exit(
@@ -2458,7 +2480,8 @@ def spice_fetch(
         typer.echo("Error: --start and --stop are both required.", err=True)
         raise typer.Exit(2)
 
-    from planetarypy.spice.archived_kernels import datasets, get_metakernel_and_files
+    with _spice_deps():
+        from planetarypy.spice.archived_kernels import datasets, get_metakernel_and_files
 
     if mission not in datasets.index:
         _suggest_and_exit(
@@ -2499,8 +2522,9 @@ def spice_cached(
     from rich.console import Console
     from rich.table import Table
 
-    from planetarypy.spice.archived_kernels import list_cached_kernels
-    from planetarypy.spice.config import KERNEL_STORAGE
+    with _spice_deps():
+        from planetarypy.spice.archived_kernels import list_cached_kernels
+        from planetarypy.spice.config import KERNEL_STORAGE
 
     cached = list_cached_kernels()
     if not cached:
@@ -2548,7 +2572,10 @@ def _humanize_bytes(n: int) -> str:
 
 def _complete_generic_alias(incomplete: str) -> list[str]:
     """Tab completion for the generic-kernel alias argument."""
-    from planetarypy.spice.generic_kernels import GENERIC_KERNEL_ALIASES
+    try:
+        from planetarypy.spice.generic_kernels import GENERIC_KERNEL_ALIASES
+    except ImportError:
+        return []
     return sorted(a for a in GENERIC_KERNEL_ALIASES
                   if a.startswith(incomplete.lower()))
 
@@ -2596,9 +2623,10 @@ def spice_generic(
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
-    from planetarypy.spice.generic_kernels import (
-        GENERIC_KERNEL_ALIASES, download_generic_kernel,
-    )
+    with _spice_deps():
+        from planetarypy.spice.generic_kernels import (
+            GENERIC_KERNEL_ALIASES, download_generic_kernel,
+        )
 
     try:
         path = download_generic_kernel(name, overwrite=force)
