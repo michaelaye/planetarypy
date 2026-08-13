@@ -298,7 +298,11 @@ Triggered by "do a release cycle":
      --title "v$V — <short subject from the CHANGELOG opening paragraph>" \
      --notes-file /tmp/release_notes.md
    ```
-8. **conda: nothing to do.** planetarypy is on conda-forge (`conda-forge/planetarypy-feedstock`, merged 2026-08-10). The **autotick bot** notices the new PyPI sdist, opens a version-bump PR on the feedstock, and merges it on green — usually within a few hours. Do not build or upload a conda package by hand.
+8. **Release notes: nothing to do.** `docs/_sync_changelog.py` runs as a Quarto
+   `pre-render` hook and republishes `CHANGELOG.md` as the site's Release Notes page,
+   with stable per-version anchors and an announcement bar naming the newest version.
+   The docs workflow picks it up on the next push; there is no second copy to update.
+9. **conda: nothing to do.** planetarypy is on conda-forge (`conda-forge/planetarypy-feedstock`, merged 2026-08-10). The **autotick bot** notices the new PyPI sdist, opens a version-bump PR on the feedstock, and merges it on green — usually within a few hours. Do not build or upload a conda package by hand.
 
 **Notes:**
 - **When the feedstock does need a human:** a release that **changes dependencies** — the bot bumps version + sha256 only, it does not sync `requirements`. Edit `recipe/recipe.yaml` on the bot's PR *before* merging. Same for a Python-floor change (`python_min` lives in the recipe's `context:` block, because planetarypy's floor is above conda-forge's global default). Both maintainers (`michaelaye`, `cjtu`) can merge.

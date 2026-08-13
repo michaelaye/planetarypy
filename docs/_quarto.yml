@@ -1,6 +1,10 @@
 project:
   type: website
   output-dir: _build
+  # Regenerates changelog.md (and the announcement bar) from the root
+  # CHANGELOG.md, so the published release notes cannot drift from the file
+  # the release process edits. Both outputs are gitignored.
+  pre-render: _sync_changelog.py
   resources:
     - cogbrowser/          # the standalone COG-viewer app (copied verbatim to _build/)
   preview:
@@ -35,6 +39,8 @@ website:
         href: factsheets.qmd
       - text: Contributing
         href: contributing.qmd
+      - text: "Release Notes"
+        href: changelog.md
     right:
       - icon: github
         aria-label: GitHub
@@ -103,9 +109,11 @@ format:
       - reference/_styles-quartodoc.css
       - _styles-abbr.css           # styled tooltips for <abbr> tags
 
-# Read the generated sidebar definitions
+# Read the generated sidebar definitions, and the announcement bar that
+# _sync_changelog.py writes from the newest CHANGELOG entry
 metadata-files:
   - reference/_sidebar.yml
+  - _announcement.yml
 
 quartodoc:
   # Use the multi-page (pkgdown-like) layout
