@@ -1,7 +1,9 @@
-# Fetching HiRISE RDR `_RED` products with `plp fetch`
+---
+title: "HOWTO batch-fetch HiRISE RDR RED products"
+draft: true
+---
 
-Cheat sheet for the most common ways to pull the RED color-band JP2 RDR
-products. The dotted key is always `mro.hirise.rdr`. The product ID is
+The most common ways to pull the RED color-band JP2 RDR products. The dotted key is always `mro.hirise.rdr`. The product ID is
 the HiRISE observation ID with the `_RED` suffix appended
 (e.g. `PSP_003092_0985_RED`).
 
@@ -46,7 +48,7 @@ band to every obsid before the catalog lookup:
 
 ```bash
 plp fetch mro.hirise.rdr \
-  --pids-from Kolhar_summer_furrows_HiRISE-20260528053713.csv \
+  --pids-from targets.csv \
   --pid-key observation_id \
   --pid-suffix _RED
 ```
@@ -72,7 +74,7 @@ The `head` idiom for testing your command on a small slice before
 committing to the full batch:
 
 ```bash
-head -n 5 Kolhar_summer_furrows_HiRISE-20260528053713.csv \
+head -n 5 targets.csv \
   | plp fetch mro.hirise.rdr \
       --pids-from - \
       --pid-key observation_id \
@@ -88,12 +90,12 @@ The same idiom works with other shell filters:
 
 ```bash
 # First 10 obsids after sorting by date column:
-sort -t, -k7 Kolhar_summer_furrows_HiRISE-20260528053713.csv \
+sort -t, -k7 targets.csv \
   | head -n 10 \
   | plp fetch mro.hirise.rdr --pids-from - --pid-key observation_id --pid-suffix _RED
 
 # Only the COMPLETE-status rows:
-grep COMPLETE Kolhar_summer_furrows_HiRISE-20260528053713.csv \
+grep COMPLETE targets.csv \
   | plp fetch mro.hirise.rdr --pids-from - --pid-key observation_id --pid-suffix _RED
 ```
 
