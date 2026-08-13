@@ -3,13 +3,13 @@ title: "HOWTO ISIS3 workflows with planetarypy"
 ---
 
 ::: {.callout-important}
-## Requires the CTX package
+## Requires the CTX and/or HiRISE packages
 
-This page uses functionality that ships separately as of planetarypy 0.82.0. Install it with `pip install "planetarypy[ctx]"` (or `pip install planetarypy-ctx`); a core-only install will not have it.
+This page uses functionality that ships separately as of planetarypy 0.82.0. Install it with `pip install "planetarypy[instruments]"` (or `pip install planetarypy-ctx planetarypy-hirise`); a core-only install will not have it.
 :::
 
 planetarypy can drive an ISIS3 calibration / projection pipeline —
-`ctx_calib`, `isis/projected.py`, and parts of the HiRISE module call
+`ctx_calib` and parts of the HiRISE module call
 out to ISIS3 binaries via a Python wrapper. **ISIS itself is not a
 Python package and is not installed by `pip install planetarypy`.**
 It's a large, separately-managed binary distribution from USGS. This
@@ -42,7 +42,7 @@ Python.
 ### Step 2 — install planetarypy's Python glue
 
 ```bash
-pip install "planetarypy[isis]"
+pip install "planetarypy-ctx[isis]"
 ```
 
 This adds three Python packages to your current environment:
@@ -58,11 +58,11 @@ you'll find out the moment you try to run a calibration pipeline.
 
 If you installed ISIS into its own conda env, activate it first, then
 run planetarypy from within it (after `pip install
-planetarypy[isis]` in that env):
+planetarypy-ctx[isis]` in that env):
 
 ```bash
 conda activate isis
-pip install "planetarypy[isis]"   # inside the isis env
+pip install "planetarypy-ctx[isis]"   # inside the isis env
 python my_calibration_script.py
 ```
 
@@ -99,12 +99,12 @@ them what to do next.
 ## What's importable without the `[isis]` extra
 
 The `[isis]` extra is purely for the **execution** of ISIS pipelines.
-The CTX modules themselves remain importable on a core install:
+The CTX modules themselves are importable as soon as the package is
+installed, with or without the extra:
 
 ```python
-# Works with just `pip install planetarypy`:
+# Works with `pip install planetarypy-ctx` (no `[isis]` extra needed):
 from planetarypy.instruments.mro.ctx import ctx_calib, ctx_edr
-from planetarypy.isis import projected
 ```
 
 The functions that actually invoke ISIS (`.calibrate()`, `.plot_any()`,

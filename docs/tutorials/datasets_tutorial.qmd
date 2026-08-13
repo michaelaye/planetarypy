@@ -23,7 +23,7 @@ fetch the bytes your lon/lat window needs. This tutorial walks the whole surface
    location, and read a window from an item;
 4. opening a dataset in the interactive **COG Browser**.
 
-It needs the geospatial extras (`rasterio`, `rioxarray`, `pyproj`) and a network
+It needs `rasterio`, `rioxarray` and `pyproj` — all core dependencies — and a network
 connection. Everything reads over HTTP — nothing is downloaded in full.
 :::
 

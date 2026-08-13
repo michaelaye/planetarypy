@@ -66,7 +66,7 @@ display; use `imshow_gray` when you want something readable on screen.
 | Old (planetaryimage) | Modern equivalent | Notes |
 |---|---|---|
 | `PDS3Image.open(path)` | `rasterio.open(path)` | Uses GDAL's `PDS` driver. Returns a `DatasetReader`; call `.read(1)` for the band-1 numpy array. |
-| `PDS3Image.open(path)` (label-aware alt) | `pdr.read(path)` | [Planetary Data Reader](https://github.com/MillionConcepts/pdr) (MillionConcepts) — the same project that powers `planetarypy.catalog`. Mission-aware, pure Python, returns labels alongside arrays. Heavier dep; only worth pulling in when you need the structured label. |
+| `PDS3Image.open(path)` (label-aware alt) | `pdr.read(path)` | [Planetary Data Reader](https://github.com/MillionConcepts/pdr) (MillionConcepts) — the engine behind `planetarypy.open()`. Mission-aware, pure Python, returns labels alongside arrays. Already a core dependency — use it directly when you want the structured label. |
 | `CubeFile.open(path)` (ISIS3 cubes) | `rasterio.open(path)` | Same call. GDAL's ISIS3 driver handles `.cub`. |
 | `img.data` | `ds.read(1)` (single band) / `ds.read()` (all bands) | rasterio returns a numpy array directly. |
 | `img.data.shape` | `(ds.count, ds.height, ds.width)` or `ds.read().shape` | rasterio splits band count from spatial dims; `read()` reassembles into one array. |

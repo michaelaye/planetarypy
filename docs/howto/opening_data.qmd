@@ -71,7 +71,7 @@ planetarypy.open("scene.raw", projected=True)     # force the raster reader
 
 ```bash
 plp open P02_001916_2221_XI_42N027W.LBL   # prints the contained objects
-plp open mosaic.tif --show                # display the default image
+plp open P02_001916_2221_XI_42N027W.LBL --show   # display the default image
 ```
 
 ---

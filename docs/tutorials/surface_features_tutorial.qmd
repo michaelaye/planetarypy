@@ -34,7 +34,8 @@ crs.set_target_crs(crs.body_crs("mars"))
 crs.get_target_crs().to_authority()
 ```
 
-`body_crs("mars")` resolves to the IAU_2015 ocentric code for Mars — the radii
+`body_crs("mars")` resolves to the IAU_2015 sphere code for Mars (`IAU_2015:49900`,
+`a == b`) — the radii
 come from the IAU code itself, nothing is hardcoded.
 
 ## 2. Ask where Jezero is

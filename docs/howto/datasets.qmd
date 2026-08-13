@@ -9,7 +9,7 @@ whole file*. This complements `pds`/`catalog`/`search` (PDS products) with the
 institutional mosaics that never went to PDS.
 
 It needs `rasterio`, `rioxarray` and `pyproj` (shipped with the conda package; on
-PyPI they come with the geospatial dependencies).
+PyPI they are core dependencies — nothing extra to install).
 
 ## What's registered
 

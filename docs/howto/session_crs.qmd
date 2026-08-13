@@ -13,7 +13,7 @@ Set it once instead.
 ```python
 from planetarypy import crs
 
-crs.set_target_crs("IAU_2015:49900")     # Mars, ocentric
+crs.set_target_crs("IAU_2015:49900")     # Mars, IAU sphere
 ```
 
 From here on, helpers that return georeferenced data convert to that frame rather

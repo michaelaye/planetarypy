@@ -12,7 +12,7 @@ ISIS v10 is moving to.
 ::: callout-note
 `footprints_to_gdf` and `overlaps` return GeoDataFrames and need
 **geopandas**, installed with the `[isis]` extra:
-`pip install "planetarypy[isis]"`.
+`pip install "planetarypy[geo]"`.
 :::
 
 ## One image → footprint

@@ -271,11 +271,11 @@ ds
 
 ```{python}
 #| eval: false
-import planetarypy as plp
+from planetarypy import plotting
 
 # image = ds.squeeze().values   # a 2D array from the opened product
 # CW-from-top azimuth required (see Obstacle 3 — convert from Spicer if needed).
-plp.plotting.imshow_with_sun(image, sun_azimuth_deg=135, title="HRSC over Jezero")
+plotting.imshow_with_sun(image, sun_azimuth_deg=135, title="HRSC over Jezero")
 ```
 
 ::: {.callout-warning}

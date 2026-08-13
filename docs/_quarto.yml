@@ -50,6 +50,8 @@ website:
         - tutorials/datasets_tutorial.qmd
         - tutorials/planetary_crs_tutorial.ipynb
         - tutorials/surface_features_tutorial.qmd
+        - tutorials/cross_archive_mars_tutorial.qmd
+        - tutorials/constants_tutorial.ipynb
         - tutorials/spicer_tutorial.ipynb
         - tutorials/spice_kernel_examples.ipynb
     - title: "How-To"
@@ -62,6 +64,8 @@ website:
         - howto/datasets.qmd
         - howto/footprints_and_overlaps.qmd
         - howto/session_crs.qmd
+        - howto/planetaryimage_today.qmd
+        - howto/isis_workflows.qmd
         - howto/howto_spice_archived.ipynb
         - howto/ctx_edr.ipynb
         - howto/ctx_calib.ipynb
@@ -73,6 +77,7 @@ website:
         - explanation/pds_index_config.qmd
         - explanation/pds_index_download_flows.qmd
         - explanation/constants_design.qmd
+        - explanation/product_url_resolution.qmd
     - title: "API Reference"
       contents: "{{ contents }}"
 
@@ -135,20 +140,30 @@ quartodoc:
         - units
         - plotting
         - datetime_format_converters
+        - io
         - utils
 
     - title: PDS Utilities and CLI
       desc: Tools for managing and working with Planetary Data System indexes.
       contents:
+        - pds
         - pds.dynamic_index
         - pds.dynamic_url_handlers
         - pds.index_fixes
         - pds.index_labels
         - pds.index_logging
         - pds.index_main
+        - pds.meta_display
         - pds.static_index
         - pds.utils
+        - catalog
 
+    - title: Archive Search and Remote Data
+      desc: Archive-wide product discovery and remote (non-PDS) datasets.
+      contents:
+        - search
+        - psa
+        - datasets
     - title: SPICE
       desc: SPICE kernels and surface illumination.
       contents:
@@ -156,6 +171,7 @@ quartodoc:
         - spice.archived_kernels
         - spice.config
         - spice.generic_kernels
+        - spice.pckernels
 
     - title: Constants
       desc: |
