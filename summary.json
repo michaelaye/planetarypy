@@ -1,5 +1,5 @@
 {
-  "checked": "2026-08-15 19:03 UTC",
+  "checked": "2026-08-16 02:11 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -28,8 +28,8 @@
     {
       "host": "planetarydata.jpl.nasa.gov",
       "total": 8,
-      "failing": 8,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "sbnarchive.psi.edu",
@@ -302,15 +302,15 @@
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "lro.lamp.edr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/edr/LROLAM_0062/INDEX/CUMINDEX.LBL",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "lro.lamp.rdr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/rdr/LROLAM_1062/INDEX/CUMINDEX.LBL",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -351,29 +351,29 @@
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "messenger.mdis.cdr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/messenger/MSGRMDS_2001/INDEX/CUMINDEX.LBL",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "messenger.mdis.edr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/messenger/MSGRMDS_1001/INDEX/CUMINDEX.LBL",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "mgs.moc.edr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/mgs/moc/mgsc_1578/index/cumindex.lbl",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "mgs.moc.rdr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/mgs/moc/rdr/mgscim_1578/index/cumindex.lbl",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -386,8 +386,8 @@
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "mro.ctx.edr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_5010/index/cumindex.lbl",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -519,8 +519,8 @@
       "host": "planetarydata.jpl.nasa.gov",
       "index_key": "viking.vis.edr",
       "url": "https://planetarydata.jpl.nasa.gov/img/data/viking/viking_orbiter/vo_1064/index/cumindex.lbl",
-      "status": "ConnectTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
