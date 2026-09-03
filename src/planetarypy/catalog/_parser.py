@@ -11,10 +11,11 @@ from pathlib import Path
 from loguru import logger
 
 
-def _eval_node(node: ast.expr, variables: dict[str, str]) -> object:
+def _eval_node(node: ast.expr, variables: dict[str, object]) -> object:
     """Safely evaluate an AST node to a Python value.
 
-    Handles: Constant, Name (variable lookup), List, Dict, and UnaryOp (negation).
+    Handles: Constant, Name (variable lookup), List, Dict, UnaryOp (negation),
+    Tuple, Set, and BinOp (dict merge with ``|``).
     """
     if isinstance(node, ast.Constant):
         return node.value
@@ -38,6 +39,13 @@ def _eval_node(node: ast.expr, variables: dict[str, str]) -> object:
         }
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
         return -_eval_node(node.operand, variables)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        left = _eval_node(node.left, variables)
+        right = _eval_node(node.right, variables)
+        if isinstance(left, dict) and isinstance(right, dict):
+            return left | right
+        logger.warning("Non-dict operands for '|' merge in AST")
+        return None
     if isinstance(node, ast.Tuple):
         return tuple(_eval_node(el, variables) for el in node.elts)
     if isinstance(node, ast.Set):
@@ -72,8 +80,9 @@ def parse_selection_rules(filepath: Path) -> dict[str, dict]:
         logger.error(f"SyntaxError parsing {filepath}: {e}")
         return {}
 
-    # Phase 1: collect module-level variable assignments (manifest aliases)
-    variables: dict[str, str] = {}
+    # Phase 1: collect module-level variable assignments (manifest aliases,
+    # and dicts like `base = {...}` reused via `base | {...}` merges)
+    variables: dict[str, object] = {}
     file_info = None
 
     for node in ast.iter_child_nodes(tree):
@@ -84,8 +93,8 @@ def parse_selection_rules(filepath: Path) -> dict[str, dict]:
                 continue
             if target.id == "file_information":
                 file_info = _eval_node(node.value, variables)
-            elif isinstance(node.value, ast.Constant):
-                variables[target.id] = node.value.value
+            elif isinstance(node.value, (ast.Constant, ast.Dict, ast.List, ast.Tuple, ast.Set)):
+                variables[target.id] = _eval_node(node.value, variables)
 
     return file_info or {}
 

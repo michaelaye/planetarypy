@@ -102,6 +102,41 @@ def test_parse_selection_rules_label_types(tmp_rules_file):
     assert result["calib"]["label"] == "D"
 
 
+@pytest.fixture
+def tmp_rules_file_with_merge(tmp_path):
+    """Create a mock selection_rules.py file using the `base | {...}` idiom."""
+    content = textwrap.dedent('''\
+        """Mock selection rules with dict-merge entries."""
+
+        IMG_FILE = "img_jpl_mer_pan"
+
+        base = {
+            "manifest": IMG_FILE,
+            "url_must_contain": ["mer", "po_0xxx/data", "rdr"],
+            "label": "A",
+        }
+
+        file_information = {
+            "ilut": base | {"fn_regex": [r"ilf"]},
+            "ilut_thumb": base | {"fn_regex": [r"ith"]},
+        }
+    ''')
+    p = tmp_path / "selection_rules.py"
+    p.write_text(content)
+    return p
+
+
+def test_parse_selection_rules_dict_merge(tmp_rules_file_with_merge):
+    """Test that `base | {...}` dict-merge entries are resolved, not dropped."""
+    result = parse_selection_rules(tmp_rules_file_with_merge)
+    assert "ilut" in result
+    assert "ilut_thumb" in result
+    assert result["ilut"]["manifest"] == "img_jpl_mer_pan"
+    assert result["ilut"]["label"] == "A"
+    assert result["ilut"]["fn_regex"] == ["ilf"]
+    assert result["ilut_thumb"]["fn_regex"] == ["ith"]
+
+
 def test_parse_selection_rules_empty(tmp_path):
     """Test parsing an empty file_information dict."""
     p = tmp_path / "selection_rules.py"
