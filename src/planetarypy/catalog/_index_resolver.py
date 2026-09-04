@@ -667,6 +667,26 @@ def resolve_from_index(
             main_file = main_file.lower()
         files = [main_file]
         label_file = main_file if main_file.upper().endswith(".LBL") else None
+
+        # Some indexes name the detached LABEL rather than the data file --
+        # every row of the Cassini UVIS index is a .LBL, for instance. Taking
+        # the index filename at face value then fetches the label alone and
+        # never the data it describes. Add the companion data file, which by
+        # PDS3 detached-label convention differs only in extension.
+        if label_file:
+            from planetarypy.catalog._pattern_resolver import (
+                get_product_type_file_info,
+            )
+
+            _, data_ext, _ = get_product_type_file_info(
+                mission, instrument, product_key
+            )
+            if data_ext:
+                data_file = PurePosixPath(main_file).with_suffix(data_ext).name
+                if config.lowercase_files:
+                    data_file = data_file.lower()
+                if data_file != main_file:
+                    files.insert(0, data_file)
     else:
         files = []
         label_file = None

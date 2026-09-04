@@ -26,6 +26,69 @@ if TYPE_CHECKING:
 # ── File inference from catalog metadata ─────────────────────────────
 
 
+def _extension_from_patterns(fn_must_contain: str | None,
+                             fn_ends_with: str | None) -> str | None:
+    """First dotted extension found in the pdr filename patterns, or None."""
+    for raw in (fn_ends_with, fn_must_contain):
+        if not raw:
+            continue
+        try:
+            items = _json.loads(raw)
+        except (ValueError, TypeError):
+            continue
+        for item in items:
+            if isinstance(item, str) and item.startswith("."):
+                return item
+    return None
+
+
+# INDEX_REGISTRY uses planetarypy's own product keys (``edr``), while the
+# catalog carries pdr-tests' keys (UVIS ships ``fuv``/``euv``/``hdac``/``hsp``).
+# Where the two namespaces disagree the per-type lookup misses entirely, so the
+# data extension is unknown and only the detached label gets fetched.
+#
+# This table is a deliberately narrow bridge for the cases that break a *fetch*,
+# NOT a fix for the namespace split. See Plans/key_grammar_plan.qmd: increment A
+# reconciles all 18 dead INDEX_REGISTRY entries, and increment E promotes
+# sub-instruments like UVIS's four detectors to ``key[1]``, at which point these
+# aliases become unnecessary and should be deleted.
+#
+# Entries map a registry triple to the catalog product keys it spans, most
+# specific first. Every listed key must agree on the data extension, since the
+# umbrella key cannot distinguish between them.
+_PRODUCT_KEY_ALIASES: dict[tuple[str, str, str], tuple[str, ...]] = {
+    # The UVIS index (COUVIS_0xxx) is a single index covering all four
+    # detectors, so the umbrella key is right here; all four ship '.DAT'.
+    ("cassini", "uvis", "edr"): ("fuv", "euv", "hdac", "hsp"),
+}
+
+
+@lru_cache(maxsize=None)
+def _aliased_data_extension(mission: str, instrument: str,
+                            product_key: str) -> str | None:
+    """Data extension for a registry key the catalog spells differently."""
+    aliases = _PRODUCT_KEY_ALIASES.get((mission, instrument, product_key))
+    if not aliases:
+        return None
+
+    from planetarypy.catalog import get_catalog
+
+    con = get_catalog()
+    for alias in aliases:
+        row = con.execute(
+            """SELECT pt.fn_must_contain, pt.fn_ends_with
+               FROM product_types pt
+               JOIN instruments i USING (folder_name)
+               WHERE i.mission = ? AND i.instrument = ?
+                 AND (pt.normalized_type = ? OR pt.product_key = ?)
+               LIMIT 1""",
+            [mission, instrument, alias, alias],
+        ).fetchone()
+        if row and (ext := _extension_from_patterns(*row)):
+            return ext
+    return None
+
+
 def get_product_type_file_info(
     mission: str, instrument: str, product_key: str,
 ) -> tuple[str, str | None, str | None]:
@@ -56,7 +119,8 @@ def get_product_type_file_info(
     ).fetchone()
 
     if row is None:
-        return "D", None, ".LBL"
+        # Product-key namespace mismatch (see _PRODUCT_KEY_ALIASES).
+        return "D", _aliased_data_extension(mission, instrument, product_key), ".LBL"
 
     label_type, fn_must_contain_json, fn_ends_with_json = row
 
@@ -79,6 +143,9 @@ def get_product_type_file_info(
                     break
         except (ValueError, TypeError):
             pass
+
+    if data_ext is None:
+        data_ext = _aliased_data_extension(mission, instrument, product_key)
 
     # Determine label extension from label_type
     label_ext = None
