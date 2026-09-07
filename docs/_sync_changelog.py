@@ -15,6 +15,11 @@ Two transformations earn their keep:
   without a committed file that churns on every release.
 
 Both outputs are gitignored.
+
+The writes are conditional on the content actually differing. `quarto preview`
+watches its inputs, so a script that rewrites a file on every render makes the
+preview re-render that page and navigate the browser to it — repeatedly, which
+leaves you unable to look at any other page.
 """
 from __future__ import annotations
 
@@ -52,6 +57,13 @@ def latest_version(text: str) -> str | None:
     return None
 
 
+def write_if_changed(path: pathlib.Path, content: str) -> None:
+    """Leave the file's mtime alone when nothing changed — see the module docstring."""
+    if path.exists() and path.read_text(encoding="utf-8") == content:
+        return
+    path.write_text(content, encoding="utf-8")
+
+
 def main() -> None:
     text = CHANGELOG.read_text(encoding="utf-8")
 
@@ -63,11 +75,12 @@ def main() -> None:
         body,
     )
 
-    PAGE.write_text(FRONT_MATTER + body.lstrip("\n"), encoding="utf-8")
+    write_if_changed(PAGE, FRONT_MATTER + body.lstrip("\n"))
 
     version = latest_version(text)
     if version:
-        ANNOUNCEMENT.write_text(
+        write_if_changed(
+            ANNOUNCEMENT,
             "website:\n"
             "  announcement:\n"
             f'    content: "**planetarypy {version}** is out — '
@@ -76,7 +89,6 @@ def main() -> None:
             "    position: below-navbar\n"
             "    dismissable: true\n"
             "    icon: rocket-takeoff\n",
-            encoding="utf-8",
         )
 
 

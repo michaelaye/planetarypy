@@ -204,6 +204,18 @@ These patterns are uniform across the existing `plp` verbs; new commands should 
 - Test class organization: group related tests in `class TestFoo:`. One test method per concrete scenario.
 - **The dev-environment kitchen-sink problem.** Running pytest in a dev environment that has every dep installed (core + spice + isis + plotting tools) **cannot** validate the declared-dependency contract. Real users `pip install planetarypy` without those extras and hit `ModuleNotFoundError` on imports that worked locally. CI's `minimal-install` job (in `.github/workflows/test.yaml`) catches this by creating a fresh venv, `pip install .` with no extras, and exercising every public submodule + CLI verb. **Before changing anything in `[project.dependencies]` or `[project.optional-dependencies]`, mentally run that job first**: does my change break the no-extras smoke?
 
+### Docs conventions
+
+- **Executing `.qmd` tutorials must ship their freeze.** The docs runner installs only `.[dev,docs]` — no jupyter, no `nbformat`, and none of the science extras. It cannot execute a notebook. Two tutorials in the nav declare `jupyter: python3` and execute: `tutorials/surface_features_tutorial.qmd` and `tutorials/cross_archive_mars_tutorial.qmd`. They render in CI **only** because `docs/_freeze/` holds their cached outputs.
+
+  Quarto keys the freeze on a hash of the source, so **editing one of those two invalidates its cache**. Re-render locally (where the extras are installed) and commit the regenerated `docs/_freeze/…` files **in the same commit as the `.qmd` edit**. Committing the source alone makes Quarto fall back to executing, and the build dies with `ModuleNotFoundError: No module named 'nbformat'` partway through the render.
+
+  This has bitten once: `a81ee61` edited both tutorials and shipped only the source. Symptom to recognise — a docs build that fails at a numbered render step (`[53/73] tutorials/…`) rather than at setup.
+
+  Deliberately keep CI thin rather than installing a kernel plus every science extra to execute tutorials on every push. The alternatives already in use: the 7 `.ipynb` tutorials carry embedded outputs and need no kernel, and `tutorials/datasets_tutorial.qmd` opts out entirely with `execute: enabled: false`.
+
+- **The published changelog is generated, not written.** `docs/_sync_changelog.py` runs as a Quarto `pre-render` hook and derives `docs/changelog.md` plus `docs/_announcement.yml` from the root `CHANGELOG.md`. Both outputs are gitignored — edit the root file, never the generated ones. The announcement bar's version comes from the newest `## [x.y.z]` heading, so a version heading added before its release is cut will advertise a release that does not exist yet.
+
 ---
 
 ## Development Principles
