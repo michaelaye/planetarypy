@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The CTX cumulative-index URL 404'd.** `CTXIndex.latest_release_folder` took `volumes_table.iloc[-2, 0]` — literally the second-to-last row of the scraped PDS listing. That listing interleaves a checksum file after every volume and ends with an unrelated entry, so the second-to-last row is `mrox_5584_md5.txt`, not a directory. The f-string join below assumes the value ends in `/`, so the result was `.../mrox_5584_md5.txtindex/cumindex.lbl`.
+
+  Selection is now by pattern (`mrox_\d+/?`) and by **numeric** maximum, not by position — lexical ordering would put `mrox_986` above `mrox_1232`. A listing containing no volume directories raises `RuntimeError` rather than composing a broken URL, and the trailing slash is normalised so the join cannot concatenate.
+
+  The existing test passed against the bug: its fixture listed only `mrox_NNNN/` rows, so the position it asserted on happened to hold a directory. The regression tests added here use the real listing shape and fail against the old implementation.
+
+- **`body_crs(body, system="ocentric")` returned a sphere.** The geographic offset table read `{"ocentric": 0, "ographic": 1}`, but IAU offset 0 is `"<Body> (2015) - Sphere / Ocentric"` — for Mars that is `IAU_2015:49900` with `a == b == 3396190`. The real ocentric ellipsoid is offset 2 (`49902`, `b = 3376200`) and was **unreachable through the API entirely**. The projected table twenty lines below had the same triple correct all along. `system` now takes `"sphere"`, `"ographic"` and `"ocentric"` mapping to +0/+1/+2, and bodies with no ellipsoid (Moon, Venus, Europa) raise rather than silently handing back the sphere.
+
+  The **default is unchanged**: `body_crs("mars")` still returns the sphere, now spelled `system="sphere"`. Spheres are the working currency in planetary practice — ISIS operates on them, many published products use them, and a shared sphere avoids datum-shift surprises when stacking heterogeneous data in GIS. What changed is that it no longer arrives mislabelled. `get_crs`'s `"default"` likewise still resolves to the sphere.
+
+### Added
+
+- **`planetarypy.units`** — a project-wide switch for astropy units, with the same setter / context-manager pair as the target CRS: `units.set_units(False)` for a session, `with units.use_units(False):` for a block. Units are **on** by default, matching what `constants` already did. Previously the only precedent was a private `_maybe_quantity` in the SPICE layer that no caller could reach.
+- **`nomenclature.find(body, name)`** — the IAU record for one named feature, so coordinates are looked up rather than remembered. The value commonly quoted for Jezero sits ~17 km east of the gazetteer's. Raises `LookupError` when absent and `ValueError` when ambiguous rather than silently returning the first match; `features(name=...)` does the same filtering for frames.
+- **Nomenclature results carry their units.** Numeric columns are documented in `.attrs["units"]` on every returned frame, and `find` returns astropy quantities for `diameter` and the lat/lon fields, subject to the toggle above. Columns stay float dtype on purpose — wrapping a whole column would make it object dtype and lose vectorised maths.
+
+- **`planetarypy.nomenclature`** — IAU-approved surface feature names as a plottable layer, from the USGS Gazetteer of Planetary Nomenclature (47 bodies; Mars 2049 features, the Moon 9086). `features()` fetches and caches per body and filters by feature class, diameter and bounding box; `add_features(ax, body)` is the `coastlines()` move, drawing onto axes you already have and reading their limits by default. Feature *extents* are drawn by default from the gazetteer's min/max lon/lat columns — a centre point says a name is nearby, the box says whether your footprint actually covers it — and labels are decluttered, largest feature first. The gazetteer ships ESRI authority codes (Mars is `ESRI:104905`); results reproject to an IAU CRS and say so. Needs the `[geo]` extra.
+
+- **A session-wide target CRS.** `crs.set_target_crs(...)` fixes one frame for the rest of a session, so work that mixes a USGS gazetteer shapefile (ESRI authority), a HiRISE GeoTIFF (IAU_2015) and PSA footprints stays consistent without restating the CRS at every call. `crs.target_crs(...)` is the context-manager form — it nests, and restores the previous setting even if the block raises. Backed by a `ContextVar` rather than a module global, so threads and asyncio tasks don't stamp on each other.
+- **`crs.resolve_crs(explicit, fallback=...)`**, the single place precedence is decided: an explicit argument beats the session target, which beats the caller's fallback (usually the body's own IAU CRS). One implementation means every consumer resolves identically.
+- **`crs.announce_conversion(...)` and `CRSConversionWarning`.** A reprojection the caller did not ask for now says so, naming both authorities. Silent reprojection is how an authority mismatch becomes quiet wrongness. It is a `warnings.warn` rather than a log line on purpose: planetarypy disables its loguru logger by default for library use, so a `logger.info` would be invisible to exactly the people who need to see it. The dedicated category means it can be silenced on its own.
+
 ## [0.83.0] - 2026-08-13
 
 Naming things and knowing where they are: IAU feature names become a plottable

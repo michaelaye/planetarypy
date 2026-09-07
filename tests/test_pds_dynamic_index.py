@@ -69,15 +69,54 @@ class TestCTXIndex:
         _ = idx.volumes_table
         assert call_count == 1
 
+    # What the PDS listing actually looks like: a checksum file after every
+    # volume, and an unrelated trailing entry. This is the shape that broke the
+    # positional lookup; FOLDERS above has neither and so never exercised it.
+    REAL_FOLDERS = [
+        "Parent Directory",
+        "mrox_1230/",
+        "mrox_1230_md5.txt",
+        "mrox_1231/",
+        "mrox_1231_md5.txt",
+        "mrox_1232/",
+        "mrox_1232_md5.txt",
+        "nssdca/",
+    ]
+
     def test_latest_release_folder(self, monkeypatch):
-        """latest_release_folder returns second-to-last row."""
+        """latest_release_folder returns the highest-numbered mrox_ directory."""
         self._patch_read_html(monkeypatch)
         idx = CTXIndex()
-        # After iloc[1:, :-1] the df starts at row index 1 (skipping row 0).
-        # iloc[-2, 0] on that slice is the second-to-last row of the trimmed df.
-        # Rows after trim: ["mrox_1231/", "mrox_1232/", "Parent Directory"]
-        # iloc[-2] => "mrox_1232/"
         assert idx.latest_release_folder == "mrox_1232/"
+
+    def test_latest_release_folder_ignores_checksums(self, monkeypatch):
+        """Regression: the listing interleaves mrox_NNNN_md5.txt after every volume.
+
+        The old implementation took ``iloc[-2, 0]`` — second-to-last row — which
+        landed on ``mrox_1232_md5.txt``. Since the URL join below assumes a
+        trailing slash, that produced ``mrox_1232_md5.txtindex/cumindex.lbl``
+        and 404'd against the live archive.
+        """
+        self._patch_read_html(monkeypatch, folders=self.REAL_FOLDERS)
+        idx = CTXIndex()
+        assert idx.latest_release_folder == "mrox_1232/"
+        assert str(idx.latest_index_label_url).endswith("mrox_1232/index/cumindex.lbl")
+
+    def test_latest_release_folder_is_numeric_not_lexical(self, monkeypatch):
+        """mrox_986 must not beat mrox_1232 on string ordering."""
+        self._patch_read_html(
+            monkeypatch,
+            folders=["Parent Directory", "mrox_986/", "mrox_1232/", "nssdca/"],
+        )
+        assert CTXIndex().latest_release_folder == "mrox_1232/"
+
+    def test_no_volumes_raises(self, monkeypatch):
+        """A listing with no mrox_ directories is an error, not a bad URL."""
+        self._patch_read_html(
+            monkeypatch, folders=["Parent Directory", "readme.txt", "nssdca/"]
+        )
+        with pytest.raises(RuntimeError, match="no mrox_"):
+            _ = CTXIndex().latest_release_folder
 
     def test_latest_release_number(self, monkeypatch):
         self._patch_read_html(monkeypatch)
