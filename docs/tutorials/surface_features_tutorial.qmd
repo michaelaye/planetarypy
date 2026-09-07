@@ -233,9 +233,14 @@ back afterwards.
 ```{python}
 local = crs.local_crs(LON, LAT, "mars")     # azimuthal equidistant on Jezero
 
-with crs.target_crs(local):
-    metric = nomenclature.features("mars", bbox=BBOX, min_diameter=3)
-    print("inside the block:", metric.crs.to_authority() or metric.crs.name)
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always", CRSConversionWarning)
+    with crs.target_crs(local):
+        metric = nomenclature.features("mars", bbox=BBOX, min_diameter=3)
+        print("inside the block:", metric.crs.to_authority() or metric.crs.name)
+
+for w in caught:
+    print(textwrap.fill(str(w.message), 78))
 
 print("after the block:  ", crs.get_target_crs().to_authority())
 ```

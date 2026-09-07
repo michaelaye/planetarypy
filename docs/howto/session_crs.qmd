@@ -62,7 +62,7 @@ If all three are `None`, `resolve_crs` returns `None`, which callers read as
 A conversion you did not ask for announces itself:
 
 ```
-CRSConversionWarning: mars nomenclature reprojected from ESRI:104905 to
+CRSConversionWarning: Reprojected mars nomenclature from ESRI:104905 to
 IAU_2015:49900 automatically. Pass an explicit CRS, or set
 planetarypy.crs.set_target_crs(...), to choose deliberately.
 ```

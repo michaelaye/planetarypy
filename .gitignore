@@ -178,3 +178,7 @@ src/planetarypy/instruments/mro/__init__.py
 # docs build — single-sourced, so never committed.
 docs/changelog.md
 docs/_announcement.yml
+
+# Quarto side-outputs from rendering an executing .qmd; the figures that
+# matter are committed under docs/_freeze/.
+docs/tutorials/*_files/

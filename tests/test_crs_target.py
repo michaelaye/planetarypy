@@ -127,7 +127,7 @@ def test_all_none_resolves_to_none():
 
 
 def test_announce_warns_on_a_real_conversion():
-    with pytest.warns(pcrs.CRSConversionWarning, match="reprojected"):
+    with pytest.warns(pcrs.CRSConversionWarning, match="[Rr]eprojected"):
         pcrs.announce_conversion(GAZETTEER, MARS_OCENTRIC)
 
 

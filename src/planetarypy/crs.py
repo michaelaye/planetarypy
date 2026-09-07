@@ -156,7 +156,7 @@ def announce_conversion(source, target, *, what: str = "data") -> None:
         return ":".join(auth) if auth else (c.name or "unknown CRS")
 
     warnings.warn(
-        f"{what} reprojected from {_label(src)} to {_label(tgt)} automatically. "
+        f"Reprojected {what} from {_label(src)} to {_label(tgt)} automatically. "
         "Pass an explicit CRS, or set planetarypy.crs.set_target_crs(...), to "
         "choose deliberately.",
         CRSConversionWarning,
