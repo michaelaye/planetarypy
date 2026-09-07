@@ -3,22 +3,35 @@ title: PlanetaryPy Documentation
 page-layout: article
 ---
 
-::: {.callout-important}
-## Requires the instrument packages
+::: {.grid}
 
-This page uses HiRISE and CTX functionality, which ships separately as of planetarypy 0.82.0. Install both with `pip install "planetarypy[instruments]"`; a core-only install will not have them.
+::: {.g-col-12 .g-col-md-4 .text-center}
+![](plpy_logo.svg){width="85%" fig-alt="planetarypy logo"}
 :::
 
-Python tools for planetary science data access.
+::: {.g-col-12 .g-col-md-8}
+**Find a planetary data product, fetch it, and open it as an array — without
+writing per-mission download code.**
 
-**Key features:**
+planetarypy knows where the archives keep their data and what shape it arrives
+in, so you can spend your time on the science rather than on URL patterns, PDS3
+labels and index files.
+:::
 
-- **90+ PDS index files** — auto-downloaded, cached as Parquet, auto-updated
-- **PDS Catalog** — 65 missions, 2042 product types, searchable via DuckDB
-- **Direct data access** — `fetch_product("mro.ctx.edr", "PRODUCT_ID")` for 58 product types across 15 missions
-- **37 SPICE missions** — date-filtered kernel subsets via NAIF
-- **Planetary constants** — per-body PCK values (radii, GM, poles) for ~145 bodies plus NSSDC fact-sheet parameters (bond albedo, surface pressure, satellite count, …), time-indexed for reproducibility studies ([Zenodo archive](https://doi.org/10.5281/zenodo.20122987)); fundamental physics constants (`G`, `c`, `M_sun`) re-exported from astropy in the same namespace
-- **Unified CLI** — `plp fetch`, `plp hibrowse`, `plp ctxqv`, `plp catalog build`
+:::
+
+```python
+import planetarypy
+from planetarypy import pds, catalog
+
+df = pds.get_index("mro.ctx.edr")      # 164,103 CTX images, as a DataFrame
+r = catalog.fetch_product("mro.ctx.edr", "P02_001916_2221_XI_42N027W")
+d = planetarypy.open(r.label_file)     # r knows where the files landed
+arr = d["IMAGE"]                       # a numpy array, ready to work with
+```
+
+The same three steps work across 15 missions and 58 product types, and the
+downloads are cached under one storage root you control.
 
 ```bash
 pip install planetarypy
@@ -26,19 +39,54 @@ pip install planetarypy
 conda install -c conda-forge planetarypy
 ```
 
-- Project repository: <https://github.com/planetarypy/planetarypy>
-- conda-forge: <https://anaconda.org/conda-forge/planetarypy>
-- PyPI: <https://pypi.org/project/planetarypy/>
-- Part of the [PlanetaryPy](https://planetarypy.org/) Organisation
+## What's in the box
 
-## How these docs are organized
+- **77 PDS index files** — auto-downloaded, cached as Parquet, auto-updated
+- **PDS Catalog** — 65 missions, 1925 product types, searchable via DuckDB
+- **Direct data access** — `fetch_product("mro.ctx.edr", "PRODUCT_ID")` for 58 product types across 15 missions
+- **ESA PSA** — the same treatment for Mars Express, Venus Express and the rest of the ESA archive
+- **37 SPICE missions** — date-filtered kernel subsets via NAIF, and an illumination calculator on top
+- **Planetary constants** — per-body PCK values (radii, GM, poles) for ~145 bodies plus NSSDC fact-sheet parameters (bond albedo, surface pressure, satellite count, …), time-indexed for reproducibility studies ([Zenodo archive](https://doi.org/10.5281/zenodo.20122987)); fundamental physics constants (`G`, `c`, `M_sun`) re-exported from astropy in the same namespace
+- **Geodesy that knows it is not on Earth** — IAU 2015 CRS codes per body, anti-meridian handling, footprints and overlaps
+- **IAU feature names** — the USGS gazetteer as a plottable layer, so coordinates are looked up rather than remembered
+- **Unified CLI** — `plp fetch`, `plp catalog build`, `plp indexes peek`, `plp spice fetch`
+
+::: {.callout-note collapse="true"}
+## Instrument processing ships separately
+
+MRO HiRISE and CTX *processing* — `plp hibrowse`, `plp hiedr`, `plp himos`,
+`plp hitif`, `plp ctxqv` and the `planetarypy.instruments.mro.*` modules — lives
+in its own distributions so each instrument versions independently:
+
+```bash
+pip install "planetarypy[instruments]"   # both
+pip install "planetarypy[hirise]"        # or just one
+```
+
+Finding, fetching and inspecting those products needs none of this — core keeps
+the catalog and index knowledge, so `plp fetch mro.hirise.rdr` and
+`plp indexes peek mro.ctx.edr` work on a plain install. See
+[Instrument packages](explanation/instrument_packages.qmd).
+:::
+
+## Where to go next
 
 This documentation follows the [Diátaxis approach](https://diataxis.fr):
 
-- **Tutorials** — Step-by-step lessons for learning the package
-- **How-To Guides** — Practical guides for solving specific problems
-- **Reference** — API documentation generated from docstrings
-- **Explanation** — Background information and design decisions
+- **[Tutorials](tutorials/)** — step-by-step lessons for learning the package
+- **[How-To Guides](howto/index.qmd)** — practical recipes for a specific job
+- **[Reference](reference/index.qmd)** — API documentation generated from docstrings
+- **[Explanation](explanation/index.qmd)** — background and design decisions
 
-The navigation bar at the top links to these four subsections.
-Sidebars enable navigation between documents, and the table of contents on the right enables navigation within a document.
+The navigation bar links to these four sections. Sidebars move between
+documents, and the table of contents on the right moves within one.
+
+New here? [Fetching your first product](howto/opening_data.qmd) is the shortest
+path to something working.
+
+## Project
+
+- Repository: <https://github.com/planetarypy/planetarypy>
+- [Release notes](changelog.md) — what changed in every version
+- PyPI: <https://pypi.org/project/planetarypy/> · conda-forge: <https://anaconda.org/conda-forge/planetarypy>
+- Part of the [PlanetaryPy](https://planetarypy.org/) Organisation
