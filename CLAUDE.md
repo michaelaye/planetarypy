@@ -208,7 +208,9 @@ These patterns are uniform across the existing `plp` verbs; new commands should 
 
 - **Executing `.qmd` tutorials must ship their freeze.** The docs runner installs only `.[dev,docs]` — no jupyter, no `nbformat`, and none of the science extras. It cannot execute a notebook. Two tutorials in the nav declare `jupyter: python3` and execute: `tutorials/surface_features_tutorial.qmd` and `tutorials/cross_archive_mars_tutorial.qmd`. They render in CI **only** because `docs/_freeze/` holds their cached outputs.
 
-  Quarto keys the freeze on a hash of the source, so **editing one of those two invalidates its cache**. Re-render locally (where the extras are installed) and commit the regenerated `docs/_freeze/…` files **in the same commit as the `.qmd` edit**. Committing the source alone makes Quarto fall back to executing, and the build dies with `ModuleNotFoundError: No module named 'nbformat'` partway through the render.
+  Quarto keys the freeze on a hash of the source, so **editing one of those two invalidates its cache**. Re-render locally (where the extras are installed) and commit the regenerated `docs/_freeze/…` files **in the same commit as the `.qmd` edit**.
+
+  **Regenerate with a full project render — `cd docs && quarto render` — not `quarto render <file> --to html`.** A single-file render writes only `execute-results/html.json` and leaves `ipynb.json` at the old hash; that mismatch alone is enough to make the site build re-execute, and it fails exactly as if no freeze had been committed. After rendering, `git status docs/_freeze/` should show **both** `html.json` and `ipynb.json` modified, and the two must carry the same `hash`. (Single-file renders also always execute locally, so they cannot be used to verify the freeze is being honoured.) Committing the source alone makes Quarto fall back to executing, and the build dies with `ModuleNotFoundError: No module named 'nbformat'` partway through the render.
 
   This has bitten once: `a81ee61` edited both tutorials and shipped only the source. Symptom to recognise — a docs build that fails at a numbered render step (`[53/73] tutorials/…`) rather than at setup.
 
