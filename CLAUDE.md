@@ -314,9 +314,23 @@ Triggered by "do a release cycle":
    `pre-render` hook and republishes `CHANGELOG.md` as the site's Release Notes page,
    with stable per-version anchors and an announcement bar naming the newest version.
    The docs workflow picks it up on the next push; there is no second copy to update.
-9. **conda: nothing to do.** planetarypy is on conda-forge (`conda-forge/planetarypy-feedstock`, merged 2026-08-10). The **autotick bot** notices the new PyPI sdist, opens a version-bump PR on the feedstock, and merges it on green — usually within a few hours. Do not build or upload a conda package by hand.
+9. **conda: merge the bot's PR.** planetarypy is on conda-forge (`conda-forge/planetarypy-feedstock`, merged 2026-08-10). The **autotick bot** notices the new PyPI sdist and opens a version-bump PR — usually within a few hours. **It does not merge it: automerge is deliberately off** (see the note below), so the release is not on conda-forge until a maintainer merges. Do not build or upload a conda package by hand.
+
+   Before merging, check the two things the bot cannot:
+
+   ```bash
+   # 1. did core dependencies change? the bot bumps version + sha256 only.
+   git diff v<prev> v<new> -- pyproject.toml | grep -E '^[+-]' | grep -v '^[+-][+-]'
+   # 2. does the PR's sha256 match the sdist we actually uploaded?
+   curl -s https://pypi.org/pypi/planetarypy/<new>/json \
+     | python3 -c "import json,sys; print([f['digests']['sha256'] for f in json.load(sys.stdin)['urls'] if f['packagetype']=='sdist'][0])"
+   ```
+
+   Core deps unchanged and sha256 matching → merge. Extras-only changes (`[geo]`, `[spice]`, …) do not affect the recipe: its `run:` list is core plus `spiceypy`/`scipy`. Core deps changed → edit `recipe/recipe.yaml` on the bot's PR *first*.
 
 **Notes:**
+- **Automerge is deliberately off.** conda-forge can automerge the bot's PRs (`bot: {automerge: true}` in the feedstock's `conda-forge.yml`, plus a rerender to generate `.github/workflows/automerge.yml`). We tried it and backed it out: the bot bumps version + sha256 only and never syncs `requirements`, so a release that changed core dependencies would ship a stale recipe **unattended**. Reviewing each bump is a minute of work and keeps that check.
+- **Feedstock PRs must come from a fork.** conda-forge's webservice rejects a PR opened from a branch in the feedstock itself ("this procedure will generate a separate build for each push to the branch and is thus not allowed") and asks you to remake it from a fork. `michaelaye/planetarypy-feedstock` exists for this. The rerender bot (`@conda-forge-admin, please rerender`) also only acts on fork-based PRs.
 - **When the feedstock does need a human:** a release that **changes dependencies** — the bot bumps version + sha256 only, it does not sync `requirements`. Edit `recipe/recipe.yaml` on the bot's PR *before* merging. Same for a Python-floor change (`python_min` lives in the recipe's `context:` block, because planetarypy's floor is above conda-forge's global default). Both maintainers (`michaelaye`, `cjtu`) can merge.
 - The feedstock recipe is **v1** (`recipe/recipe.yaml`, rattler-build), not v0 `meta.yaml`. Validate any hand edit with `rattler-build build --recipe recipe.yaml --render-only` (rc=0 = good). rattler-build is not installed globally — `mamba create -p ./rbenv -c conda-forge rattler-build`.
 - Dep name mapping for recipe edits: `duckdb` (pip) → `python-duckdb`, `astropy` → `astropy-base`, `matplotlib` → `matplotlib-base`, `pdr[pillow]` → `pdr` + `pillow`; others 1:1. SPICE has no conda "extras" mechanism, so `spiceypy` + `scipy` ship in the conda package directly.
