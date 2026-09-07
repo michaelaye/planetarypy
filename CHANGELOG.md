@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The CTX cumulative-index URL 404'd.** `CTXIndex.latest_release_folder` took `volumes_table.iloc[-2, 0]` — literally the second-to-last row of the scraped PDS listing. That listing interleaves a checksum file after every volume and ends with an unrelated entry, so the second-to-last row is `mrox_5584_md5.txt`, not a directory. The f-string join below assumes the value ends in `/`, so the result was `.../mrox_5584_md5.txtindex/cumindex.lbl`.
+
+  Selection is now by pattern (`mrox_\d+/?`) and by **numeric** maximum, not by position — lexical ordering would put `mrox_986` above `mrox_1232`. A listing containing no volume directories raises `RuntimeError` rather than composing a broken URL, and the trailing slash is normalised so the join cannot concatenate.
+
+  The existing test passed against the bug: its fixture listed only `mrox_NNNN/` rows, so the position it asserted on happened to hold a directory. The regression tests added here use the real listing shape and fail against the old implementation.
+
 - **`body_crs(body, system="ocentric")` returned a sphere.** The geographic offset table read `{"ocentric": 0, "ographic": 1}`, but IAU offset 0 is `"<Body> (2015) - Sphere / Ocentric"` — for Mars that is `IAU_2015:49900` with `a == b == 3396190`. The real ocentric ellipsoid is offset 2 (`49902`, `b = 3376200`) and was **unreachable through the API entirely**. The projected table twenty lines below had the same triple correct all along. `system` now takes `"sphere"`, `"ographic"` and `"ocentric"` mapping to +0/+1/+2, and bodies with no ellipsoid (Moon, Venus, Europa) raise rather than silently handing back the sphere.
 
   The **default is unchanged**: `body_crs("mars")` still returns the sphere, now spelled `system="sphere"`. Spheres are the working currency in planetary practice — ISIS operates on them, many published products use them, and a shared sphere avoids datum-shift surprises when stacking heterogeneous data in GIS. What changed is that it no longer arrives mislabelled. `get_crs`'s `"default"` likewise still resolves to the sphere.

@@ -3,6 +3,8 @@
 
 __all__ = ["CTXIndex", "LROCIndex", "LAMPEDRIndex", "LAMPRDRIndex"]
 
+import re
+
 import pandas as pd
 from loguru import logger
 from yarl import URL
@@ -55,7 +57,30 @@ class CTXIndex:
 
     @property
     def latest_release_folder(self):
-        return self.volumes_table.iloc[-2, 0]
+        """Newest ``mrox_NNNN/`` volume directory in the scraped listing.
+
+        Selected by matching the volume-directory pattern, not by position. The
+        listing interleaves a checksum file after every volume and ends with an
+        unrelated entry:
+
+            mrox_5584/
+            mrox_5584_md5.txt
+            nssdca/
+
+        so the previous ``iloc[-2, 0]`` returned ``mrox_5584_md5.txt``. Combined
+        with the f-string join below — which assumes a trailing slash — that built
+        ``.../mrox_5584_md5.txtindex/cumindex.lbl`` and 404'd.
+        """
+        vols = [
+            v for v in self.volumes_table.iloc[:, 0].astype(str)
+            if re.fullmatch(r"mrox_\d+/?", v.strip())
+        ]
+        if not vols:
+            msg = "no mrox_* volume directories found in the CTX volumes listing"
+            raise RuntimeError(msg)
+        latest = max(vols, key=lambda s: int(re.search(r"\d+", s).group()))
+        # normalise the trailing slash so the URL join below cannot concatenate
+        return latest.strip().rstrip("/") + "/"
 
     @property
     def latest_release_number(self):
