@@ -137,7 +137,7 @@ Typer app with sub-apps grouped by Rich help panel:
 
 **Verb inventory** (one line per sub-app — names drift rarely, so they live here to save a grep; the *implementation* still lives in code, read it before editing):
 - `plp catalog`: build, list, show, search, samples, summary, ambiguous
-- `plp indexes`: list, peek, last, counts, select, info, refresh
+- `plp indexes`: list, peek, last, counts, select, info, refresh, prune
 - `plp spice`: missions, info, fetch, cached, generic
 
 **Design philosophy: API first, CLI wraps thin.** Every `plp` verb is a thin wrapper over a public Python API. Build and test the library function first; the CLI command then forwards arguments and formats output. Useful logic — parsing PID lists, building catalogs, batching downloads, filtering indexes by PIDs, parallel execution — lives in `planetarypy.*` modules, not under `cli.py`. The reason is reuse: notebooks and downstream tooling should pick up new capabilities without screen-scraping or shelling out to `plp`. If you find substantial logic inside `cli.py`, that's a bug — factor it down to the API layer.

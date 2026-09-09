@@ -3,7 +3,7 @@
 This module provides a unified Index class that uses composition with Remote classes
 to handle URL management."""
 
-__all__ = ["Index", "InventoryIndex"]
+__all__ = ["Index", "InventoryIndex", "index_local_dir"]
 
 import csv
 from pathlib import Path
@@ -21,6 +21,22 @@ from .dynamic_index import (
 from .index_labels import IndexLabel
 from .static_index import StaticRemoteHandler
 from .utils import check_index_key_shape
+
+
+def index_local_dir(
+    index_key: str, storage_root: str | Path | None = None
+) -> Path:
+    """Return the cache directory the current layout uses for ``index_key``.
+
+    Pure path arithmetic: creates nothing and does not require the key to be
+    registered. Single source of truth for the on-disk layout, so anything
+    that has to reason about cache locations (see
+    :mod:`planetarypy.pds.index_prune`) stays in step with what ``Index``
+    actually writes.
+    """
+    mission, instrument, indexname = check_index_key_shape(index_key).split(".")
+    root = Path(storage_root) if storage_root else Path(config.storage_root)
+    return root / mission / instrument / "indexes" / indexname
 
 
 class Index:
@@ -61,10 +77,7 @@ class Index:
 
     def _default_local_dir(self) -> Path:
         """Get default local directory for this index."""
-        return (
-            Path(config.storage_root)
-            / f"{self.mission}/{self.instrument}/indexes/{self.indexname}"
-        )
+        return index_local_dir(self.index_key)
 
     @property
     def local_dir(self) -> Path:

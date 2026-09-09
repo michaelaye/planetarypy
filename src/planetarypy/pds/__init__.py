@@ -7,7 +7,12 @@ from pandas import DataFrame
 
 from typing import Iterable
 
-from planetarypy.pds.index_main import Index, InventoryIndex
+from planetarypy.pds.index_main import Index, InventoryIndex, index_local_dir
+from planetarypy.pds.index_prune import (
+    OrphanCache,
+    find_orphan_index_caches,
+    remove_orphan_index_caches,
+)
 from planetarypy.pds.meta_display import register_meta_handler
 from planetarypy.pds.utils import (
     IndexKeyError,
@@ -31,6 +36,10 @@ __all__ = [
     "MalformedIndexKeyError",
     "UnknownIndexKeyError",
     "InventoryIndex",
+    "index_local_dir",
+    "OrphanCache",
+    "find_orphan_index_caches",
+    "remove_orphan_index_caches",
     "get_index",
     "missing_pids",
     "resolve_pids",

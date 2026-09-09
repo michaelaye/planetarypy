@@ -2208,6 +2208,84 @@ def indexes_refresh(
         typer.echo(f"Cached at: {idx.local_parq_path}")
 
 
+
+@indexes_app.command("prune")
+def indexes_prune(
+    yes: bool = typer.Option(
+        False, "--yes", "-y",
+        help="Delete the listed files. Without it, prune only reports.",
+    ),
+):
+    """Report (or delete) index caches stranded by an old storage layout.
+
+    A cache is an orphan when its directory is not the one the current layout
+    computes for any registered index key -- files left where an earlier
+    planetarypy wrote them, or caches whose mission or index key was renamed
+    upstream. They are invisible to every other verb and nothing ever reads
+    them again.
+
+    Reports only unless --yes is given. With --yes the registered-key list is
+    refreshed from upstream first, so a stale local config cannot make a live
+    cache look orphaned.
+
+    Examples:
+        plp indexes prune             # list what would be deleted
+        plp indexes prune --yes       # delete it
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    from planetarypy.config import config as pconfig
+    from planetarypy.pds import find_orphan_index_caches, remove_orphan_index_caches
+    from planetarypy.utils import have_internet
+
+    if yes:
+        if have_internet():
+            from planetarypy.pds.static_index import ConfigHandler
+            ConfigHandler(force_update=True)
+            typer.echo("Refreshed the index registry from upstream.", err=True)
+        else:
+            typer.echo(
+                "Offline: pruning against the cached index registry.", err=True
+            )
+
+    caches = find_orphan_index_caches()
+    if not caches:
+        typer.echo(f"No orphaned index caches under {pconfig.storage_root}", err=True)
+        raise typer.Exit()
+
+    total_files = sum(len(c.files) for c in caches)
+    total_bytes = sum(c.n_bytes for c in caches)
+
+    console = Console()
+    table = Table(
+        title=f"Orphaned index caches under {pconfig.storage_root}",
+        title_style="bold",
+        header_style="bold magenta",
+    )
+    table.add_column("size", justify="right", no_wrap=True)
+    table.add_column("files", justify="right", no_wrap=True)
+    table.add_column("directory", overflow="fold")
+    for c in caches:
+        table.add_row(
+            f"{c.n_bytes / 1e6:.1f} MB", str(len(c.files)), str(c.directory.resolve())
+        )
+    console.print(table)
+
+    if not yes:
+        typer.echo(
+            f"\n{total_files} files in {len(caches)} directories, "
+            f"{total_bytes / 1e9:.2f} GB. "
+            "Nothing deleted -- rerun with --yes to remove them.",
+            err=True,
+        )
+        raise typer.Exit()
+
+    n_files, n_bytes = remove_orphan_index_caches(caches)
+    typer.echo(f"\nDeleted {n_files} files, freed {n_bytes / 1e9:.2f} GB.", err=True)
+
+
+
 # ── CTX housekeeping ────────────────────────────────────────────────
 
 
