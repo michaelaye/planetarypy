@@ -1,5 +1,5 @@
 {
-  "checked": "2026-09-10 11:51 UTC",
+  "checked": "2026-09-10 16:41 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -316,14 +316,14 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "lro.lola.edr",
       "url": "http://pds-geosciences.wustl.edu/lro/lro-l-lola-2-edr-v1/lrolol_0xxx/index/edrindex.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "lro.lola.rdr",
       "url": "http://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/index/rdrindex.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
@@ -414,28 +414,28 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.apxs.edr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-apxs-2-edr-v1/mslapx_0xxx/index/index.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.apxs.rdr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-apxs-4_5-rdr-v1/mslapx_1xxx/index/index.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.ccam.edr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemcam-libs-2-edr-v1/mslccm_0xxx/index/index.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.ccam.libs_rdr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemcam-libs-4_5-rdr-v1/mslccm_1xxx/index/libsindex.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
@@ -505,14 +505,14 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "phoenix.meca.edr",
       "url": "https://pds-geosciences.wustl.edu/phx/phx-m-meca-2-niedr-v1/phxmec_0xxx/index/index.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "phoenix.meca.rdr",
       "url": "https://pds-geosciences.wustl.edu/phx/phx-m-meca-4-nirdr-v1/phxmec_1xxx/index/index.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
