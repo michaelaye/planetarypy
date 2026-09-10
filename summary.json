@@ -1,5 +1,5 @@
 {
-  "checked": "2026-09-10 05:19 UTC",
+  "checked": "2026-09-10 11:51 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -10,8 +10,8 @@
     {
       "host": "pds-geosciences.wustl.edu",
       "total": 22,
-      "failing": 0,
-      "up": true
+      "failing": 15,
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -316,15 +316,15 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "lro.lola.edr",
       "url": "http://pds-geosciences.wustl.edu/lro/lro-l-lola-2-edr-v1/lrolol_0xxx/index/edrindex.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "lro.lola.rdr",
       "url": "http://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/index/rdrindex.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -414,78 +414,78 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.apxs.edr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-apxs-2-edr-v1/mslapx_0xxx/index/index.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.apxs.rdr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-apxs-4_5-rdr-v1/mslapx_1xxx/index/index.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.ccam.edr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemcam-libs-2-edr-v1/mslccm_0xxx/index/index.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.ccam.libs_rdr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemcam-libs-4_5-rdr-v1/mslccm_1xxx/index/libsindex.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.ccam.rmi_rdr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemcam-libs-4_5-rdr-v1/mslccm_1xxx/index/rmiindex.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.cmn.edr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-2-edr-v1/mslcmn_0xxx/index/index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.cmn.rdr",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-chemin-4-rdr-v1/mslcmn_1xxx/index/index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l0",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l0_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l1a",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l1a_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l1b",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l1b_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "msl.sam.l2",
       "url": "https://pds-geosciences.wustl.edu/msl/msl-m-sam-2-rdr-l0-v1/mslsam_1xxx/index/l2_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -505,15 +505,15 @@
       "host": "pds-geosciences.wustl.edu",
       "index_key": "phoenix.meca.edr",
       "url": "https://pds-geosciences.wustl.edu/phx/phx-m-meca-2-niedr-v1/phxmec_0xxx/index/index.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
       "index_key": "phoenix.meca.rdr",
       "url": "https://pds-geosciences.wustl.edu/phx/phx-m-meca-4-nirdr-v1/phxmec_1xxx/index/index.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "planetarydata.jpl.nasa.gov",
