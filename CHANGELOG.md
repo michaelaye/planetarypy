@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`plp indexes counts`, `plp indexes list --tree` and `plp catalog build` print Rich output**, like the rest of `plp`. Counts come as a table of value, count and percent, where shares that would round to 0.0% or 100.0% read `<0.1%` and `>99.9%`: `mro.ctx.edr` has 21 COMET rows among 164,103, which used to show as 0.0%. The tree gains per-branch counts and the full dotted key on each leaf, and the catalog build ends with a summary table; progress notes go to stderr. The library's `print_available_indexes` is unchanged.
 - **Mission metakernels are found through spice-kernel-db's own quiet lookup.** `find_metakernel` now asks `KernelDB.metakernels_covering` which tracked metakernels cover the spacecraft, instead of opening every SPK itself and swallowing the table `list_metakernels` used to print. The `[skd]` extra now needs spice-kernel-db 0.19 or newer.
 
 ### Fixed

@@ -281,6 +281,10 @@ When the user invokes a red team explicitly: include "find state-machine bugs wh
 
 ---
 
+## Issues and commit messages
+
+The code is pushed to the fork `michaelaye/planetarypy`, which has issues disabled; the issue tracker is `planetarypy/planetarypy`. A commit that resolves an issue therefore carries the fully qualified closing line `Closes planetarypy/planetarypy#N` (a bare `Closes #N` does nothing on the fork). Until commits reach the upstream default branch, close the issue by hand with a link to the commit.
+
 ## Release Process
 
 Triggered by "do a release cycle":
@@ -341,7 +345,7 @@ Triggered by "do a release cycle":
 - `noarch: python` — one build serves every platform, Windows included. A red `win_64` job in staged-recipes is therefore never a reason to hold a noarch package.
 - The CI gate at step 5 deliberately waits on the **tag** ref, not `main`. The same code can produce different results because external prefetch hits flaky upstreams; only the tag's run represents the artifact we're about to publish.
 - **Three publishing surfaces — git tag, PyPI, GitHub Releases — are one indivisible release.** None is "done" until all three are. If a release cycle is interrupted between `twine upload` and `gh release create`, treat it as incomplete; do the missing step retroactively before considering the cycle closed. conda-forge is *not* on this list — it follows PyPI automatically.
-- **The personal `anaconda.org/michaelaye` channel is retired** as of 2026-08-10; conda-forge is the only conda surface. Packages already published there stay (removing them would break anyone pinned to `-c michaelaye`), but nothing new is uploaded. `grayskull` / `conda-build` / `anaconda-client` in the `py314` env are no longer part of any release step.
+- **The personal `anaconda.org/michaelaye` channel is retired** as of 2026-08-10; conda-forge is the only conda surface. Packages already published there stay (removing them would break anyone pinned to `-c michaelaye`), but nothing new is uploaded. `grayskull` / `conda-build` / `anaconda-client` (now in the conda `base` env, as conda-build recommends) are no longer part of any release step.
 
 ### NSSDC Zenodo Dataset Updates
 

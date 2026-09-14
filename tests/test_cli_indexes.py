@@ -232,6 +232,17 @@ class TestIndexesCounts:
         # The less-frequent values are truncated away.
         assert "DEIMOS" not in result.output
 
+    def test_tiny_and_near_total_shares_are_not_rounded_to_0_or_100(self):
+        df = pd.DataFrame({"TARGET_NAME": ["MARS"] * 9999 + ["COMET"]})
+        with patch("planetarypy.pds.utils._all_dotted_index_keys",
+                   return_value={"mro.ctx.edr"}), \
+             patch("planetarypy.pds.get_index", return_value=df):
+            result = runner.invoke(app, ["indexes", "counts", "mro.ctx.edr", "TARGET_NAME"])
+        assert result.exit_code == 0
+        assert ">99.9%" in result.output
+        assert "<0.1%" in result.output
+        assert "100.0%" not in result.output
+
     def test_columns_flag_renders_one_block_per_column(self):
         df = _fake_counts_df()
         with patch("planetarypy.pds.utils._all_dotted_index_keys",
@@ -673,3 +684,49 @@ class TestIndexesRefresh:
         assert result.exit_code == 1
         assert "Unknown index key" in result.output
         assert "Traceback" not in result.output
+
+
+# ── plp indexes list --tree ─────────────────────────────────────────────
+
+
+class TestIndexesListTree:
+
+    def test_tree_groups_keys_with_counts(self):
+        keys = ["cassini.iss.index", "cassini.iss.ring_summary", "mro.ctx.edr"]
+        with patch("planetarypy.pds.print_available_indexes", return_value=keys) as mock:
+            result = runner.invoke(app, ["indexes", "list", "--tree"])
+        assert result.exit_code == 0
+        mock.assert_called_once_with(filter_mission=None, filter_instrument=None, keys_only=True)
+        assert "PDS indexes (3)" in result.output
+        assert "cassini (2)" in result.output
+        assert "iss (2)" in result.output
+        assert "mro.ctx.edr" in result.output
+        assert "├──" in result.output or "└──" in result.output
+
+    def test_tree_passes_filters_and_reports_empty(self):
+        with patch("planetarypy.pds.print_available_indexes", return_value=[]) as mock:
+            result = runner.invoke(app, ["indexes", "list", "cassini.iss", "--tree"])
+        assert result.exit_code == 0
+        mock.assert_called_once_with(
+            filter_mission="cassini", filter_instrument="iss", keys_only=True
+        )
+        assert "No indexes found" in result.output
+
+
+# ── plp catalog build ───────────────────────────────────────────────────
+
+
+class TestCatalogBuildSummary:
+
+    def test_summary_table_lists_counts_and_ambiguous(self):
+        stats = {"instruments": 1234, "product_types": 56, "products": 7890,
+                 "ambiguous": ["mex.hrsc", "vg.iss"]}
+        with patch("planetarypy.catalog.build_catalog", return_value=stats):
+            result = runner.invoke(app, ["catalog", "build"])
+        assert result.exit_code == 0
+        assert "1,234" in result.stdout
+        assert "7,890" in result.stdout
+        assert "ambiguous mappings" in result.stdout
+        assert "Ambiguous: mex.hrsc, vg.iss" in result.stdout
+        assert "Building PDS catalog" in result.stderr
+

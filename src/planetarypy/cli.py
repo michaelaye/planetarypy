@@ -903,26 +903,43 @@ def catalog_build(
     """Build the PDS catalog database from pdr-tests definitions."""
     from planetarypy.catalog import build_catalog
 
-    typer.echo("Building PDS catalog...")
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+    typer.echo("Building PDS catalog...", err=True)
     stats = build_catalog(force=force)
-    typer.echo(
-        f"Done: {stats.get('instruments', '?')} instruments, "
-        f"{stats.get('product_types', '?')} product types, "
-        f"{stats.get('products', '?')} products"
-    )
-    if stats.get("ambiguous"):
-        typer.echo(
-            f"\nAmbiguous mappings ({len(stats['ambiguous'])}): "
-            f"{', '.join(stats['ambiguous'])}"
-        )
+
+    table = Table(title="PDS catalog", title_style="bold", header_style="bold magenta")
+    table.add_column("item", style="cyan", no_wrap=True)
+    table.add_column("count", justify="right")
+    for label, name in (("instruments", "instruments"),
+                        ("product types", "product_types"),
+                        ("products", "products")):
+        value = stats.get(name, "?")
+        table.add_row(label, f"{value:,}" if isinstance(value, int) else str(value))
+    ambiguous = stats.get("ambiguous") or []
+    table.add_row("ambiguous mappings", str(len(ambiguous)))
+    console.print(table)
+    if ambiguous:
+        typer.echo(f"Ambiguous: {', '.join(ambiguous)}")
 
     if validate_urls:
         from planetarypy.catalog._validation import validate_urls as do_validate
         from planetarypy.config import config
 
-        typer.echo("\nValidating URLs...")
+        typer.echo("\nValidating URLs...", err=True)
         counts = do_validate(config.storage_root)
-        typer.echo(f"URL validation: {counts}")
+        if isinstance(counts, dict):
+            vtable = Table(title="URL validation", title_style="bold",
+                           header_style="bold magenta")
+            vtable.add_column("result", style="cyan", no_wrap=True)
+            vtable.add_column("count", justify="right")
+            for result, n in counts.items():
+                vtable.add_row(str(result), f"{n:,}" if isinstance(n, int) else str(n))
+            console.print(vtable)
+        else:
+            typer.echo(f"URL validation: {counts}")
 
 
 # ── catalog: browsing helpers + cross-reference to INDEX_REGISTRY ───
@@ -1341,6 +1358,33 @@ indexes_app = typer.Typer(
 app.add_typer(indexes_app, name="indexes", rich_help_panel=_PANEL_DISCOVERY)
 
 
+def _render_index_tree(keys: list[str]) -> None:
+    """Rich tree of missions → instruments → indexes, with counts per branch."""
+    from collections import defaultdict
+
+    from rich.console import Console
+    from rich.tree import Tree
+
+    if not keys:
+        typer.echo("No indexes found for the given filters.")
+        return
+    nested: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+    for k in keys:
+        mission, instrument, index = k.split(".", 2)
+        nested[mission][instrument].append(index)
+
+    root = Tree(f"[bold]PDS indexes[/bold] ({len(keys)})")
+    for mission in sorted(nested):
+        n = sum(len(v) for v in nested[mission].values())
+        m_node = root.add(f"[bold cyan]{mission}[/bold cyan] ({n})")
+        for instrument in sorted(nested[mission]):
+            indexes = sorted(nested[mission][instrument])
+            i_node = m_node.add(f"[green]{instrument}[/green] ({len(indexes)})")
+            for index in indexes:
+                i_node.add(f"{index}  [dim]{mission}.{instrument}.{index}[/dim]")
+    Console().print(root)
+
+
 @indexes_app.command("list")
 def indexes_list(
     key: str = typer.Argument(
@@ -1377,10 +1421,11 @@ def indexes_list(
         raise typer.Exit(1)
 
     if tree:
-        print_available_indexes(
+        _render_index_tree(print_available_indexes(
             filter_mission=parts[0] if parts else None,
             filter_instrument=parts[1] if len(parts) == 2 else None,
-        )
+            keys_only=True,
+        ))
         return
 
     all_keys = _all_dotted_index_keys()
@@ -1680,31 +1725,44 @@ def indexes_last(
 
 def _render_value_counts(key: str, column: str, series, *, total: int,
                          top: int, dropna: bool) -> None:
-    """Print a plain aligned value-frequency table for one column.
+    """Print a value-frequency table for one column.
 
-    Three columns: value, count (comma-grouped), percent-of-total.
-    ``top <= 0`` shows every distinct value.
+    A bold header line with the total and distinct counts, then a Rich table
+    of value, count (comma-grouped) and percent-of-total. ``top <= 0`` shows
+    every distinct value.
     """
+    from rich.console import Console
+    from rich.table import Table
+
     vc = series.value_counts(dropna=dropna)
     n_distinct = series.nunique(dropna=True)
     shown = vc if top <= 0 else vc.head(top)
+    console = Console()
 
-    typer.echo(f"{key}.{column} — {total:,} rows, {n_distinct:,} distinct values")
+    console.print(f"[bold]{key}.{column}[/bold] — {total:,} rows, {n_distinct:,} distinct values",
+                  highlight=False)
     if top > 0 and len(vc) > top:
-        typer.echo(f"(showing top {top})")
-    typer.echo("")
+        console.print(f"(showing top {top})", highlight=False)
 
     if len(shown) == 0:
         typer.echo("(no values)")
         return
 
-    labels = ["NaN" if pd_isna(k) else str(k) for k in shown.index]
-    counts = [int(v) for v in shown.values]
-    wlabel = max(len(s) for s in labels)
-    wcount = max(len(f"{c:,}") for c in counts)
-    for label, c in zip(labels, counts):
-        pct = 100.0 * c / total if total else 0.0
-        typer.echo(f"{label:<{wlabel}}  {c:>{wcount},}  {pct:5.1f}%")
+    table = Table(header_style="bold magenta")
+    table.add_column("value", style="cyan", overflow="fold")
+    table.add_column("count", justify="right")
+    table.add_column("percent", justify="right")
+    for value, count in shown.items():
+        label = "NaN" if pd_isna(value) else str(value)
+        pct = 100.0 * int(count) / total if total else 0.0
+        if 0 < pct < 0.1:
+            pct_text = "<0.1%"
+        elif 99.9 < pct < 100:
+            pct_text = ">99.9%"
+        else:
+            pct_text = f"{pct:.1f}%"
+        table.add_row(label, f"{int(count):,}", pct_text)
+    console.print(table)
 
 
 @indexes_app.command("counts")

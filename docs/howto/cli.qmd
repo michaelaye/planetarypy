@@ -234,7 +234,8 @@ A `pandas.value_counts` view: how many rows carry each distinct value of a
 column, with percent-of-total. Handy for categorical columns
 (`TARGET_NAME`, `MISSION_PHASE_NAME`, `INSTRUMENT_MODE_ID`) before filtering.
 `--top N` limits to the N most frequent (default 10; `0` for all);
-`--dropna` excludes missing values.
+`--dropna` excludes missing values. Shares below 0.1% or above 99.9% show as
+`<0.1%` and `>99.9%`, so rare values aren't rounded away to 0.0%.
 
 ```bash
 plp indexes counts mro.ctx.edr TARGET_NAME
