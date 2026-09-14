@@ -2293,10 +2293,45 @@ def indexes_prune(
 # ── spicer ───────────────────────────────────────────────────────────
 
 
+def _spicer_light_time(s, time, observer, observer_code, observer_name, metakernel):
+    """Print the light-time line, finding mission metakernels for spacecraft ends."""
+    from astropy.time import TimeDelta
+
+    from planetarypy.spice import mission_kernels
+
+    try:
+        if metakernel is not None:
+            mks = [mission_kernels.resolve_metakernel(metakernel)]
+        else:
+            spacecraft = [name for name, code in ((s.body, s.target_id), (observer, observer_code))
+                          if code < 0]
+            mks = list(dict.fromkeys(
+                mission_kernels.find_metakernel(name, time) for name in spacecraft
+            ))
+    except (ImportError, LookupError) as e:
+        typer.echo(f"  Light time from {observer_name}: (no mission kernels)")
+        typer.echo(textwrap.indent(str(e), "    "))
+        return
+    names = ", ".join(mk.name for mk in mks)
+    try:
+        seconds = s.light_time(time, observer=observer, metakernel=mks)
+    except Exception:
+        missing = f"{names} doesn't cover this time" if mks else "needs ephemeris kernels"
+        typer.echo(f"  Light time from {observer_name}: ({missing})")
+        return
+    # a spacecraft in orbit is milliseconds away; keep those digits
+    seconds = round(seconds, 1 if seconds >= 60 else 3)
+    lt = TimeDelta(seconds, format="sec").to_value("quantity_str")
+    source = f"  ({names})" if mks else ""
+    typer.echo(f"  Light time from {observer_name}: {lt}{source}")
+
+
 @app.command(rich_help_panel=_PANEL_SCIENCE)
 def spicer(
     ctx: typer.Context,
-    body: str = typer.Argument(None, help="NAIF body name, e.g. Mars, Moon, Enceladus"),
+    body: str = typer.Argument(
+        None, help="NAIF body or spacecraft name or ID, e.g. Mars, Enceladus, MPO"
+    ),
     time: str = typer.Option(None, "--time", "-t", help="UTC time (default: now)"),
     lon: float = typer.Option(None, "--lon", help="Longitude [deg] for surface illumination"),
     lat: float = typer.Option(None, "--lat", help="Latitude [deg] for surface illumination"),
@@ -2306,16 +2341,16 @@ def spicer(
     ),
     metakernel: str = typer.Option(
         None, "--metakernel",
-        help="Mission metakernel for a spacecraft observer (path or spice-kernel-db "
-             "filename); default: the tracked one covering --time",
+        help="Mission metakernel for a spacecraft body or observer (path or "
+             "spice-kernel-db filename); default: the tracked one covering --time",
     ),
 ):
-    """Show current SPICE data for a solar system body.
+    """Show current SPICE data for a solar system body or spacecraft.
 
     Without --lon/--lat, shows global properties (L_s, subsolar point,
     solar constant, light time). With coordinates, adds surface illumination.
-    A spacecraft --observer uses mission metakernels that spice-kernel-db
-    already has on disk; nothing is downloaded.
+    A spacecraft (as BODY or --observer) uses mission metakernels that
+    spice-kernel-db already has on disk; nothing is downloaded.
 
     Examples:
         plp spicer Mars
@@ -2323,6 +2358,7 @@ def spicer(
         plp spicer Mars --lon 137.4 --lat -4.6
         plp spicer Mars --observer Jupiter
         plp spicer Mercury --observer MPO --time 2027-06-01
+        plp spicer MPO
     """
     if body is None:
         typer.echo(ctx.get_help())
@@ -2332,30 +2368,38 @@ def spicer(
         from planetarypy.spice import mission_kernels
         from planetarypy.spice._deps import spice
         from planetarypy.spice.spicer import Spicer
-    from astropy.time import TimeDelta
 
-    try:
-        s = Spicer(body)
-    except Exception as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
-
-    try:
-        observer_code = spice.bods2c(observer)
-    except Exception:
-        message = f"Error: --observer {observer!r} is not a known NAIF body"
+    def naif_code(name: str, what: str) -> int:
         try:
-            spacecraft = mission_kernels.mission_spacecraft(observer)
-        except ImportError:
-            spacecraft = []
-        if spacecraft:
-            names = ", ".join(repr(name) for name in spacecraft)
-            message += f"; for the {observer.upper()} mission use one of: {names}"
-        typer.echo(message, err=True)
-        raise typer.Exit(1)
+            return spice.bods2c(name)
+        except Exception:
+            message = f"Error: {what} {name!r} is not a known NAIF body"
+            try:
+                spacecraft = mission_kernels.mission_spacecraft(name)
+            except (ImportError, LookupError):
+                spacecraft = []
+            if spacecraft:
+                names = ", ".join(repr(sc) for sc in spacecraft)
+                message += f"; for the {name.upper()} mission use one of: {names}"
+            typer.echo(message, err=True)
+            raise typer.Exit(1)
+
+    body_code = naif_code(body, "BODY")
+    observer_code = naif_code(observer, "--observer")
     observer_name = spice.bodc2n(observer_code)
     if observer_code > 0:
         observer_name = observer_name.title()
+
+    s = Spicer(body)
+    if s.is_spacecraft:
+        title = f"{spice.bodc2n(body_code)} (spacecraft)"
+        typer.echo(f"\n  {title}")
+        typer.echo(f"  {'=' * len(title)}")
+        _spicer_light_time(s, time, observer, observer_code, observer_name, metakernel)
+        if lon is not None and lat is not None:
+            typer.echo("\n  Surface illumination: (a spacecraft has no surface)")
+        typer.echo()
+        return
 
     typer.echo(f"\n  {s.body}")
     typer.echo(f"  {'=' * len(s.body)}")
@@ -2380,26 +2424,7 @@ def spicer(
     except Exception:
         typer.echo("  Solar constant:        (needs ephemeris kernels)")
 
-    mk = None
-    try:
-        if metakernel is not None:
-            mk = mission_kernels.resolve_metakernel(metakernel)
-        elif observer_code < 0:
-            mk = mission_kernels.find_metakernel(observer, time)
-    except (ImportError, LookupError) as e:
-        typer.echo(f"  Light time from {observer_name}: (no mission kernels)")
-        typer.echo(textwrap.indent(str(e), "    "))
-    else:
-        try:
-            seconds = s.light_time(time, observer=observer, metakernel=mk)
-            # a spacecraft in orbit is milliseconds away; keep those digits
-            seconds = round(seconds, 1 if seconds >= 60 else 3)
-            lt = TimeDelta(seconds, format="sec").to_value("quantity_str")
-            source = f"  ({mk.name})" if mk else ""
-            typer.echo(f"  Light time from {observer_name}: {lt}{source}")
-        except Exception:
-            missing = f"{mk.name} doesn't cover this time" if mk else "needs ephemeris kernels"
-            typer.echo(f"  Light time from {observer_name}: ({missing})")
+    _spicer_light_time(s, time, observer, observer_code, observer_name, metakernel)
 
     if lon is not None and lat is not None:
         try:

@@ -245,7 +245,8 @@ class TestSpicerObserver:
             radii = spicer_mod.Radii(3396.2, 3396.2, 3376.2)
 
             def __init__(self, body):
-                pass
+                self.is_spacecraft = body.upper() in ("MPO", "-121")
+                self.target_id = -121 if self.is_spacecraft else 499
 
             def solar_longitude(self, time):
                 return 30.0
@@ -319,6 +320,24 @@ class TestSpicerObserver:
         )
         assert result.exit_code == 0
         assert "(bc_ops.tm)" in result.stdout
+
+    def test_spacecraft_as_body_shows_light_time_only(self, fake_spicer, monkeypatch, tmp_path):
+        from planetarypy.spice import mission_kernels
+
+        monkeypatch.setattr(
+            mission_kernels, "find_metakernel", lambda sc, time: tmp_path / "bc_plan.tm"
+        )
+        result = runner.invoke(app, ["spicer", "MPO", "--lon", "1", "--lat", "2"])
+        assert result.exit_code == 0
+        assert "BEPICOLOMBO MPO (spacecraft)" in result.stdout
+        assert "Light time from Earth: 0.011s  (bc_plan.tm)" in result.stdout
+        assert "Radii" not in result.stdout
+        assert "a spacecraft has no surface" in result.stdout
+
+    def test_unknown_body_errors_like_an_unknown_observer(self, fake_spicer):
+        result = runner.invoke(app, ["spicer", "Notabody"])
+        assert result.exit_code == 1
+        assert result.stderr.startswith("Error: BODY 'Notabody'")
 
     def test_no_covering_metakernel_prints_the_hint(self, fake_spicer, monkeypatch):
         from planetarypy.spice import mission_kernels

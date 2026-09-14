@@ -50,6 +50,11 @@ class TestSpicerBasics:
         s = Spicer("MOON")
         assert s.radii.a == pytest.approx(1737.4, abs=1)
 
+    def test_spacecraft_detected_by_name_or_id(self):
+        assert Spicer("MPO").is_spacecraft
+        assert Spicer("-121").target_id == -121
+        assert not Spicer("MARS").is_spacecraft
+
 
 class TestSolarLongitude:
     def test_returns_float(self):
@@ -113,6 +118,43 @@ class TestLightTime:
         monkeypatch.setattr(spicer_mod, "ensure_system_for_body", ensured.append)
         assert Spicer("MARS").light_time("2024-01-01", observer="EUROPA") == 42.0
         assert ensured == ["MARS", "EUROPA"]
+
+    def test_spacecraft_on_either_end_gets_its_metakernel(self, monkeypatch):
+        from planetarypy.spice import mission_kernels
+        from planetarypy.spice import spicer as spicer_mod
+
+        found, loaded, calls = [], [], []
+
+        def spkpos_failing_once(*args):
+            calls.append(args)
+            if len(calls) == 1:
+                raise RuntimeError("insufficient ephemeris data")
+            return np.zeros(3), 0.011
+
+        monkeypatch.setattr(spicer_mod.spice, "spkpos", spkpos_failing_once)
+        monkeypatch.setattr(spicer_mod.spice, "furnsh", loaded.append)
+        monkeypatch.setattr(spicer_mod, "ensure_system_for_body", lambda body: None)
+        monkeypatch.setattr(
+            mission_kernels, "find_metakernel",
+            lambda sc, time: found.append(sc) or f"/mk/{sc}.tm",
+        )
+        Spicer("MPO").light_time("2027-06-01", observer="JUICE")
+        assert found == ["MPO", "JUICE"]
+        assert loaded == ["/mk/MPO.tm", "/mk/JUICE.tm"]
+
+    def test_explicit_metakernels_skip_the_search(self, monkeypatch, tmp_path):
+        from planetarypy.spice import mission_kernels
+        from planetarypy.spice import spicer as spicer_mod
+
+        mks = [tmp_path / "bc_plan.tm", tmp_path / "juice_plan.tm"]
+        for mk in mks:
+            mk.touch()
+        loaded = []
+        monkeypatch.setattr(spicer_mod.spice, "furnsh", loaded.append)
+        monkeypatch.setattr(spicer_mod.spice, "spkpos", lambda *args: (np.zeros(3), 1.0))
+        monkeypatch.setattr(mission_kernels, "find_metakernel", pytest.fail)
+        Spicer("MPO").light_time("2027-06-01", observer="JUICE", metakernel=mks)
+        assert loaded == [str(mk) for mk in mks]
 
 
 class TestIllumination:
