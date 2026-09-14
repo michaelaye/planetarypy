@@ -1,11 +1,14 @@
 """Tests for the Spicer illumination calculator."""
 
+import datetime as dt
+import time
+
 import numpy as np
 import pytest
 
 spiceypy = pytest.importorskip("spiceypy")
 
-from planetarypy.spice.spicer import Spicer, _rotate_vector  # noqa: E402
+from planetarypy.spice.spicer import Spicer, _rotate_vector, _to_et  # noqa: E402
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -244,6 +247,38 @@ class TestSolarAzimuth:
             f"{pid}: SPICE={spice_az:.1f}° vs index={hirise_geographic:.1f}°, "
             f"Δ={diff:.1f}°"
         )
+
+
+class TestTimeConversion:
+    """Times reach SPICE as UTC, whatever the process time zone (#41)."""
+
+    @staticmethod
+    def _et_of_utc_now():
+        utc_now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+        return spiceypy.utc2et(utc_now.isoformat())
+
+    def test_default_now_is_utc(self):
+        assert _to_et(None) == pytest.approx(self._et_of_utc_now(), abs=5)
+
+    @pytest.mark.skipif(not hasattr(time, "tzset"), reason="needs time.tzset (POSIX)")
+    def test_default_now_is_utc_in_non_utc_zone(self, monkeypatch):
+        monkeypatch.setenv("TZ", "Asia/Tokyo")
+        time.tzset()
+        try:
+            assert time.localtime().tm_gmtoff == 9 * 3600
+            assert _to_et(None) == pytest.approx(self._et_of_utc_now(), abs=5)
+        finally:
+            monkeypatch.undo()
+            time.tzset()
+
+    def test_aware_datetime_is_converted_to_utc(self):
+        tokyo = dt.timezone(dt.timedelta(hours=9))
+        aware = dt.datetime(2024, 1, 1, 21, 0, tzinfo=tokyo)
+        assert _to_et(aware) == spiceypy.utc2et("2024-01-01T12:00:00")
+
+    def test_naive_datetime_is_taken_as_utc(self):
+        naive = dt.datetime(2024, 1, 1, 12, 0)
+        assert _to_et(naive) == spiceypy.utc2et("2024-01-01T12:00:00")
 
 
 class TestRotateVector:

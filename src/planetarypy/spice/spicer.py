@@ -77,12 +77,21 @@ def _rotate_vector(vector, axis, angle_rad):
 
 
 def _parse_time(time) -> dt.datetime:
-    """Parse a time argument into a datetime."""
+    """Parse a time argument into a naive datetime in UTC.
+
+    ``None`` means the current instant. A timezone-aware datetime (or a string
+    carrying a UTC offset) is converted to UTC; naive datetimes and strings
+    without an offset are taken to be UTC already.
+    """
     if time is None:
-        return dt.datetime.now()
-    if isinstance(time, dt.datetime):
-        return time
-    return tparser.parse(time)
+        t = dt.datetime.now(dt.timezone.utc)
+    elif isinstance(time, dt.datetime):
+        t = time
+    else:
+        t = tparser.parse(time)
+    if t.tzinfo is not None:
+        t = t.astimezone(dt.timezone.utc).replace(tzinfo=None)
+    return t
 
 
 def _ensure_generic_kernels():
@@ -93,7 +102,10 @@ def _ensure_generic_kernels():
 
 
 def _to_et(time) -> float:
-    """Convert a time argument to SPICE ephemeris time."""
+    """Convert a time argument to SPICE ephemeris time.
+
+    Naive datetimes and offset-free strings are read as UTC; see `_parse_time`.
+    """
     _ensure_generic_kernels()
     t = _parse_time(time)
     return spice.utc2et(t.isoformat())
