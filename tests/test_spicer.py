@@ -83,6 +83,37 @@ class TestLightTime:
         lt = Spicer("MARS", units=True).light_time("2024-01-01")
         assert str(lt.unit) == "s"
 
+    def test_observer_accepts_naif_id(self):
+        mars = Spicer("MARS")
+        assert mars.light_time("2024-01-01", observer="399") == mars.light_time(
+            "2024-01-01", observer="EARTH"
+        )
+
+    def test_other_observer_is_symmetric(self):
+        """Mars→Moon and Moon→Mars cross the same gap; the bodies' motion during
+        the ~20 min transit shifts the two by well under 0.1 %."""
+        there = Spicer("MARS").light_time("2024-01-01", observer="MOON")
+        back = Spicer("MOON").light_time("2024-01-01", observer="MARS")
+        assert there == pytest.approx(back, rel=1e-3)
+
+    def test_retry_loads_ephemeris_for_both_ends(self, monkeypatch):
+        """A moon on either end needs its system SPK; loading only the target's fails."""
+        from planetarypy.spice import spicer as spicer_mod
+
+        ensured = []
+        calls = []
+
+        def spkpos_failing_once(*args):
+            calls.append(args)
+            if len(calls) == 1:
+                raise RuntimeError("insufficient ephemeris data")
+            return np.zeros(3), 42.0
+
+        monkeypatch.setattr(spicer_mod.spice, "spkpos", spkpos_failing_once)
+        monkeypatch.setattr(spicer_mod, "ensure_system_for_body", ensured.append)
+        assert Spicer("MARS").light_time("2024-01-01", observer="EUROPA") == 42.0
+        assert ensured == ["MARS", "EUROPA"]
+
 
 class TestIllumination:
     def test_basic(self):

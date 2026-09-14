@@ -78,7 +78,7 @@ def _body_to_system(body_name: str) -> str | None:
         return planet_map[body]
     # Moon codes: first digit of (code % 1000) tells the planet
     try:
-        code = spice.bodn2c(body)
+        code = spice.bods2c(body)
     except Exception:
         return None
     planet_code = code // 100

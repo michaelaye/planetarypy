@@ -38,7 +38,7 @@ import dateutil.parser as tparser
 import numpy as np
 
 from ._deps import SPICE_INSTALL_HINT, spice
-from .generic_kernels import load_generic_kernels
+from .generic_kernels import ensure_system_for_body, load_generic_kernels
 
 _kernels_loaded = False
 
@@ -283,14 +283,17 @@ class Spicer:
     def light_time(self, time=None, observer: str = "EARTH") -> float:
         """One-way light (signal) travel time from the body to an observer [s].
 
-        The signal is received by ``observer`` at ``time`` (default: now), so
-        it left the body one light time earlier ("LT" correction).
+        The signal is received by ``observer`` (NAIF name or ID) at ``time``
+        (default: now), so it left the body one light time earlier ("LT"
+        correction).
         """
         et = _to_et(time)
         try:
             _, lt = spice.spkpos(self._body, et, "J2000", "LT", observer)
         except Exception:
-            self._ensure_ephemeris()
+            # either end may be a moon whose system ephemeris isn't loaded yet
+            ensure_system_for_body(self._body)
+            ensure_system_for_body(observer)
             _, lt = spice.spkpos(self._body, et, "J2000", "LT", observer)
         return _maybe_quantity(lt, "s", self._units)
 

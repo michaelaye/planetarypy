@@ -2299,6 +2299,9 @@ def spicer(
     time: str = typer.Option(None, "--time", "-t", help="UTC time (default: now)"),
     lon: float = typer.Option(None, "--lon", help="Longitude [deg] for surface illumination"),
     lat: float = typer.Option(None, "--lat", help="Latitude [deg] for surface illumination"),
+    observer: str = typer.Option(
+        "EARTH", "--observer", help="Body receiving the signal for the light time (name or NAIF ID)"
+    ),
 ):
     """Show current SPICE data for a solar system body.
 
@@ -2309,12 +2312,14 @@ def spicer(
         plp spicer Mars
         plp spicer Moon --time 2024-06-15T12:00:00
         plp spicer Mars --lon 137.4 --lat -4.6
+        plp spicer Mars --observer Jupiter
     """
     if body is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
     with _spice_deps():
+        from planetarypy.spice._deps import spice
         from planetarypy.spice.spicer import Spicer
     from astropy.time import TimeDelta
 
@@ -2322,6 +2327,12 @@ def spicer(
         s = Spicer(body)
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        observer_name = spice.bodc2n(spice.bods2c(observer)).title()
+    except Exception:
+        typer.echo(f"Error: --observer {observer!r} is not a known NAIF body", err=True)
         raise typer.Exit(1)
 
     typer.echo(f"\n  {s.body}")
@@ -2348,10 +2359,10 @@ def spicer(
         typer.echo("  Solar constant:        (needs ephemeris kernels)")
 
     try:
-        lt = TimeDelta(round(s.light_time(time), 1), format="sec")
-        typer.echo(f"  Light time from Earth: {lt.to_value('quantity_str')}")
+        lt = TimeDelta(round(s.light_time(time, observer=observer), 1), format="sec")
+        typer.echo(f"  Light time from {observer_name}: {lt.to_value('quantity_str')}")
     except Exception:
-        typer.echo("  Light time from Earth: (needs ephemeris kernels)")
+        typer.echo(f"  Light time from {observer_name}: (needs ephemeris kernels)")
 
     if lon is not None and lat is not None:
         try:

@@ -228,6 +228,58 @@ class TestTabCompletion:
             assert alias in out
 
 
+class TestSpicerObserver:
+    """``--observer`` threads through to ``Spicer.light_time`` and names the body."""
+
+    @pytest.fixture()
+    def fake_spicer(self, monkeypatch):
+        pytest.importorskip("spiceypy")
+        from planetarypy.spice import spicer as spicer_mod
+
+        observers = []
+
+        class FakeSpicer:
+            body = "MARS"
+            ref_frame = "IAU_MARS"
+            radii = spicer_mod.Radii(3396.2, 3396.2, 3376.2)
+
+            def __init__(self, body):
+                pass
+
+            def solar_longitude(self, time):
+                return 30.0
+
+            def subsolar_point(self, time):
+                return 41.0, 12.0
+
+            def solar_constant(self, time):
+                return 515.0
+
+            def light_time(self, time, observer):
+                observers.append(observer)
+                return 2000.0
+
+        monkeypatch.setattr(spicer_mod, "Spicer", FakeSpicer)
+        return observers
+
+    def test_default_is_earth(self, fake_spicer):
+        result = runner.invoke(app, ["spicer", "Mars"])
+        assert result.exit_code == 0
+        assert fake_spicer == ["EARTH"]
+        assert "Light time from Earth: 33min 20.0s" in result.stdout
+
+    def test_naif_id_is_shown_by_name(self, fake_spicer):
+        result = runner.invoke(app, ["spicer", "Mars", "--observer", "599"])
+        assert result.exit_code == 0
+        assert fake_spicer == ["599"]
+        assert "Light time from Jupiter:" in result.stdout
+
+    def test_unknown_observer_errors(self, fake_spicer):
+        result = runner.invoke(app, ["spicer", "Mars", "--observer", "Notabody"])
+        assert result.exit_code == 1
+        assert result.stderr.startswith("Error:")
+
+
 class TestSpiceExtraMissing:
     """Without the ``[spice]`` extra, the CLI owes the user one actionable line.
 
