@@ -229,3 +229,58 @@ def test_viewer_proj4_from_iau_code():
 
     p4 = _viewer_proj4(_Src())
     assert "+proj=eqc" in p4 and "+R=3396190" in p4
+
+
+# ── basemaps ────────────────────────────────────────────────────────────────
+# Registry/selection logic is offline; only the live read is ``slow``.
+
+
+def test_basemaps_lists_only_single_file_rasters():
+    """A STAC collection is a set of tiles, not something to stream one window from."""
+    shorts = [r.short for r in datasets.basemaps("mars")]
+    assert "hrsc_level3" in shorts
+    assert "themis_mosaics" not in shorts  # StacCollection, not a RemoteRaster
+    assert datasets.basemaps("nosuchbody") == []
+
+
+def test_default_basemap_is_curated_not_inferred():
+    assert datasets.default_basemap("mars").short == "hrsc_level3"
+    assert datasets.default_basemap("MARS").short == "hrsc_level3"  # case-insensitive
+    assert datasets.default_basemap("moon") is None  # no curated default yet
+
+
+def test_add_basemap_requires_body_or_source():
+    with pytest.raises(ValueError, match="body= or source="):
+        datasets.add_basemap(ax=None)
+
+
+def test_add_basemap_names_the_alternatives_when_no_default():
+    """A body with rasters but no curated default should say what it does have."""
+    with pytest.raises(LookupError) as e:
+        datasets.add_basemap(ax=None, body="moon")
+    assert "no default basemap" in str(e.value)
+
+
+def test_add_basemap_rejects_a_bad_bbox():
+    plt = pytest.importorskip("matplotlib.pyplot")
+    _, ax = plt.subplots()
+    with pytest.raises(ValueError, match="bbox must be"):
+        datasets.add_basemap(ax, "mars", bbox="everywhere")
+    plt.close("all")
+
+
+@pytest.mark.slow
+def test_add_basemap_draws_behind_and_keeps_limits():
+    """The background must not reframe a plot the caller already composed."""
+    plt = pytest.importorskip("matplotlib.pyplot")
+    pytest.importorskip("rioxarray")
+    _, ax = plt.subplots()
+    ax.scatter([77.6], [18.4])
+    ax.set_xlim(77.2, 78.0)
+    ax.set_ylim(18.1, 18.7)
+    im = datasets.add_basemap(ax, "mars")
+    assert im.get_zorder() < 0                      # behind the caller's data
+    assert ax.get_xlim() == (77.2, 78.0)            # limits untouched
+    assert ax.get_ylim() == (18.1, 18.7)
+    assert im.get_array().size > 0
+    plt.close("all")

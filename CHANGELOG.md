@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`Spicer.light_time(time=None, observer="EARTH")`** — one-way signal travel time from a body to an observer, in seconds (an astropy quantity with `units=True`). It is the light-time-corrected value: the signal arrives at `time`, so it left the body one light time earlier. `plp spicer <body>` now prints it as "Light time from Earth", formatted by astropy's `TimeDelta` (`1.3s` for the Moon, `5min 21.2s` for Mars, `1hr 25min 6.1s` for Saturn).
+- **WIP: `datasets.add_basemap(ax, body)`** — draws a surface image behind lon/lat data you have already plotted, reading only the window the axes show and leaving their limits alone; `default_basemap(body)` and `basemaps(body)` pick and list the candidates. Work in progress: the registry holds a single usable background so far (HRSC level-3 for Mars), so every other body raises `LookupError` until global mosaics for them are added.
 
 ### Fixed
 

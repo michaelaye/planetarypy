@@ -24,6 +24,7 @@ __all__ = [
     "RemoteRaster", "StacCollection", "StacItem",
     "list_datasets", "bodies", "read_window", "read_bbox",
     "stac_search", "stac_items", "stac_collections", "browse",
+    "basemaps", "default_basemap", "add_basemap",
 ]
 
 # The interactive COG viewer shipped as a docs tab (docs/cogbrowser/), published to
@@ -568,6 +569,125 @@ class _BodyNamespace:
 
     def __repr__(self):
         return f"<datasets.{self._body}: {sorted(self._by_short)}>"
+
+
+# ── basemaps ────────────────────────────────────────────────────────────────
+#
+# A body usually has more than one plausible background, so which one is *the*
+# default is a curation decision, not a property of the data. Keep that decision
+# here, in one readable place, rather than inferring it from the registry.
+#
+# Values are registry ``short`` names. A body absent from this map has no default
+# background yet — `add_basemap` will say so and list what it does have.
+_DEFAULT_BASEMAP: dict = {
+    "mars": "hrsc_level3",
+}
+
+
+def basemaps(body: "Optional[str]" = None) -> "list":
+    """Registered rasters usable as a plotting background.
+
+    Only single-file rasters qualify: a STAC *collection* is a set of tiles, and
+    picking and mosaicking the right ones is a different job from streaming one
+    window. Pass any such item to :func:`add_basemap` explicitly if you want it.
+    """
+    out = [r for r in _REGISTRY.values() if isinstance(r, RemoteRaster)]
+    if body is not None:
+        out = [r for r in out if r.body == body.lower()]
+    return out
+
+
+def default_basemap(body: str):
+    """The curated default background for ``body``, or ``None`` if there is none."""
+    short = _DEFAULT_BASEMAP.get(body.lower())
+    if short is None:
+        return None
+    return next((r for r in _REGISTRY.values() if r.short == short), None)
+
+
+def add_basemap(ax, body: "Optional[str]" = None, source=None, *, bbox="auto",
+                cmap: str = "gray", stretch=(2, 98), zorder: int = -10,
+                **imshow_kw):
+    """Draw a surface image behind whatever is already on ``ax``.
+
+    Built for the common case: you have lon/lat measurements plotted, and you
+    want them in front of the surface rather than on an empty grid. Draws at a
+    low ``zorder`` and leaves the axes limits alone, so it composes with a plot
+    you already made — and with :func:`planetarypy.nomenclature.add_features`.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axes to draw on. Existing content and limits are preserved.
+    body : str, optional
+        Body name; its curated default background is used. Ignored when
+        ``source`` is given.
+    source : optional
+        Any background you like — a :class:`RemoteRaster`, a :class:`StacItem`,
+        a registry key or ``short`` name, or a bare COG URL. Overrides ``body``.
+    bbox : "auto" or (west, south, east, north)
+        ``"auto"`` (default) reads the axes' current limits.
+    stretch : (lo, hi) or None
+        Percentile clip for display. ``None`` leaves values untouched — use it
+        when the numbers matter, e.g. a DEM you intend to read off.
+
+    Returns
+    -------
+    matplotlib.image.AxesImage
+
+    Examples
+    --------
+    >>> fig, ax = plt.subplots()
+    >>> ax.scatter(lons, lats)                        # your data
+    >>> datasets.add_basemap(ax, "mars")              # surface behind it
+    >>> nomenclature.add_features(ax, "mars")         # names on top
+    """
+    import numpy as np
+
+    if source is None:
+        if body is None:
+            raise ValueError("give either body= or source=")
+        source = default_basemap(body)
+        if source is None:
+            have = ", ".join(sorted(r.short for r in basemaps(body))) or "none"
+            raise LookupError(
+                f"no default basemap for {body!r}. Registered single-file "
+                f"rasters for it: {have}. Pass one as source=, or any COG URL."
+            )
+
+    if not isinstance(bbox, (tuple, list)):
+        if bbox != "auto":
+            raise ValueError(f"bbox must be 'auto' or a 4-tuple, got {bbox!r}")
+        x0, x1 = ax.get_xlim()
+        y0, y1 = ax.get_ylim()
+        bbox = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+    west, south, east, north = bbox
+
+    da = read_bbox(source, west, south, east, north)
+    arr = np.asarray(da.squeeze())
+
+    # nodata -> NaN so it renders transparent rather than as a hard extreme
+    nodata = getattr(da, "rio", None) and da.rio.nodata
+    if nodata is not None:
+        arr = np.where(arr == nodata, np.nan, arr).astype("float32")
+
+    if stretch is not None and np.isfinite(arr).any():
+        lo, hi = np.nanpercentile(arr, stretch)
+        if hi > lo:
+            imshow_kw.setdefault("vmin", lo)
+            imshow_kw.setdefault("vmax", hi)
+
+    imshow_kw.setdefault("origin", "upper")
+    imshow_kw.setdefault("interpolation", "nearest")
+    if arr.ndim == 2:
+        imshow_kw.setdefault("cmap", cmap)
+
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    im = ax.imshow(arr, extent=(west, east, south, north), zorder=zorder, **imshow_kw)
+    # imshow would otherwise reframe the plot the caller already composed
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    return im
 
 
 def __getattr__(name: str):
