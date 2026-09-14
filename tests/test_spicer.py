@@ -150,7 +150,7 @@ class TestLightTime:
         monkeypatch.setattr(spicer_mod.spice, "furnsh", loaded.append)
         monkeypatch.setattr(spicer_mod, "ensure_system_for_body", lambda body: None)
         monkeypatch.setattr(
-            mission_kernels, "find_metakernel",
+            mission_kernels, "find_spacecraft_kernel",
             lambda sc, time: found.append(sc) or f"/mk/{sc}.tm",
         )
         Spicer("MPO").light_time("2027-06-01", observer="JUICE")
@@ -167,7 +167,7 @@ class TestLightTime:
         loaded = []
         monkeypatch.setattr(spicer_mod.spice, "furnsh", loaded.append)
         monkeypatch.setattr(spicer_mod.spice, "spkpos", lambda *args: (np.zeros(3), 1.0))
-        monkeypatch.setattr(mission_kernels, "find_metakernel", pytest.fail)
+        monkeypatch.setattr(mission_kernels, "find_spacecraft_kernel", pytest.fail)
         Spicer("MPO").light_time("2027-06-01", observer="JUICE", metakernel=mks)
         assert loaded == [str(mk) for mk in mks]
 

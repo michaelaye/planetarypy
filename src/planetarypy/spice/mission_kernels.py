@@ -146,6 +146,33 @@ def find_metakernel(spacecraft: str, time=None) -> Path:
     )
 
 
+def find_spacecraft_kernel(spacecraft: str, time=None) -> Path:
+    """A kernel to load for ``spacecraft`` at ``time``, without downloading.
+
+    Tries the metakernels spice-kernel-db tracks (:func:`find_metakernel`),
+    then trajectories already fetched from NAIF's operational server with
+    ``plp spice spk`` (:func:`~planetarypy.spice.operational_kernels.find_local_spk`).
+
+    Raises
+    ------
+    LookupError
+        Neither has one; the message says how to get either.
+    """
+    from .operational_kernels import find_local_spk
+
+    try:
+        return find_metakernel(spacecraft, time)
+    except (ImportError, LookupError) as exc:
+        skd_problem = str(exc)
+    spk = find_local_spk(spacecraft, time)
+    if spk is not None:
+        return spk
+    raise LookupError(
+        f"{skd_problem}\n\nOr download its current trajectory from NAIF's operational "
+        "server with:\n\n    plp spice spk <MISSION> --time <UTC>"
+    )
+
+
 def resolve_metakernel(name_or_path) -> Path:
     """A metakernel path, given a path on disk or a tracked metakernel's filename."""
     path = Path(name_or_path).expanduser()

@@ -314,7 +314,7 @@ class TestSpicerObserver:
         from planetarypy.spice import mission_kernels
 
         mk = tmp_path / "bc_plan.tm"
-        monkeypatch.setattr(mission_kernels, "find_metakernel", lambda sc, time: mk)
+        monkeypatch.setattr(mission_kernels, "find_spacecraft_kernel", lambda sc, time: mk)
         result = runner.invoke(app, ["spicer", "Mercury", "--observer", "MPO"])
         assert result.exit_code == 0
         assert self.row(result.stdout, "Light time from BEPICOLOMBO MPO")[1] == (
@@ -328,9 +328,9 @@ class TestSpicerObserver:
         mk.touch()
 
         def must_not_search(*args):
-            raise AssertionError("find_metakernel called despite --metakernel")
+            raise AssertionError("find_spacecraft_kernel called despite --metakernel")
 
-        monkeypatch.setattr(mission_kernels, "find_metakernel", must_not_search)
+        monkeypatch.setattr(mission_kernels, "find_spacecraft_kernel", must_not_search)
         result = runner.invoke(
             app, ["spicer", "Mercury", "--observer", "MPO", "--metakernel", str(mk)]
         )
@@ -341,7 +341,7 @@ class TestSpicerObserver:
         from planetarypy.spice import mission_kernels
 
         monkeypatch.setattr(
-            mission_kernels, "find_metakernel", lambda sc, time: tmp_path / "bc_plan.tm"
+            mission_kernels, "find_spacecraft_kernel", lambda sc, time: tmp_path / "bc_plan.tm"
         )
         result = runner.invoke(app, ["spicer", "MPO", "--lon", "1", "--lat", "2"])
         assert result.exit_code == 0
@@ -418,13 +418,49 @@ class TestSpicerObserver:
             raise LookupError("No metakernel tracked by spice-kernel-db covers MPO.\n"
                               "    spice-kernel-db browse BEPICOLOMBO")
 
-        monkeypatch.setattr(mission_kernels, "find_metakernel", nothing_covers)
+        monkeypatch.setattr(mission_kernels, "find_spacecraft_kernel", nothing_covers)
         result = runner.invoke(app, ["spicer", "Mercury", "--observer", "MPO"])
         assert result.exit_code == 0
         assert self.row(result.stdout, "Light time from BEPICOLOMBO MPO")[1] == (
             "(no mission kernels)"
         )
         assert "spice-kernel-db browse BEPICOLOMBO" in result.stdout
+
+
+class TestSpk:
+    def test_bare_invocation_prints_help(self):
+        result = runner.invoke(app, ["spice", "spk"])
+        assert result.exit_code == 0
+        assert "Usage:" in result.stdout
+
+    def test_path_goes_to_stdout(self, monkeypatch, tmp_path):
+        pytest.importorskip("spiceypy")
+        from planetarypy.spice import operational_kernels
+
+        spk = tmp_path / "psyche_sc-eph.bsp"
+        calls = []
+
+        def fetch(mission, time, spacecraft, max_size_mb):
+            calls.append((mission, time, spacecraft, max_size_mb))
+            return spk
+
+        monkeypatch.setattr(operational_kernels, "fetch_spk", fetch)
+        result = runner.invoke(app, ["spice", "spk", "psyche", "--time", "2026-09-14"])
+        assert result.exit_code == 0
+        assert result.stdout.strip() == str(spk)
+        assert calls == [("psyche", "2026-09-14", None, 200)]
+
+    def test_lookup_failure_is_one_error_line(self, monkeypatch):
+        pytest.importorskip("spiceypy")
+        from planetarypy.spice import operational_kernels
+
+        def fetch(*args, **kwargs):
+            raise LookupError("NAIF has no operational SPK folder for 'nope'")
+
+        monkeypatch.setattr(operational_kernels, "fetch_spk", fetch)
+        result = runner.invoke(app, ["spice", "spk", "nope"])
+        assert result.exit_code == 1
+        assert result.stderr.startswith("Error: NAIF has no operational SPK folder")
 
 
 class TestSpiceExtraMissing:
@@ -442,6 +478,7 @@ class TestSpiceExtraMissing:
         "planetarypy.spice.config",
         "planetarypy.spice.spicer",
         "planetarypy.spice.mission_kernels",
+        "planetarypy.spice.operational_kernels",
     )
 
     def _without_spice(self, monkeypatch):
@@ -456,6 +493,7 @@ class TestSpiceExtraMissing:
             ["spice", "info", "cassini"],
             ["spice", "cached"],
             ["spice", "generic", "lsk"],
+            ["spice", "spk", "psyche"],
             ["spice", "fetch", "cassini", "--start", "2006-06-01",
              "--stop", "2006-06-30"],
             ["spicer", "Mars"],

@@ -2313,7 +2313,7 @@ def _spicer_light_time(s, time, observer, observer_code, metakernel):
             ends = ((s.body, s.target_id), (observer, observer_code))
             spacecraft = [name for name, code in ends if code < 0]
             mks = list(dict.fromkeys(
-                mission_kernels.find_metakernel(name, time) for name in spacecraft
+                mission_kernels.find_spacecraft_kernel(name, time) for name in spacecraft
             ))
     except (ImportError, LookupError) as e:
         return "[dim](no mission kernels)[/dim]", str(e)
@@ -2394,16 +2394,17 @@ def spicer(
     ),
     metakernel: str = typer.Option(
         None, "--metakernel",
-        help="Mission metakernel for a spacecraft body or observer (path or "
-             "spice-kernel-db filename); default: the tracked one covering --time",
+        help="Mission metakernel or SPK for a spacecraft body or observer (path, or "
+             "spice-kernel-db filename); default: one on disk covering --time",
     ),
 ):
     """Show current SPICE data for a solar system body or spacecraft.
 
     Without --lon/--lat, shows global properties (L_s, subsolar point,
     solar constant, light time). With coordinates, adds surface illumination.
-    A spacecraft (as BODY or --observer) uses mission metakernels that
-    spice-kernel-db already has on disk; nothing is downloaded.
+    A spacecraft (as BODY or --observer) uses kernels already on disk:
+    metakernels spice-kernel-db tracks, or trajectories fetched with
+    `plp spice spk`. plp spicer itself never downloads.
 
     Examples:
         plp spicer Mars
@@ -2814,6 +2815,51 @@ def _complete_generic_alias(incomplete: str) -> list[str]:
         return []
     return sorted(a for a in GENERIC_KERNEL_ALIASES
                   if a.startswith(incomplete.lower()))
+
+
+@spice_app.command("spk")
+def spice_spk(
+    ctx: typer.Context,
+    mission: str = typer.Argument(
+        None, help="NAIF mission folder name, e.g. psyche, lucy, mro (case-insensitive)."
+    ),
+    time: str = typer.Option(None, "--time", "-t", help="UTC time to cover (default: now)"),
+    spacecraft: str = typer.Option(
+        None, "--spacecraft",
+        help="SPICE name or NAIF ID, when it can't be derived from the mission name",
+    ),
+    max_size: float = typer.Option(
+        200, "--max-size", help="Skip SPKs larger than this many MB"
+    ),
+):
+    """Download a mission's current trajectory from NAIF's operational server.
+
+    Most active NASA missions publish no metakernel on
+    https://naif.jpl.nasa.gov/pub/naif/, only SPK files, and the PDS archive
+    lags months behind. This fetches the newest SPK that covers the spacecraft
+    at --time into {storage_root}/spice_kernels/operational/<MISSION>/spk/ and
+    prints its path; `plp spicer` then finds it by itself. A covering file
+    already on disk is reused without downloading.
+
+    \b
+    Examples:
+        plp spice spk psyche
+        plp spicer PSYC
+        plp spice spk lucy --time 2027-04-01
+    """
+    if mission is None:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+
+    with _spice_deps():
+        from planetarypy.spice.operational_kernels import fetch_spk
+
+    try:
+        path = fetch_spk(mission, time, spacecraft=spacecraft, max_size_mb=max_size)
+    except (LookupError, ValueError) as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+    typer.echo(str(path))
 
 
 @spice_app.command("generic")

@@ -311,8 +311,8 @@ class Spicer:
         A spacecraft on either end needs a mission metakernel. Without
         ``metakernel`` (a path or the filename of one tracked by
         spice-kernel-db, or a list of those when both ends are spacecraft),
-        the tracked one covering ``time`` is found with
-        :func:`planetarypy.spice.mission_kernels.find_metakernel`. Loading it
+        a kernel covering ``time`` is found with
+        :func:`planetarypy.spice.mission_kernels.find_spacecraft_kernel`. Loading it
         stays in effect for the rest of the session, including its own
         LSK/PCK versions.
         """
@@ -332,7 +332,7 @@ class Spicer:
             if metakernel is None:
                 for end in (self._body, observer):
                     if spice.bods2c(end) < 0:
-                        spice.furnsh(str(mission_kernels.find_metakernel(end, time)))
+                        spice.furnsh(str(mission_kernels.find_spacecraft_kernel(end, time)))
             _, lt = spice.spkpos(self._body, et, "J2000", "LT", observer)
         return _maybe_quantity(lt, "s", self._units)
 

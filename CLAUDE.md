@@ -103,6 +103,7 @@ Supporting files: `_mission_map.py`, `_parser.py`, `_repo.py`, `_schema.py`, `_u
   - `Spicer(body).solar_azimuth_at(lon, lat, time)` — CW-from-north sun azimuth
   - `Spicer(body).north_azimuth_at(lon, lat, time)` — image-plane north arrow
 - `mission_kernels.py` — spacecraft ephemerides via the optional `[skd]` extra (`spice-kernel-db`): `find_metakernel(spacecraft, time)` picks the tracked metakernel whose SPKs cover that time (`*_ops` > `*_plan` > scenarios). Read-only and never downloads; failures raise `LookupError` naming the `spice-kernel-db` command to run. `KernelDB.list_metakernels()` prints a table, so its stdout is swallowed here.
+- `operational_kernels.py` — current spacecraft trajectories from NAIF's operational server (`https://naif.jpl.nasa.gov/pub/naif/<MISSION>/kernels/spk/`), where only 8 of 77 missions publish a metakernel. `fetch_spk(mission, time)` downloads the newest SPK covering the time (skips files over 200 MB, deletes misses) into `{storage_root}/spice_kernels/operational/`; `find_local_spk` finds it again offline. The listing is preformatted text, not an HTML table, so `pd.read_html` can't parse it. `mission_kernels.find_spacecraft_kernel` tries spice-kernel-db metakernels first, then these.
 - `config.py` — SPICE-specific paths
 - Kernels cached under `{storage_root}/spice_kernels/`
 
@@ -139,7 +140,7 @@ Typer app with sub-apps grouped by Rich help panel:
 **Verb inventory** (one line per sub-app — names drift rarely, so they live here to save a grep; the *implementation* still lives in code, read it before editing):
 - `plp catalog`: build, list, show, search, samples, summary, ambiguous
 - `plp indexes`: list, peek, last, counts, select, info, refresh, prune
-- `plp spice`: missions, info, fetch, cached, generic
+- `plp spice`: missions, info, fetch, cached, generic, spk
 
 **Design philosophy: API first, CLI wraps thin.** Every `plp` verb is a thin wrapper over a public Python API. Build and test the library function first; the CLI command then forwards arguments and formats output. Useful logic — parsing PID lists, building catalogs, batching downloads, filtering indexes by PIDs, parallel execution — lives in `planetarypy.*` modules, not under `cli.py`. The reason is reuse: notebooks and downstream tooling should pick up new capabilities without screen-scraping or shelling out to `plp`. If you find substantial logic inside `cli.py`, that's a bug — factor it down to the API layer.
 

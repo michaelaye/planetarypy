@@ -149,3 +149,35 @@ class TestSpacecraftForMission:
     def test_archived_mission_without_a_matching_spacecraft_name(self):
         assert mission_kernels.spacecraft_for_mission("bc") is None
 
+
+class TestFindSpacecraftKernel:
+    def test_tracked_metakernel_comes_first(self, monkeypatch):
+        from planetarypy.spice import operational_kernels
+
+        monkeypatch.setattr(mission_kernels, "find_metakernel", lambda sc, t: "bc_plan.tm")
+        monkeypatch.setattr(operational_kernels, "find_local_spk", pytest.fail)
+        assert mission_kernels.find_spacecraft_kernel("MPO", "2027-06-01") == "bc_plan.tm"
+
+    def test_falls_back_to_a_fetched_operational_spk(self, monkeypatch, tmp_path):
+        from planetarypy.spice import operational_kernels
+
+        def no_skd(sc, t):
+            raise ImportError("no spice-kernel-db")
+
+        spk = tmp_path / "psyche_sc-eph.bsp"
+        monkeypatch.setattr(mission_kernels, "find_metakernel", no_skd)
+        monkeypatch.setattr(operational_kernels, "find_local_spk", lambda sc, t: spk)
+        assert mission_kernels.find_spacecraft_kernel("PSYC", "2026-09-14") == spk
+
+    def test_neither_explains_both_routes(self, monkeypatch):
+        from planetarypy.spice import operational_kernels
+
+        def nothing(sc, t):
+            raise LookupError("No metakernel tracked by spice-kernel-db covers PSYC.")
+
+        monkeypatch.setattr(mission_kernels, "find_metakernel", nothing)
+        monkeypatch.setattr(operational_kernels, "find_local_spk", lambda sc, t: None)
+        with pytest.raises(LookupError) as e:
+            mission_kernels.find_spacecraft_kernel("PSYC", "2026-09-14")
+        assert "No metakernel tracked" in str(e.value)
+        assert "plp spice spk <MISSION>" in str(e.value)
