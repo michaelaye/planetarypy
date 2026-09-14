@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.84.1] - 2026-09-14
+
+A correctness fix for the SPICE tools, released quickly: without an explicit
+time, `Spicer` and `plp spicer` read the local clock as UTC, so every "now"
+result was off by the local UTC offset. Also: Rich output for the last three
+hand-formatted `plp` commands, and mission metakernels found through
+spice-kernel-db 0.19's quiet lookup.
 
 ### Changed
 
