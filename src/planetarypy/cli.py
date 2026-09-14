@@ -2338,6 +2338,42 @@ def _spicer_light_time(s, time, observer, observer_code, metakernel):
     return (f"{lt}  [dim]({names})[/dim]" if mks else lt), None
 
 
+def _spicer_list(Spicer, mission_kernels):
+    """Back end of ``plp spicer --list``."""
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+    bodies = Spicer.supported_bodies()
+    table = Table(title=f"Bodies with a shape ({len(bodies)})",
+                  title_style="bold", header_style="bold magenta")
+    table.add_column("body", style="cyan", no_wrap=True)
+    table.add_column("equatorial radius", justify="right")
+    for _, name, radius in bodies:
+        table.add_row(name.title(), f"{radius:,.1f} km")
+    console.print(table)
+
+    try:
+        spacecraft = mission_kernels.tracked_spacecraft()
+    except ImportError:
+        typer.echo("\nSpacecraft: install spice-kernel-db to use mission kernels "
+                   "(pip install 'planetarypy[skd]').")
+        return
+    except LookupError as e:
+        typer.echo(f"\nSpacecraft: {e}")
+        return
+    if not spacecraft:
+        typer.echo("\nSpacecraft: spice-kernel-db tracks no mission metakernels yet.")
+        return
+    table = Table(title="Spacecraft with mission kernels in spice-kernel-db",
+                  title_style="bold", header_style="bold magenta")
+    table.add_column("mission", style="cyan", no_wrap=True)
+    table.add_column("spacecraft")
+    for mission, names in spacecraft.items():
+        table.add_row(mission, ", ".join(names))
+    console.print(table)
+
+
 @app.command(rich_help_panel=_PANEL_SCIENCE)
 def spicer(
     ctx: typer.Context,
@@ -2350,6 +2386,11 @@ def spicer(
     observer: str = typer.Option(
         "EARTH", "--observer",
         help="Body or spacecraft receiving the signal for the light time (name or NAIF ID)",
+    ),
+    list_bodies: bool = typer.Option(
+        False, "--list",
+        help="List the bodies with a shape in the loaded kernels, and the spacecraft "
+             "spice-kernel-db has mission kernels for",
     ),
     metakernel: str = typer.Option(
         None, "--metakernel",
@@ -2371,8 +2412,9 @@ def spicer(
         plp spicer Mars --observer Jupiter
         plp spicer Mercury --observer MPO --time 2027-06-01
         plp spicer MPO
+        plp spicer --list
     """
-    if body is None:
+    if body is None and not list_bodies:
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
@@ -2382,6 +2424,10 @@ def spicer(
         from planetarypy.spice.spicer import Spicer
     from rich.console import Console
     from rich.table import Table
+
+    if list_bodies:
+        _spicer_list(Spicer, mission_kernels)
+        return
 
     def naif_code(name: str, what: str) -> int:
         try:
@@ -2405,6 +2451,14 @@ def spicer(
         observer_name = observer_name.title()
 
     s = Spicer(body)
+    if not s.is_spacecraft and not s.has_shape:
+        typer.echo(
+            f"Error: SPICE knows {spice.bodc2n(body_code)!r}, but the loaded planetary "
+            "constants kernel has no shape for it, so there is nothing to compute. "
+            "`plp spicer --list` shows the bodies that work.",
+            err=True,
+        )
+        raise typer.Exit(1)
     no_kernels = "[dim](needs ephemeris kernels)[/dim]"
     hints = []
 

@@ -198,6 +198,15 @@ class Spicer:
         return spice.bods2c(self._body)
 
     @property
+    def has_shape(self) -> bool:
+        """Whether the loaded kernels define radii for this body.
+
+        A name SPICE knows (e.g. the asteroid PSYCHE) can still lack them,
+        and then nothing that needs a surface or orientation can be computed.
+        """
+        return bool(spice.bodfnd(self.target_id, "RADII"))
+
+    @property
     def is_spacecraft(self) -> bool:
         """NAIF gives spacecraft negative IDs; they have no shape or surface."""
         return self.target_id < 0
@@ -590,6 +599,7 @@ class Spicer:
         -------
         list of (naif_id, name, equatorial_radius_km)
         """
+        _ensure_generic_kernels()
         bodies = []
         for code in list(range(0, 1000)) + list(range(2000000, 2000100)):
             try:

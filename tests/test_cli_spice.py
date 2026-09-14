@@ -255,6 +255,7 @@ class TestSpicerObserver:
             radii = spicer_mod.Radii(3396.2, 3396.2, 3376.2)
 
             def __init__(self, body):
+                self.has_shape = body.upper() != "PSYCHE"
                 self.is_spacecraft = body.upper() in ("MPO", "-121")
                 self.target_id = -121 if self.is_spacecraft else 499
 
@@ -351,6 +352,47 @@ class TestSpicerObserver:
         assert self.row(result.stdout, "Surface illumination")[1] == (
             "(a spacecraft has no surface)"
         )
+
+    def test_known_name_without_shape_is_rejected_cleanly(self, fake_spicer):
+        result = runner.invoke(app, ["spicer", "Psyche"])
+        assert result.exit_code == 1
+        assert "Traceback" not in result.output
+        assert result.stderr.startswith("Error: SPICE knows 'PSYCHE'")
+        assert "plp spicer --list" in result.stderr
+
+    def test_list_shows_bodies_and_tracked_spacecraft(self, fake_spicer, monkeypatch):
+        from planetarypy.spice import mission_kernels
+        from planetarypy.spice import spicer as spicer_mod
+
+        monkeypatch.setattr(
+            spicer_mod.Spicer, "supported_bodies",
+            staticmethod(lambda: [(499, "MARS", 3396.19), (2000001, "CERES", 487.3)]),
+            raising=False,
+        )
+        monkeypatch.setattr(
+            mission_kernels, "tracked_spacecraft",
+            lambda: {"BEPICOLOMBO": ["BEPICOLOMBO MMO", "BEPICOLOMBO MPO"]},
+        )
+        result = runner.invoke(app, ["spicer", "--list"])
+        assert result.exit_code == 0
+        assert self.row(result.stdout, "Mars") == ["Mars", "3,396.2 km"]
+        assert self.row(result.stdout, "Ceres")[1] == "487.3 km"
+        assert self.row(result.stdout, "BEPICOLOMBO") == [
+            "BEPICOLOMBO", "BEPICOLOMBO MMO, BEPICOLOMBO MPO"
+        ]
+
+    def test_list_without_skd_still_lists_bodies(self, fake_spicer, monkeypatch):
+        from planetarypy.spice import spicer as spicer_mod
+
+        monkeypatch.setattr(
+            spicer_mod.Spicer, "supported_bodies",
+            staticmethod(lambda: [(499, "MARS", 3396.19)]), raising=False,
+        )
+        monkeypatch.setitem(sys.modules, "spice_kernel_db", None)
+        result = runner.invoke(app, ["spicer", "--list"])
+        assert result.exit_code == 0
+        self.row(result.stdout, "Mars")
+        assert "planetarypy[skd]" in result.stdout
 
     def test_unknown_body_errors_like_an_unknown_observer(self, fake_spicer):
         result = runner.invoke(app, ["spicer", "Notabody"])

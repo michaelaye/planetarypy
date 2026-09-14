@@ -160,16 +160,29 @@ def resolve_metakernel(name_or_path) -> Path:
     )
 
 
-def mission_spacecraft(mission: str) -> list[str]:
-    """NAIF names of the spacecraft in a tracked mission's SPKs, e.g. BEPICOLOMBO → MPO."""
-    ids = set()
+def tracked_spacecraft() -> dict[str, list[str]]:
+    """NAIF names of the spacecraft in each tracked mission's SPKs.
+
+    E.g. ``{"BEPICOLOMBO": ["BEPICOLOMBO MMO", "BEPICOLOMBO MPO", ...]}``.
+    """
+    ids_by_mission: dict[str, set[int]] = {}
     for row in tracked_metakernels():
-        if row["mission"].lower() != mission.lower():
-            continue
+        ids = ids_by_mission.setdefault(row["mission"], set())
         for spk in _spk_paths(row["mk_path"]):
             ids.update(int(i) for i in spice.spkobj(str(spk)) if i < 0)
-    names = set()
-    for body_id in ids:
-        with contextlib.suppress(Exception):
-            names.add(spice.bodc2n(body_id))
-    return sorted(names)
+    result = {}
+    for mission, ids in sorted(ids_by_mission.items()):
+        names = set()
+        for body_id in ids:
+            with contextlib.suppress(Exception):
+                names.add(spice.bodc2n(body_id))
+        result[mission] = sorted(names)
+    return result
+
+
+def mission_spacecraft(mission: str) -> list[str]:
+    """NAIF names of the spacecraft in a tracked mission's SPKs, e.g. BEPICOLOMBO → MPO."""
+    for name, spacecraft in tracked_spacecraft().items():
+        if name.lower() == mission.lower():
+            return spacecraft
+    return []

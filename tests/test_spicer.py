@@ -50,6 +50,21 @@ class TestSpicerBasics:
         s = Spicer("MOON")
         assert s.radii.a == pytest.approx(1737.4, abs=1)
 
+    def test_supported_bodies_works_before_any_spicer_exists(self):
+        """It is a staticmethod; the kernels must load inside it, not only in __init__."""
+        import subprocess
+        import sys
+
+        code = ("from planetarypy.spice.spicer import Spicer; "
+                "print(len(Spicer.supported_bodies()))")
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                             check=True)
+        assert int(out.stdout.strip().splitlines()[-1]) > 50
+
+    def test_has_shape_only_when_radii_are_loaded(self):
+        assert Spicer("MARS").has_shape
+        assert not Spicer("PSYCHE").has_shape  # asteroid: known name, no PCK radii
+
     def test_spacecraft_detected_by_name_or_id(self):
         assert Spicer("MPO").is_spacecraft
         assert Spicer("-121").target_id == -121
