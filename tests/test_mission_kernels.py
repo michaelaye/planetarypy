@@ -119,3 +119,33 @@ class TestResolveMetakernel:
         monkeypatch.setattr(mission_kernels, "tracked_metakernels", lambda: [])
         with pytest.raises(LookupError, match="spice-kernel-db metakernels"):
             mission_kernels.resolve_metakernel("nope.tm")
+
+
+class TestSpacecraftForMission:
+    @pytest.fixture(autouse=True)
+    def _archive(self, monkeypatch):
+        import pandas as pd
+
+        from planetarypy.spice import archived_kernels
+
+        table = pd.DataFrame(
+            {"Mission Name": ["Psyche", "Lucy", "Hayabusa2", "BepiColombo"]},
+            index=["psyche", "lucy", "hayabusa2", "bc"],
+        )
+        monkeypatch.setattr(archived_kernels, "datasets", table)
+
+    def test_collision_resolves_by_prefix(self):
+        assert mission_kernels.spacecraft_for_mission("Psyche") == "PSYC"
+
+    def test_exact_name_wins_over_a_shorter_prefix(self):
+        assert mission_kernels.spacecraft_for_mission("hayabusa2") == "HAYABUSA2"
+
+    def test_matching_name_is_returned_as_is(self):
+        assert mission_kernels.spacecraft_for_mission("LUCY") == "LUCY"
+
+    def test_not_an_archived_mission(self):
+        assert mission_kernels.spacecraft_for_mission("Mars") is None
+
+    def test_archived_mission_without_a_matching_spacecraft_name(self):
+        assert mission_kernels.spacecraft_for_mission("bc") is None
+

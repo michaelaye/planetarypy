@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`Spicer.supported_bodies()` returned an empty list in a fresh session.** It is a static method, and the generic kernels only loaded when a `Spicer` was created, so calling it first found no radii. It now loads them itself.
-- **`plp spicer psyche` crashed with a SPICE traceback.** SPICE knows the name (the asteroid 16 Psyche), but the default planetary constants kernel has no radii for it, and the radii row raised. A body without a shape now exits with a one-line error pointing at `plp spicer --list`; the new `Spicer.has_shape` makes the check.
+- **`plp spicer psyche` crashed with a SPICE traceback.** SPICE knows the name (the asteroid 16 Psyche), but the default planetary constants kernel has no radii for it, and the radii row raised. A body without a shape now exits with a one-line error pointing at `plp spicer --list`; the new `Spicer.has_shape` makes the check. When the name is also a NAIF-archived mission, the error names its spacecraft (SPICE calls the Psyche spacecraft `PSYC`), via the new `mission_kernels.spacecraft_for_mission`.
 
 - **A reprojection notice opened with a lowercase proper noun.** `announce_conversion` built its message as `f"{what} reprojected from …"`, and `nomenclature` passes `what=f"{body} nomenclature"` with the body as the user typed it — so the sentence began "mars nomenclature reprojected…". Reworded to "Reprojected {what} from …", which fixes it for every caller rather than guessing capitalisation rules for body names.
 

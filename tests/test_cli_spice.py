@@ -276,6 +276,7 @@ class TestSpicerObserver:
         FakeSpicer.metakernels = []
         monkeypatch.setattr(spicer_mod, "Spicer", FakeSpicer)
         monkeypatch.setattr(mission_kernels, "mission_spacecraft", lambda mission: [])
+        monkeypatch.setattr(mission_kernels, "spacecraft_for_mission", lambda mission: None)
         return observers
 
     def test_default_is_earth(self, fake_spicer):
@@ -360,6 +361,17 @@ class TestSpicerObserver:
         assert result.stderr.startswith("Error: SPICE knows 'PSYCHE'")
         assert "plp spicer --list" in result.stderr
 
+    def test_shapeless_name_that_is_also_a_mission_points_at_its_spacecraft(
+        self, fake_spicer, monkeypatch
+    ):
+        from planetarypy.spice import mission_kernels
+
+        monkeypatch.setattr(mission_kernels, "spacecraft_for_mission", lambda name: "PSYC")
+        result = runner.invoke(app, ["spicer", "Psyche"])
+        assert result.exit_code == 1
+        assert "There is also a PSYCHE mission" in result.stderr
+        assert "try `plp spicer PSYC`" in result.stderr
+
     def test_list_shows_bodies_and_tracked_spacecraft(self, fake_spicer, monkeypatch):
         from planetarypy.spice import mission_kernels
         from planetarypy.spice import spicer as spicer_mod
@@ -429,6 +441,7 @@ class TestSpiceExtraMissing:
         "planetarypy.spice.generic_kernels",
         "planetarypy.spice.config",
         "planetarypy.spice.spicer",
+        "planetarypy.spice.mission_kernels",
     )
 
     def _without_spice(self, monkeypatch):

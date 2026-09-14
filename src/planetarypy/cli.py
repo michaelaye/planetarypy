@@ -2452,12 +2452,16 @@ def spicer(
 
     s = Spicer(body)
     if not s.is_spacecraft and not s.has_shape:
-        typer.echo(
+        message = (
             f"Error: SPICE knows {spice.bodc2n(body_code)!r}, but the loaded planetary "
             "constants kernel has no shape for it, so there is nothing to compute. "
-            "`plp spicer --list` shows the bodies that work.",
-            err=True,
+            "`plp spicer --list` shows the bodies that work."
         )
+        spacecraft = mission_kernels.spacecraft_for_mission(body)
+        if spacecraft:
+            message += (f" There is also a {body.upper()} mission; SPICE calls its "
+                        f"spacecraft {spacecraft!r}: try `plp spicer {spacecraft}`.")
+        typer.echo(message, err=True)
         raise typer.Exit(1)
     no_kernels = "[dim](needs ephemeris kernels)[/dim]"
     hints = []

@@ -186,3 +186,50 @@ def mission_spacecraft(mission: str) -> list[str]:
         if name.lower() == mission.lower():
             return spacecraft
     return []
+
+
+def _normalized(name: str) -> str:
+    return "".join(ch for ch in name.upper() if ch.isalnum())
+
+
+def spacecraft_for_mission(mission: str) -> str | None:
+    """SPICE name of a NAIF-archived mission's spacecraft, when it can be told.
+
+    Names can collide: SPICE reads ``PSYCHE`` as the asteroid, while the
+    Psyche spacecraft is ``PSYC``. This looks ``mission`` up among NAIF's
+    archived missions and matches it against SPICE's built-in spacecraft
+    names, exactly first, then as the longest built-in name the mission
+    name starts with. Returns None when ``mission`` isn't an archived
+    mission or no spacecraft name matches.
+    """
+    try:
+        from .archived_kernels import datasets
+    except Exception:
+        return None
+    wanted = _normalized(mission)
+    names = {wanted}
+    for shorthand, full_name in datasets["Mission Name"].items():
+        if wanted in (_normalized(shorthand), _normalized(full_name)):
+            names = {_normalized(shorthand), _normalized(full_name)}
+            break
+    else:
+        return None
+
+    # some mission names are spacecraft names already (MRO, MAVEN, LUCY)
+    for name in names:
+        with contextlib.suppress(Exception):
+            code = spice.bods2c(name)
+            if code < 0:
+                return spice.bodc2n(code)
+
+    builtin = []
+    for code in range(-1, -1000, -1):
+        with contextlib.suppress(Exception):
+            builtin.append(spice.bodc2n(code))
+    for name in builtin:
+        if _normalized(name) in names:
+            return name
+    prefixes = [name for name in builtin
+                if len(_normalized(name)) >= 4
+                and any(n.startswith(_normalized(name)) for n in names)]
+    return max(prefixes, key=len) if prefixes else None
