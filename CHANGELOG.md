@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.84.0] - 2026-09-14
+
+Light time from anywhere to anything: `plp spicer` gives the signal travel time
+and distance between any body or spacecraft, loads mission kernels that are
+already on disk, and `plp spice spk` fetches a live mission's current trajectory
+from NAIF. `plp spicer` output becomes a Rich table, `plp indexes prune` clears
+caches an old storage layout stranded, and a work-in-progress basemap helper
+arrives for Mars. Four fixes ride along, one of them a crash on names SPICE knows
+but cannot shape.
 
 ### Added
 
@@ -13,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Spacecraft as light-time observers, via spice-kernel-db.** `plp spicer Mercury --observer MPO --time 2027-06-01` → `0.011 s (= 3,173 km)  (bc_plan.tm)`. A spacecraft needs a mission metakernel; `planetarypy.spice.mission_kernels.find_metakernel` picks, among those [spice-kernel-db](https://github.com/michaelaye/spice-kernel-db) already has on disk, the one whose SPKs cover the requested time — `*_ops` before `*_plan` before scenario metakernels, since BepiColombo's `bc_ops.tm` ends in April 2027 while `bc_plan.tm` runs to 2031. `--metakernel` (and `metakernel=` on `light_time`) overrides the choice. Nothing is downloaded: when no tracked metakernel covers the time, the message names the `spice-kernel-db browse`/`get` commands to run. A spacecraft also works as the main body: `plp spicer MPO` shows the light time from Earth, skipping the rows that need a shape. Typing a mission instead of a spacecraft (`BepiColombo`) lists the spacecraft names to use. New `[skd]` extra.
 - **`plp spicer --list`** shows the bodies `plp spicer` can compute for (79 with the default kernels, with their equatorial radii) and the spacecraft spice-kernel-db has mission kernels for, grouped by mission.
 - **`plp spice spk <mission>`** downloads a mission's current trajectory from NAIF's operational server, where most active NASA missions (PSYCHE, LUCY, MRO, MAVEN, …) publish SPKs but no metakernel, and the PDS archive lags months behind. It picks the newest SPK covering `--time`, skips files over `--max-size` (200 MB; MAVEN's newest is 2.1 GB), deletes the ones that miss, and prints the path. `plp spicer` finds these files by itself: `plp spice spk psyche` then `plp spicer PSYC` → `16 min 18.0 s (= 293.196 million km)`. API: `planetarypy.spice.operational_kernels.fetch_spk` / `find_local_spk`, and `mission_kernels.find_spacecraft_kernel`, which tries spice-kernel-db first.
+- **`plp indexes prune`** reports index caches stranded by an earlier storage layout, or by an index key renamed upstream (`mer.opportunity` → `mer_opportunity.pancam`), and deletes them with `--yes`. Orphans are found by difference against the directories the current layout computes for every registered key, so future layout changes are caught too; one development machine held 3.11 GB of them. `--yes` refreshes the key registry from upstream first, so a stale local config cannot make a live cache look orphaned. API: `planetarypy.pds.find_orphan_index_caches` / `remove_orphan_index_caches`.
 - **WIP: `datasets.add_basemap(ax, body)`** — draws a surface image behind lon/lat data you have already plotted, reading only the window the axes show and leaving their limits alone; `default_basemap(body)` and `basemaps(body)` pick and list the candidates. Work in progress: the registry holds a single usable background so far (HRSC level-3 for Mars), so every other body raises `LookupError` until global mosaics for them are added.
 
 ### Changed
@@ -23,9 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`Spicer.supported_bodies()` returned an empty list in a fresh session.** It is a static method, and the generic kernels only loaded when a `Spicer` was created, so calling it first found no radii. It now loads them itself.
 - **`plp spicer psyche` crashed with a SPICE traceback.** SPICE knows the name (the asteroid 16 Psyche), but the default planetary constants kernel has no radii for it, and the radii row raised. A body without a shape now exits with a one-line error pointing at `plp spicer --list`; the new `Spicer.has_shape` makes the check. When the name is also a NAIF-archived mission, the error names its spacecraft (SPICE calls the Psyche spacecraft `PSYC`), via the new `mission_kernels.spacecraft_for_mission`.
-
 - **A reprojection notice opened with a lowercase proper noun.** `announce_conversion` built its message as `f"{what} reprojected from …"`, and `nomenclature` passes `what=f"{body} nomenclature"` with the body as the user typed it — so the sentence began "mars nomenclature reprojected…". Reworded to "Reprojected {what} from …", which fixes it for every caller rather than guessing capitalisation rules for body names.
-
 - **A tutorial leaked a local kernel path into the published docs.** The surface-features tutorial let one `CRSConversionWarning` escape uncaught, so Python's default formatter printed its origin — an ephemeral `/var/folders/…/ipykernel_NNNN/…py` path from the machine that rendered it — onto the public page. That cell now catches and prints the warning like the earlier one does; the warning stays visible, the path does not.
 
 ## [0.83.0] - 2026-09-07
