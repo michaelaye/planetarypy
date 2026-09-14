@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Mission metakernels are found through spice-kernel-db's own quiet lookup.** `find_metakernel` now asks `KernelDB.metakernels_covering` which tracked metakernels cover the spacecraft, instead of opening every SPK itself and swallowing the table `list_metakernels` used to print. The `[skd]` extra now needs spice-kernel-db 0.19 or newer.
+
 ## [0.84.0] - 2026-09-14
 
 Light time from anywhere to anything: `plp spicer` gives the signal travel time

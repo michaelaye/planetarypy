@@ -16,7 +16,6 @@ PosixPath('.../BEPICOLOMBO/mk/bc_plan.tm')
 from __future__ import annotations
 
 import contextlib
-import io
 from pathlib import Path
 
 from ._deps import spice
@@ -40,13 +39,9 @@ def _skd():
     return spice_kernel_db
 
 
-def tracked_metakernels() -> list[dict]:
-    """Metakernels spice-kernel-db has on disk, without identical aliases.
-
-    Each dict carries at least ``filename``, ``mission`` and ``mk_path``.
-    Raises ``LookupError`` when the database is missing or locked by a
-    running spice-kernel-db write.
-    """
+@contextlib.contextmanager
+def _database():
+    """spice-kernel-db's database, read-only; LookupError when missing or locked."""
     import duckdb
 
     try:
@@ -60,11 +55,20 @@ def tracked_metakernels() -> list[dict]:
                       "mission with `spice-kernel-db mission add`.")
         raise LookupError(reason) from exc
     try:
-        # list_metakernels() also prints a Rich summary table
-        with contextlib.redirect_stdout(io.StringIO()):
-            rows = db.list_metakernels()
+        yield db
     finally:
         db.close()
+
+
+def tracked_metakernels() -> list[dict]:
+    """Metakernels spice-kernel-db has on disk, without identical aliases.
+
+    Each dict carries at least ``filename``, ``mission`` and ``mk_path``.
+    Raises ``LookupError`` when the database is missing or locked by a
+    running spice-kernel-db write.
+    """
+    with _database() as db:
+        rows = db.list_metakernels(show=False)
     return [r for r in rows if not r.get("identical_to")]
 
 
@@ -72,12 +76,6 @@ def _spk_paths(mk_path) -> list[Path]:
     parsed = _skd().parse_metakernel(mk_path)
     paths = (Path(parsed.resolve(raw)) for raw in parsed.kernels)
     return [p for p in paths if p.suffix.lower() == ".bsp" and p.is_file()]
-
-
-def _coverage(spk_path: Path, body_id: int) -> list[tuple[float, float]]:
-    cover = spice.stypes.SPICEDOUBLE_CELL(2000)
-    spice.spkcov(str(spk_path), body_id, cover)
-    return [tuple(spice.wnfetd(cover, i)) for i in range(spice.wncard(cover))]
 
 
 def _preference(filename: str) -> int:
@@ -113,19 +111,12 @@ def find_metakernel(spacecraft: str, time=None) -> Path:
 
     body_id = spice.bods2c(spacecraft)
     et = _to_et(time)
-    candidates = sorted(
-        tracked_metakernels(),
-        key=lambda r: (_preference(r["filename"]), r["filename"]),
-    )
-    missions_with_body = set()
-    for row in candidates:
-        intervals = [
-            iv for spk in _spk_paths(row["mk_path"]) for iv in _coverage(spk, body_id)
-        ]
-        if intervals:
-            missions_with_body.add(row["mission"])
-        if any(start <= et <= end for start, end in intervals):
-            return Path(row["mk_path"])
+    with _database() as db:
+        covering = db.metakernels_covering(body_id, et)
+        if covering:
+            best = min(covering, key=lambda r: (_preference(r["filename"]), r["filename"]))
+            return Path(best["mk_path"])
+        missions_with_body = {r["mission"] for r in db.metakernels_covering(body_id)}
 
     when = spice.et2utc(et, "ISOC", 0)
     if missions_with_body:

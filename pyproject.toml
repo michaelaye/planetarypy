@@ -64,7 +64,7 @@ spice = [
 # `plp spicer --observer`, from mission metakernels spice-kernel-db has on disk.
 # Use together with [spice].
 skd = [
-    "spice-kernel-db>=0.18",
+    "spice-kernel-db>=0.19",
 ]
 # Optional dependencies for ISIS3-pipeline workflows (CTX calibration,
 # projected cubes, footprint geometry, interactive raster display).

@@ -28,17 +28,24 @@ def _require_generic_kernels(is_transient_network_error):
 
 
 def _fake_store(monkeypatch, coverage):
-    """Tracked metakernels whose single SPK covers MPO over ``coverage[filename]``."""
-    rows = [
-        {"filename": name, "mission": "BEPICOLOMBO", "mk_path": f"/mk/{name}"}
-        for name in coverage
-    ]
-    monkeypatch.setattr(mission_kernels, "tracked_metakernels", lambda: rows)
-    monkeypatch.setattr(mission_kernels, "_spk_paths", lambda mk_path: [mk_path])
-    monkeypatch.setattr(
-        mission_kernels, "_coverage",
-        lambda spk, body_id: coverage[spk.rsplit("/", 1)[1]],
-    )
+    """A read-only skd database whose metakernels cover MPO over ``coverage[filename]``."""
+
+    class FakeDB:
+        def __init__(self, read_only):
+            assert read_only
+
+        def metakernels_covering(self, body_id, et=None, mission=None):
+            return [
+                {"filename": name, "mission": "BEPICOLOMBO", "mk_path": f"/mk/{name}",
+                 "intervals": spans}
+                for name, spans in coverage.items()
+                if spans and (et is None or any(s <= et <= e for s, e in spans))
+            ]
+
+        def close(self):
+            pass
+
+    monkeypatch.setitem(sys.modules, "spice_kernel_db", SimpleNamespace(KernelDB=FakeDB))
 
 
 def _et(utc):
@@ -90,8 +97,8 @@ class TestDatabaseAccess:
             def __init__(self, read_only):
                 assert read_only
 
-            def list_metakernels(self):
-                print("a Rich table")
+            def list_metakernels(self, show=True):
+                assert show is False
                 return [
                     {"filename": "bc_plan.tm", "identical_to": None},
                     {"filename": "bc_plan_v2.tm", "identical_to": "bc_plan.tm"},
