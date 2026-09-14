@@ -280,6 +280,20 @@ class Spicer:
         flux = self.L_SUN / (2 * tau * dist_m**2)
         return _maybe_quantity(flux, "W/m2", self._units)
 
+    def light_time(self, time=None, observer: str = "EARTH") -> float:
+        """One-way light (signal) travel time from the body to an observer [s].
+
+        The signal is received by ``observer`` at ``time`` (default: now), so
+        it left the body one light time earlier ("LT" correction).
+        """
+        et = _to_et(time)
+        try:
+            _, lt = spice.spkpos(self._body, et, "J2000", "LT", observer)
+        except Exception:
+            self._ensure_ephemeris()
+            _, lt = spice.spkpos(self._body, et, "J2000", "LT", observer)
+        return _maybe_quantity(lt, "s", self._units)
+
     def illumination(self, lon: float, lat: float, time=None,
                      observer: str | None = None,
                      tau_atm: float = 0.0,

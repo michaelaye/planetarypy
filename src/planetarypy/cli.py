@@ -2316,6 +2316,7 @@ def spicer(
 
     with _spice_deps():
         from planetarypy.spice.spicer import Spicer
+    from astropy.time import TimeDelta
 
     try:
         s = Spicer(body)
@@ -2345,6 +2346,12 @@ def spicer(
         typer.echo(f"  Solar constant:        {sc:.0f} W/m²")
     except Exception:
         typer.echo("  Solar constant:        (needs ephemeris kernels)")
+
+    try:
+        lt = TimeDelta(round(s.light_time(time), 1), format="sec")
+        typer.echo(f"  Light time from Earth: {lt.to_value('quantity_str')}")
+    except Exception:
+        typer.echo("  Light time from Earth: (needs ephemeris kernels)")
 
     if lon is not None and lat is not None:
         try:

@@ -64,6 +64,26 @@ class TestSolarLongitude:
         assert hasattr(ls, "unit")
 
 
+class TestLightTime:
+    def test_moon_bounded_by_perigee_and_apogee(self):
+        lt = Spicer("MOON").light_time("2024-01-01")
+        # 356,400 km .. 406,700 km at c = 299,792.458 km/s
+        assert 1.188 < lt < 1.357
+
+    def test_matches_geometric_distance_over_c(self):
+        time = "2024-01-01"
+        lt = Spicer("MARS").light_time(time)
+        et = spiceypy.utc2et(time)
+        pos, _ = spiceypy.spkpos("MARS", et, "J2000", "NONE", "EARTH")
+        # Mars moves ~24 km/s relative to Earth during the light time,
+        # so the retarded distance differs from the geometric one by < 1e-4.
+        assert lt == pytest.approx(spiceypy.vnorm(pos) / spiceypy.clight(), rel=1e-4)
+
+    def test_units(self):
+        lt = Spicer("MARS", units=True).light_time("2024-01-01")
+        assert str(lt.unit) == "s"
+
+
 class TestIllumination:
     def test_basic(self):
         s = Spicer("MARS")

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Spicer.light_time(time=None, observer="EARTH")`** — one-way signal travel time from a body to an observer, in seconds (an astropy quantity with `units=True`). It is the light-time-corrected value: the signal arrives at `time`, so it left the body one light time earlier. `plp spicer <body>` now prints it as "Light time from Earth", formatted by astropy's `TimeDelta` (`1.3s` for the Moon, `5min 21.2s` for Mars, `1hr 25min 6.1s` for Saturn).
+
 ### Fixed
 
 - **A reprojection notice opened with a lowercase proper noun.** `announce_conversion` built its message as `f"{what} reprojected from …"`, and `nomenclature` passes `what=f"{body} nomenclature"` with the body as the user typed it — so the sentence began "mars nomenclature reprojected…". Reworded to "Reprojected {what} from …", which fixes it for every caller rather than guessing capitalisation rules for body names.
