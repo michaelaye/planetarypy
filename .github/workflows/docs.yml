@@ -6,6 +6,7 @@ on:
     paths:
       - 'docs/**'
       - 'src/**'
+      - 'CHANGELOG.md'  # docs/_sync_changelog.py builds the release-notes page from it
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
