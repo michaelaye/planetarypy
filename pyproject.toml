@@ -60,6 +60,12 @@ spice = [
     "spiceypy",       # For SPICE kernel handling
     "scipy",          # For scipy.spatial.transform.Rotation in spicer.py
 ]
+# Spacecraft positions for `Spicer.light_time(observer=<spacecraft>)` and
+# `plp spicer --observer`, from mission metakernels spice-kernel-db has on disk.
+# Use together with [spice].
+skd = [
+    "spice-kernel-db>=0.18",
+]
 # Optional dependencies for ISIS3-pipeline workflows (CTX calibration,
 # projected cubes, footprint geometry, interactive raster display).
 # Installs Python-side glue only — ISIS itself is a separate heavy

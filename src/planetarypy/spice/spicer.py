@@ -84,8 +84,16 @@ def _parse_time(time) -> dt.datetime:
     return tparser.parse(time)
 
 
+def _ensure_generic_kernels():
+    global _kernels_loaded
+    if not _kernels_loaded:
+        load_generic_kernels()
+        _kernels_loaded = True
+
+
 def _to_et(time) -> float:
     """Convert a time argument to SPICE ephemeris time."""
+    _ensure_generic_kernels()
     t = _parse_time(time)
     return spice.utc2et(t.isoformat())
 
@@ -172,10 +180,7 @@ class Spicer:
     L_SUN = 3.828e26  # Solar luminosity [W]
 
     def __init__(self, body: str, units: bool = False):
-        global _kernels_loaded
-        if not _kernels_loaded:
-            load_generic_kernels()
-            _kernels_loaded = True
+        _ensure_generic_kernels()
         self._body = body.upper()
         self._units = units
 
@@ -280,20 +285,34 @@ class Spicer:
         flux = self.L_SUN / (2 * tau * dist_m**2)
         return _maybe_quantity(flux, "W/m2", self._units)
 
-    def light_time(self, time=None, observer: str = "EARTH") -> float:
+    def light_time(self, time=None, observer: str = "EARTH",
+                   metakernel=None) -> float:
         """One-way light (signal) travel time from the body to an observer [s].
 
         The signal is received by ``observer`` (NAIF name or ID) at ``time``
         (default: now), so it left the body one light time earlier ("LT"
         correction).
+
+        A spacecraft observer needs a mission metakernel. Without
+        ``metakernel`` (a path, or the filename of one tracked by
+        spice-kernel-db), the tracked one covering ``time`` is found with
+        :func:`planetarypy.spice.mission_kernels.find_metakernel`. Loading it
+        stays in effect for the rest of the session, including its own
+        LSK/PCK versions.
         """
+        from . import mission_kernels
+
         et = _to_et(time)
+        if metakernel is not None:
+            spice.furnsh(str(mission_kernels.resolve_metakernel(metakernel)))
         try:
             _, lt = spice.spkpos(self._body, et, "J2000", "LT", observer)
         except Exception:
             # either end may be a moon whose system ephemeris isn't loaded yet
             ensure_system_for_body(self._body)
             ensure_system_for_body(observer)
+            if metakernel is None and spice.bods2c(observer) < 0:
+                spice.furnsh(str(mission_kernels.find_metakernel(observer, time)))
             _, lt = spice.spkpos(self._body, et, "J2000", "LT", observer)
         return _maybe_quantity(lt, "s", self._units)
 

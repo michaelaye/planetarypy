@@ -102,6 +102,7 @@ Supporting files: `_mission_map.py`, `_parser.py`, `_repo.py`, `_schema.py`, `_u
   - `Spicer(body).illumination(lon, lat, time)` — full illumination angles
   - `Spicer(body).solar_azimuth_at(lon, lat, time)` — CW-from-north sun azimuth
   - `Spicer(body).north_azimuth_at(lon, lat, time)` — image-plane north arrow
+- `mission_kernels.py` — spacecraft ephemerides via the optional `[skd]` extra (`spice-kernel-db`): `find_metakernel(spacecraft, time)` picks the tracked metakernel whose SPKs cover that time (`*_ops` > `*_plan` > scenarios). Read-only and never downloads; failures raise `LookupError` naming the `spice-kernel-db` command to run. `KernelDB.list_metakernels()` prints a table, so its stdout is swallowed here.
 - `config.py` — SPICE-specific paths
 - Kernels cached under `{storage_root}/spice_kernels/`
 

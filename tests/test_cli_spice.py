@@ -234,6 +234,7 @@ class TestSpicerObserver:
     @pytest.fixture()
     def fake_spicer(self, monkeypatch):
         pytest.importorskip("spiceypy")
+        from planetarypy.spice import mission_kernels
         from planetarypy.spice import spicer as spicer_mod
 
         observers = []
@@ -255,11 +256,14 @@ class TestSpicerObserver:
             def solar_constant(self, time):
                 return 515.0
 
-            def light_time(self, time, observer):
+            def light_time(self, time, observer, metakernel=None):
                 observers.append(observer)
-                return 2000.0
+                self.metakernels.append(metakernel)
+                return 0.0112 if metakernel else 2000.0
 
+        FakeSpicer.metakernels = []
         monkeypatch.setattr(spicer_mod, "Spicer", FakeSpicer)
+        monkeypatch.setattr(mission_kernels, "mission_spacecraft", lambda mission: [])
         return observers
 
     def test_default_is_earth(self, fake_spicer):
@@ -278,6 +282,56 @@ class TestSpicerObserver:
         result = runner.invoke(app, ["spicer", "Mars", "--observer", "Notabody"])
         assert result.exit_code == 1
         assert result.stderr.startswith("Error:")
+
+    def test_mission_name_lists_its_spacecraft(self, fake_spicer, monkeypatch):
+        from planetarypy.spice import mission_kernels
+
+        monkeypatch.setattr(
+            mission_kernels, "mission_spacecraft", lambda mission: ["BEPICOLOMBO MPO"]
+        )
+        result = runner.invoke(app, ["spicer", "Mercury", "--observer", "BepiColombo"])
+        assert result.exit_code == 1
+        assert "'BEPICOLOMBO MPO'" in result.stderr
+
+    def test_spacecraft_uses_found_metakernel_and_names_it(
+        self, fake_spicer, monkeypatch, tmp_path
+    ):
+        from planetarypy.spice import mission_kernels
+
+        mk = tmp_path / "bc_plan.tm"
+        monkeypatch.setattr(mission_kernels, "find_metakernel", lambda sc, time: mk)
+        result = runner.invoke(app, ["spicer", "Mercury", "--observer", "MPO"])
+        assert result.exit_code == 0
+        assert "Light time from BEPICOLOMBO MPO: 0.011s  (bc_plan.tm)" in result.stdout
+
+    def test_metakernel_option_overrides_the_search(self, fake_spicer, monkeypatch, tmp_path):
+        from planetarypy.spice import mission_kernels
+
+        mk = tmp_path / "bc_ops.tm"
+        mk.touch()
+
+        def must_not_search(*args):
+            raise AssertionError("find_metakernel called despite --metakernel")
+
+        monkeypatch.setattr(mission_kernels, "find_metakernel", must_not_search)
+        result = runner.invoke(
+            app, ["spicer", "Mercury", "--observer", "MPO", "--metakernel", str(mk)]
+        )
+        assert result.exit_code == 0
+        assert "(bc_ops.tm)" in result.stdout
+
+    def test_no_covering_metakernel_prints_the_hint(self, fake_spicer, monkeypatch):
+        from planetarypy.spice import mission_kernels
+
+        def nothing_covers(sc, time):
+            raise LookupError("No metakernel tracked by spice-kernel-db covers MPO.\n"
+                              "    spice-kernel-db browse BEPICOLOMBO")
+
+        monkeypatch.setattr(mission_kernels, "find_metakernel", nothing_covers)
+        result = runner.invoke(app, ["spicer", "Mercury", "--observer", "MPO"])
+        assert result.exit_code == 0
+        assert "Light time from BEPICOLOMBO MPO: (no mission kernels)" in result.stdout
+        assert "spice-kernel-db browse BEPICOLOMBO" in result.stdout
 
 
 class TestSpiceExtraMissing:
