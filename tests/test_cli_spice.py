@@ -12,6 +12,7 @@ Three verbs are CLI-ready against the existing
 Tests use Typer's ``CliRunner`` to capture stdout + stderr per stream.
 """
 
+import re
 import sys
 from unittest.mock import patch
 
@@ -231,6 +232,15 @@ class TestTabCompletion:
 class TestSpicerObserver:
     """``--observer`` threads through to ``Spicer.light_time`` and names the body."""
 
+    @staticmethod
+    def row(stdout, label):
+        """The Rich table row whose first cell is ``label``, cells stripped."""
+        for line in stdout.splitlines():
+            cells = [c.strip() for c in re.split("[│┃]", line) if c.strip()]
+            if cells and cells[0] == label:
+                return cells
+        raise AssertionError(f"no row {label!r} in:\n{stdout}")
+
     @pytest.fixture()
     def fake_spicer(self, monkeypatch):
         pytest.importorskip("spiceypy")
@@ -271,13 +281,15 @@ class TestSpicerObserver:
         result = runner.invoke(app, ["spicer", "Mars"])
         assert result.exit_code == 0
         assert fake_spicer == ["EARTH"]
-        assert "Light time from Earth: 33min 20.0s" in result.stdout
+        assert self.row(result.stdout, "Light time from Earth") == [
+            "Light time from Earth", "33 min 20.0 s (= 599.585 million km)"
+        ]
 
     def test_naif_id_is_shown_by_name(self, fake_spicer):
         result = runner.invoke(app, ["spicer", "Mars", "--observer", "599"])
         assert result.exit_code == 0
         assert fake_spicer == ["599"]
-        assert "Light time from Jupiter:" in result.stdout
+        self.row(result.stdout, "Light time from Jupiter")
 
     def test_unknown_observer_errors(self, fake_spicer):
         result = runner.invoke(app, ["spicer", "Mars", "--observer", "Notabody"])
@@ -303,7 +315,9 @@ class TestSpicerObserver:
         monkeypatch.setattr(mission_kernels, "find_metakernel", lambda sc, time: mk)
         result = runner.invoke(app, ["spicer", "Mercury", "--observer", "MPO"])
         assert result.exit_code == 0
-        assert "Light time from BEPICOLOMBO MPO: 0.011s  (bc_plan.tm)" in result.stdout
+        assert self.row(result.stdout, "Light time from BEPICOLOMBO MPO")[1] == (
+            "0.011 s (= 3,358 km)  (bc_plan.tm)"
+        )
 
     def test_metakernel_option_overrides_the_search(self, fake_spicer, monkeypatch, tmp_path):
         from planetarypy.spice import mission_kernels
@@ -330,9 +344,13 @@ class TestSpicerObserver:
         result = runner.invoke(app, ["spicer", "MPO", "--lon", "1", "--lat", "2"])
         assert result.exit_code == 0
         assert "BEPICOLOMBO MPO (spacecraft)" in result.stdout
-        assert "Light time from Earth: 0.011s  (bc_plan.tm)" in result.stdout
+        assert self.row(result.stdout, "Light time from Earth")[1] == (
+            "0.011 s (= 3,358 km)  (bc_plan.tm)"
+        )
         assert "Radii" not in result.stdout
-        assert "a spacecraft has no surface" in result.stdout
+        assert self.row(result.stdout, "Surface illumination")[1] == (
+            "(a spacecraft has no surface)"
+        )
 
     def test_unknown_body_errors_like_an_unknown_observer(self, fake_spicer):
         result = runner.invoke(app, ["spicer", "Notabody"])
@@ -349,7 +367,9 @@ class TestSpicerObserver:
         monkeypatch.setattr(mission_kernels, "find_metakernel", nothing_covers)
         result = runner.invoke(app, ["spicer", "Mercury", "--observer", "MPO"])
         assert result.exit_code == 0
-        assert "Light time from BEPICOLOMBO MPO: (no mission kernels)" in result.stdout
+        assert self.row(result.stdout, "Light time from BEPICOLOMBO MPO")[1] == (
+            "(no mission kernels)"
+        )
         assert "spice-kernel-db browse BEPICOLOMBO" in result.stdout
 
 

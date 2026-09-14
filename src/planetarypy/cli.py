@@ -10,6 +10,7 @@ the planetarypy-hirise and planetarypy-ctx packages, which mount them here
 through the ``planetarypy.cli_plugins`` entry point.
 """
 
+import re
 import textwrap
 from contextlib import contextmanager
 from pathlib import Path
@@ -2293,9 +2294,15 @@ def indexes_prune(
 # ── spicer ───────────────────────────────────────────────────────────
 
 
-def _spicer_light_time(s, time, observer, observer_code, observer_name, metakernel):
-    """Print the light-time line, finding mission metakernels for spacecraft ends."""
+def _spicer_light_time(s, time, observer, observer_code, metakernel):
+    """The light-time cell, plus a hint to print below the table (or None).
+
+    Finds mission metakernels for a spacecraft at either end.
+    """
+    from astropy import constants as const
+    from astropy import units as u
     from astropy.time import TimeDelta
+    from rich.markup import escape
 
     from planetarypy.spice import mission_kernels
 
@@ -2303,27 +2310,32 @@ def _spicer_light_time(s, time, observer, observer_code, observer_name, metakern
         if metakernel is not None:
             mks = [mission_kernels.resolve_metakernel(metakernel)]
         else:
-            spacecraft = [name for name, code in ((s.body, s.target_id), (observer, observer_code))
-                          if code < 0]
+            ends = ((s.body, s.target_id), (observer, observer_code))
+            spacecraft = [name for name, code in ends if code < 0]
             mks = list(dict.fromkeys(
                 mission_kernels.find_metakernel(name, time) for name in spacecraft
             ))
     except (ImportError, LookupError) as e:
-        typer.echo(f"  Light time from {observer_name}: (no mission kernels)")
-        typer.echo(textwrap.indent(str(e), "    "))
-        return
-    names = ", ".join(mk.name for mk in mks)
+        return "[dim](no mission kernels)[/dim]", str(e)
+    names = escape(", ".join(mk.name for mk in mks))
     try:
         seconds = s.light_time(time, observer=observer, metakernel=mks)
     except Exception:
         missing = f"{names} doesn't cover this time" if mks else "needs ephemeris kernels"
-        typer.echo(f"  Light time from {observer_name}: ({missing})")
-        return
-    # a spacecraft in orbit is milliseconds away; keep those digits
-    seconds = round(seconds, 1 if seconds >= 60 else 3)
-    lt = TimeDelta(seconds, format="sec").to_value("quantity_str")
-    source = f"  ({names})" if mks else ""
-    typer.echo(f"  Light time from {observer_name}: {lt}{source}")
+        return f"[dim]({missing})[/dim]", None
+    if seconds < 60:
+        # a spacecraft in orbit is milliseconds away; keep those digits
+        lt = f"{seconds * u.s:.3f}"
+    else:
+        # TimeDelta writes "6min 19.2s"; space the units like a Quantity does
+        mixed = TimeDelta(round(seconds, 1), format="sec").to_value("quantity_str")
+        lt = re.sub(r"(\d)([a-z])", r"\1 \2", mixed)
+    distance = (seconds * u.s * const.c).to(u.km)
+    if distance < 1e6 * u.km:
+        lt += f" (= {distance:,.0f})"
+    else:
+        lt += f" (= {distance.to_value(u.km) / 1e6:,.3f} million km)"
+    return (f"{lt}  [dim]({names})[/dim]" if mks else lt), None
 
 
 @app.command(rich_help_panel=_PANEL_SCIENCE)
@@ -2368,6 +2380,8 @@ def spicer(
         from planetarypy.spice import mission_kernels
         from planetarypy.spice._deps import spice
         from planetarypy.spice.spicer import Spicer
+    from rich.console import Console
+    from rich.table import Table
 
     def naif_code(name: str, what: str) -> int:
         try:
@@ -2391,56 +2405,62 @@ def spicer(
         observer_name = observer_name.title()
 
     s = Spicer(body)
+    no_kernels = "[dim](needs ephemeris kernels)[/dim]"
+    hints = []
+
+    def attempt(compute, fmt):
+        try:
+            return fmt(compute())
+        except Exception:
+            return no_kernels
+
     if s.is_spacecraft:
         title = f"{spice.bodc2n(body_code)} (spacecraft)"
-        typer.echo(f"\n  {title}")
-        typer.echo(f"  {'=' * len(title)}")
-        _spicer_light_time(s, time, observer, observer_code, observer_name, metakernel)
-        if lon is not None and lat is not None:
-            typer.echo("\n  Surface illumination: (a spacecraft has no surface)")
-        typer.echo()
-        return
+    else:
+        title = s.body
+    table = Table(title=title, title_style="bold", header_style="bold magenta")
+    table.add_column("quantity", style="cyan", no_wrap=True)
+    table.add_column("value", overflow="fold")
 
-    typer.echo(f"\n  {s.body}")
-    typer.echo(f"  {'=' * len(s.body)}")
-    typer.echo(f"  Radii:          {s.radii.a:.1f} x {s.radii.b:.1f} x {s.radii.c:.1f} km")
-    typer.echo(f"  Reference frame: {s.ref_frame}")
+    if not s.is_spacecraft:
+        r = s.radii
+        table.add_row("Radii", f"{r.a:.1f} x {r.b:.1f} x {r.c:.1f} km")
+        table.add_row("Reference frame", s.ref_frame)
+        table.add_section()
+        table.add_row("Solar longitude (L_s)",
+                      attempt(lambda: s.solar_longitude(time), lambda ls: f"{ls:.1f}°"))
+        table.add_row("Sub-solar point",
+                      attempt(lambda: s.subsolar_point(time),
+                              lambda p: f"lon={p[0]:.2f}°, lat={p[1]:.2f}°"))
+        table.add_row("Solar constant",
+                      attempt(lambda: s.solar_constant(time), lambda sc: f"{sc:.0f} W/m²"))
 
-    try:
-        ls = s.solar_longitude(time)
-        typer.echo(f"\n  Solar longitude (L_s): {ls:.1f}")
-    except Exception:
-        typer.echo("\n  Solar longitude:       (needs ephemeris kernels)")
-
-    try:
-        ss_lon, ss_lat = s.subsolar_point(time)
-        typer.echo(f"  Sub-solar point:       lon={ss_lon:.2f}, lat={ss_lat:.2f}")
-    except Exception:
-        typer.echo("  Sub-solar point:       (needs ephemeris kernels)")
-
-    try:
-        sc = s.solar_constant(time)
-        typer.echo(f"  Solar constant:        {sc:.0f} W/m²")
-    except Exception:
-        typer.echo("  Solar constant:        (needs ephemeris kernels)")
-
-    _spicer_light_time(s, time, observer, observer_code, observer_name, metakernel)
+    light_time, hint = _spicer_light_time(s, time, observer, observer_code, metakernel)
+    table.add_row(f"Light time from {observer_name}", light_time)
+    if hint:
+        hints.append(hint)
 
     if lon is not None and lat is not None:
-        try:
-            illum = s.illumination(lon=lon, lat=lat, time=time)
-            typer.echo(f"\n  Surface at ({lon}, {lat}):")
-            typer.echo(f"    Solar incidence:   {illum.solar_incidence:.1f}")
-            typer.echo(f"    Solar flux:        {illum.solar_flux:.0f} W/m²")
-            typer.echo(f"    Local solar time:  {illum.local_solar_time}")
+        table.add_section()
+        if s.is_spacecraft:
+            table.add_row("Surface illumination", "[dim](a spacecraft has no surface)[/dim]")
+        else:
+            table.add_row("Surface point", f"lon={lon}°, lat={lat}°")
+            try:
+                illum = s.illumination(lon=lon, lat=lat, time=time)
+                az = s.solar_azimuth_at(lon, lat, time)
+                table.add_row("Solar incidence", f"{illum.solar_incidence:.1f}°")
+                table.add_row("Solar flux", f"{illum.solar_flux:.0f} W/m²")
+                table.add_row("Local solar time", str(illum.local_solar_time))
+                table.add_row("Solar azimuth", f"{az:.1f}° (CW from N)")
+            except Exception as e:
+                table.add_row("Surface illumination", no_kernels)
+                hints.append(str(e))
 
-            az = s.solar_azimuth_at(lon, lat, time)
-            typer.echo(f"    Solar azimuth:     {az:.1f} (CW from N)")
-        except Exception as e:
-            typer.echo("\n  Surface illumination: (needs ephemeris kernels)")
-            typer.echo(f"    {e}")
-
-    typer.echo()
+    console = Console()
+    console.print(table)
+    for hint in hints:
+        typer.echo(textwrap.indent(hint, "  "))
 
 
 # TODO: plp geo sub-app over planetarypy.geo is the next planned CLI
