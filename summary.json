@@ -1,5 +1,5 @@
 {
-  "checked": "2026-09-30 22:38 UTC",
+  "checked": "2026-10-01 06:34 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -16,8 +16,8 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 1,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -34,8 +34,8 @@
     {
       "host": "sbnarchive.psi.edu",
       "total": 1,
-      "failing": 1,
-      "up": false
+      "failing": 0,
+      "up": true
     }
   ],
   "results": [
@@ -43,8 +43,8 @@
       "host": "sbnarchive.psi.edu",
       "index_key": "cassini.cda.index",
       "url": "https://sbnarchive.psi.edu/pds3/cassini/cda/COCDA_0101/INDEX/INDEX.LBL",
-      "status": "522",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -64,8 +64,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.cirs.cube_ring_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_ring_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
