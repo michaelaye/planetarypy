@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-01 22:55 UTC",
+  "checked": "2026-10-02 06:14 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -16,7 +16,7 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 21,
+      "failing": 38,
       "up": false
     },
     {
@@ -71,8 +71,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.cruise_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_1xxx/COISS_1999/COISS_1999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -85,8 +85,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.inventory",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_inventory.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -225,50 +225,50 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.vims.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COVIMS_0xxx/COVIMS_0999/COVIMS_0999_supplemental_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "go.ssi.body_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_body_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "go.ssi.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "go.ssi.ring_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_ring_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "go.ssi.sky_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_sky_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "go.ssi.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_supplemental_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "juno.junocam.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/JNOJNC_0xxx/JNOJNC_0999/JNOJNC_0999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -491,15 +491,15 @@
       "host": "pds-rings.seti.org",
       "index_key": "new_horizons.lorri.edr",
       "url": "https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_1999/NHxxLO_1999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "new_horizons.lorri.rdr",
       "url": "https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_2999/NHxxLO_2999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -526,57 +526,57 @@
       "host": "pds-rings.seti.org",
       "index_key": "voyager1.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager1.iss.jupiter_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_jupiter_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager1.iss.moon_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_moon_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager1.iss.raw_image_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_raw_image_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager1.iss.ring_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_ring_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager1.iss.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_supplemental_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager2.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager2.iss.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_supplemental_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     }
   ]
 }
