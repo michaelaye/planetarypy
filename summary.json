@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-02 22:34 UTC",
+  "checked": "2026-10-03 05:45 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -16,8 +16,8 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 0,
-      "up": true
+      "failing": 3,
+      "up": false
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -197,8 +197,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.vims.occ_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COVIMS_8xxx/COVIMS_8001/COVIMS_8001_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -218,15 +218,15 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.vims.saturn_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COVIMS_0xxx/COVIMS_0999/COVIMS_0999_saturn_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.vims.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COVIMS_0xxx/COVIMS_0999/COVIMS_0999_supplemental_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
