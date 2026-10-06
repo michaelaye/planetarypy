@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-05 15:17 UTC",
+  "checked": "2026-10-06 00:21 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -16,8 +16,8 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 0,
-      "up": true
+      "failing": 6,
+      "up": false
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -120,22 +120,22 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.rss.profile_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_profile_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.moon_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_moon_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -155,22 +155,22 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.ring_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_ring_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.saturn_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_saturn_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_supplemental_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
