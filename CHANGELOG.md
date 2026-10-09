@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.84.2] - 2026-10-09
+
+A robustness fix for index downloads: a slow PDS server no longer makes
+`get_index` fail before it has tried to download, and a server that goes
+silent no longer hangs a download forever.
+
+### Fixed
+
+- **A timed-out update check no longer fails `get_index`.** Before downloading, a static index asks the server when the file last changed, with a 10 s limit. A slow reply raised `TimeoutError`, which the check's "warn and carry on" handling did not catch, so `get_index` failed without trying the download. The check now warns and the download goes ahead. The scheduled PDS download smoke failed this way on pds-rings.seti.org four times since 2026-09-08.
+- **Downloads time out when the server goes silent.** `url_retrieve` gave `requests` no timeout, so a server that stopped answering could hang a download indefinitely. It now gives up after 30 s without a connection or without new data; a large file that keeps arriving is never cut off.
+
 ## [0.84.1] - 2026-09-14
 
 A correctness fix for the SPICE tools, released quickly: without an explicit
