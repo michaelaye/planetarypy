@@ -1,11 +1,11 @@
 {
-  "checked": "2026-10-09 13:50 UTC",
+  "checked": "2026-10-09 22:55 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "total": 3,
-      "failing": 3,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -16,7 +16,7 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 38,
+      "failing": 34,
       "up": false
     },
     {
@@ -267,8 +267,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "juno.junocam.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/JNOJNC_0xxx/JNOJNC_0999/JNOJNC_0999_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -393,22 +393,22 @@
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.dtm",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/DTMCUMINDEX.LBL",
-      "status": "ReadTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.edr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL",
-      "status": "502",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.rdr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/RDRCUMINDEX.LBL",
-      "status": "502",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -491,8 +491,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "new_horizons.lorri.edr",
       "url": "https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_1999/NHxxLO_1999_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -568,15 +568,15 @@
       "host": "pds-rings.seti.org",
       "index_key": "voyager2.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager2.iss.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_supplemental_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     }
   ]
 }

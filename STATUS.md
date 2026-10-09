@@ -1,12 +1,12 @@
 # PDS archive reachability
 
-Last checked: 2026-10-09 13:50 UTC
+Last checked: 2026-10-09 22:55 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
-| HiRISE (LPL) | 3 | **3 failing** |
+| HiRISE (LPL) | 3 | up |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **38 failing** |
+| PDS Rings (SETI) | 42 | **34 failing** |
 | LROC (ASU) | 1 | up |
 | PDS Imaging (JPL) | 8 | up |
 | SBN (PSI) | 1 | up |
@@ -42,11 +42,6 @@ Last checked: 2026-10-09 13:50 UTC
 | `go.ssi.ring_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_ring_summary.lbl |
 | `go.ssi.sky_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_sky_summary.lbl |
 | `go.ssi.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_supplemental_index.lbl |
-| `juno.junocam.index` | **503** | https://pds-rings.seti.org/holdings/metadata/JNOJNC_0xxx/JNOJNC_0999/JNOJNC_0999_index.lbl |
-| `mro.hirise.dtm` | **ReadTimeout** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/DTMCUMINDEX.LBL |
-| `mro.hirise.edr` | **502** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL |
-| `mro.hirise.rdr` | **502** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/RDRCUMINDEX.LBL |
-| `new_horizons.lorri.edr` | **503** | https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_1999/NHxxLO_1999_index.lbl |
 | `new_horizons.lorri.rdr` | **503** | https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_2999/NHxxLO_2999_index.lbl |
 | `voyager1.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_index.lbl |
 | `voyager1.iss.jupiter_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_jupiter_summary.lbl |
@@ -54,7 +49,5 @@ Last checked: 2026-10-09 13:50 UTC
 | `voyager1.iss.raw_image_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_raw_image_index.lbl |
 | `voyager1.iss.ring_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_ring_summary.lbl |
 | `voyager1.iss.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_supplemental_index.lbl |
-| `voyager2.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_index.lbl |
-| `voyager2.iss.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_supplemental_index.lbl |
 
-36/77 index URLs reachable across 6 hosts.
+43/77 index URLs reachable across 6 hosts.
