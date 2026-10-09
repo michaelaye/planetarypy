@@ -85,6 +85,21 @@ def test_url_retrieve_writes_file_and_cleans_part(tmp_path, monkeypatch):
     outfile.replace(tmp_path / "data2.bin")
 
 
+def test_url_retrieve_sets_a_timeout(tmp_path, monkeypatch):
+    """Without a timeout, a server that stops answering hangs the download forever."""
+    seen = {}
+
+    def fake_get(*args, **kwargs):
+        seen.update(kwargs)
+        return _FakeResponse(b"hello world")
+
+    monkeypatch.setattr(utils.requests, "get", fake_get)
+    utils.url_retrieve(
+        "http://example.invalid/data.bin", str(tmp_path / "data.bin"), disable_tqdm=True
+    )
+    assert seen["timeout"] == 30
+
+
 class TestUserAgent:
     """The UA is how archive operators identify our traffic in their logs."""
 

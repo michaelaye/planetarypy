@@ -361,7 +361,14 @@ def url_retrieve(
         auth = HTTPBasicAuth(user, passwd)
     else:
         auth = None
-    R = requests.get(url, stream=True, allow_redirects=True, auth=auth, headers=headers())
+    R = requests.get(
+        url,
+        stream=True,
+        allow_redirects=True,
+        auth=auth,
+        headers=headers(),
+        timeout=30,
+    )
     if R.status_code != 200:
         raise ConnectionError(f"Could not download {url}\nError code: {R.status_code}")
     tqdm_kwargs = dict(

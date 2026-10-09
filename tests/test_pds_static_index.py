@@ -297,6 +297,17 @@ class TestStaticRemoteHandler:
         assert result is None
         assert handler._remote_timestamp is None
 
+    def test_get_remote_timestamp_read_timeout(self, config_env, monkeypatch):
+        """A read timeout is a TimeoutError, not a URLError, and must not escape."""
+        handler = self._make_handler(config_env, monkeypatch)
+        monkeypatch.setattr(
+            "planetarypy.pds.static_index.utils.get_remote_timestamp",
+            MagicMock(side_effect=TimeoutError("The read operation timed out")),
+        )
+        result = handler.get_remote_timestamp()
+        assert result is None
+        assert handler._remote_timestamp is None
+
     def test_get_remote_timestamp_called_during_init_when_should_check(
         self, config_env, monkeypatch
     ):

@@ -152,7 +152,7 @@ class StaticRemoteHandler:
         """Get the last modified timestamp of the remote index file."""
         try:
             tstamp = utils.get_remote_timestamp(self.url)
-        except URLError as e:
+        except (URLError, TimeoutError) as e:
             logger.warning(f"Could not retrieve remote timestamp for {self.url}: {e}")
             return None
         else:
