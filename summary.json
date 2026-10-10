@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-09 22:55 UTC",
+  "checked": "2026-10-10 06:24 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -16,7 +16,7 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 34,
+      "failing": 42,
       "up": false
     },
     {
@@ -78,29 +78,29 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.inventory",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_inventory.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.moon_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_moon_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.ring_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_ring_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -267,8 +267,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "juno.junocam.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/JNOJNC_0xxx/JNOJNC_0999/JNOJNC_0999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -491,8 +491,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "new_horizons.lorri.edr",
       "url": "https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_1999/NHxxLO_1999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -568,15 +568,15 @@
       "host": "pds-rings.seti.org",
       "index_key": "voyager2.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "voyager2.iss.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_supplemental_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     }
   ]
 }

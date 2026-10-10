@@ -1,12 +1,12 @@
 # PDS archive reachability
 
-Last checked: 2026-10-09 22:55 UTC
+Last checked: 2026-10-10 06:24 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
 | HiRISE (LPL) | 3 | up |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **34 failing** |
+| PDS Rings (SETI) | 42 | **42 failing** |
 | LROC (ASU) | 1 | up |
 | PDS Imaging (JPL) | 8 | up |
 | SBN (PSI) | 1 | up |
@@ -19,6 +19,10 @@ Last checked: 2026-10-09 22:55 UTC
 | `cassini.cirs.cube_point_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl |
 | `cassini.cirs.cube_ring_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_ring_index.lbl |
 | `cassini.iss.cruise_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COISS_1xxx/COISS_1999/COISS_1999_index.lbl |
+| `cassini.iss.index` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_index.lbl |
+| `cassini.iss.inventory` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_inventory.lbl |
+| `cassini.iss.moon_summary` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_moon_summary.lbl |
+| `cassini.iss.ring_summary` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_ring_summary.lbl |
 | `cassini.iss.saturn_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_saturn_summary.lbl |
 | `cassini.rss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_index.lbl |
 | `cassini.rss.profile_index` | **503** | https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_profile_index.lbl |
@@ -42,6 +46,8 @@ Last checked: 2026-10-09 22:55 UTC
 | `go.ssi.ring_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_ring_summary.lbl |
 | `go.ssi.sky_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_sky_summary.lbl |
 | `go.ssi.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_supplemental_index.lbl |
+| `juno.junocam.index` | **503** | https://pds-rings.seti.org/holdings/metadata/JNOJNC_0xxx/JNOJNC_0999/JNOJNC_0999_index.lbl |
+| `new_horizons.lorri.edr` | **503** | https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_1999/NHxxLO_1999_index.lbl |
 | `new_horizons.lorri.rdr` | **503** | https://pds-rings.seti.org/holdings/metadata/NHxxLO_xxxx/NHxxLO_2999/NHxxLO_2999_index.lbl |
 | `voyager1.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_index.lbl |
 | `voyager1.iss.jupiter_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_jupiter_summary.lbl |
@@ -49,5 +55,7 @@ Last checked: 2026-10-09 22:55 UTC
 | `voyager1.iss.raw_image_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_raw_image_index.lbl |
 | `voyager1.iss.ring_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_ring_summary.lbl |
 | `voyager1.iss.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_supplemental_index.lbl |
+| `voyager2.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_index.lbl |
+| `voyager2.iss.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_supplemental_index.lbl |
 
-43/77 index URLs reachable across 6 hosts.
+35/77 index URLs reachable across 6 hosts.
