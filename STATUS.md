@@ -1,12 +1,12 @@
 # PDS archive reachability
 
-Last checked: 2026-10-10 06:24 UTC
+Last checked: 2026-10-10 13:04 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
 | HiRISE (LPL) | 3 | up |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **42 failing** |
+| PDS Rings (SETI) | 42 | **40 failing** |
 | LROC (ASU) | 1 | up |
 | PDS Imaging (JPL) | 8 | up |
 | SBN (PSI) | 1 | up |
@@ -19,10 +19,8 @@ Last checked: 2026-10-10 06:24 UTC
 | `cassini.cirs.cube_point_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl |
 | `cassini.cirs.cube_ring_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_ring_index.lbl |
 | `cassini.iss.cruise_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COISS_1xxx/COISS_1999/COISS_1999_index.lbl |
-| `cassini.iss.index` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_index.lbl |
 | `cassini.iss.inventory` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_inventory.lbl |
 | `cassini.iss.moon_summary` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_moon_summary.lbl |
-| `cassini.iss.ring_summary` | **ReadTimeout** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_ring_summary.lbl |
 | `cassini.iss.saturn_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_saturn_summary.lbl |
 | `cassini.rss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_index.lbl |
 | `cassini.rss.profile_index` | **503** | https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_profile_index.lbl |
@@ -58,4 +56,4 @@ Last checked: 2026-10-10 06:24 UTC
 | `voyager2.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_index.lbl |
 | `voyager2.iss.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_supplemental_index.lbl |
 
-35/77 index URLs reachable across 6 hosts.
+37/77 index URLs reachable across 6 hosts.

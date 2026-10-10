@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-10 06:24 UTC",
+  "checked": "2026-10-10 13:04 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -16,7 +16,7 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 42,
+      "failing": 40,
       "up": false
     },
     {
@@ -78,8 +78,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_index.lbl",
-      "status": "ReadTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -99,8 +99,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.ring_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_ring_summary.lbl",
-      "status": "ReadTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
