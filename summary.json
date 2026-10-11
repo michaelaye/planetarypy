@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-10 22:00 UTC",
+  "checked": "2026-10-11 06:28 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -34,8 +34,8 @@
     {
       "host": "sbnarchive.psi.edu",
       "total": 1,
-      "failing": 0,
-      "up": true
+      "failing": 1,
+      "up": false
     }
   ],
   "results": [
@@ -43,8 +43,8 @@
       "host": "sbnarchive.psi.edu",
       "index_key": "cassini.cda.index",
       "url": "https://sbnarchive.psi.edu/pds3/cassini/cda/COCDA_0101/INDEX/INDEX.LBL",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -78,7 +78,7 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_index.lbl",
-      "status": "504",
+      "status": "ReadTimeout",
       "up": false
     },
     {
@@ -92,7 +92,7 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.moon_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_moon_summary.lbl",
-      "status": "ReadTimeout",
+      "status": "504",
       "up": false
     },
     {
@@ -260,7 +260,7 @@
       "host": "pds-rings.seti.org",
       "index_key": "go.ssi.supplemental_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_supplemental_index.lbl",
-      "status": "ReadTimeout",
+      "status": "503",
       "up": false
     },
     {
@@ -526,7 +526,7 @@
       "host": "pds-rings.seti.org",
       "index_key": "voyager1.iss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_index.lbl",
-      "status": "503",
+      "status": "ReadTimeout",
       "up": false
     },
     {
