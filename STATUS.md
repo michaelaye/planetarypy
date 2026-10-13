@@ -1,22 +1,27 @@
 # PDS archive reachability
 
-Last checked: 2026-10-13 14:35 UTC
+Last checked: 2026-10-13 23:08 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
 | HiRISE (LPL) | 3 | up |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **3 failing** |
+| PDS Rings (SETI) | 42 | up |
 | LROC (ASU) | 1 | up |
-| PDS Imaging (JPL) | 8 | up |
+| PDS Imaging (JPL) | 8 | **8 failing** |
 | SBN (PSI) | 1 | up |
 
 ## Failing indexes
 
 | index key | status | url |
 | --- | --- | --- |
-| `cassini.cirs.cube_equi_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_equi_index.lbl |
-| `cassini.iss.cruise_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COISS_1xxx/COISS_1999/COISS_1999_index.lbl |
-| `cassini.rss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_index.lbl |
+| `lro.lamp.edr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/edr/LROLAM_0062/INDEX/CUMINDEX.LBL |
+| `lro.lamp.rdr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/rdr/LROLAM_1062/INDEX/CUMINDEX.LBL |
+| `messenger.mdis.cdr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/messenger/MSGRMDS_2001/INDEX/CUMINDEX.LBL |
+| `messenger.mdis.edr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/messenger/MSGRMDS_1001/INDEX/CUMINDEX.LBL |
+| `mgs.moc.edr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/mgs/moc/mgsc_1578/index/cumindex.lbl |
+| `mgs.moc.rdr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/mgs/moc/rdr/mgscim_1578/index/cumindex.lbl |
+| `mro.ctx.edr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_5010/index/cumindex.lbl |
+| `viking.vis.edr` | **ConnectionError** | https://planetarydata.jpl.nasa.gov/img/data/viking/viking_orbiter/vo_1064/index/cumindex.lbl |
 
-74/77 index URLs reachable across 6 hosts.
+69/77 index URLs reachable across 6 hosts.
