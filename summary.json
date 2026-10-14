@@ -1,11 +1,11 @@
 {
-  "checked": "2026-10-14 12:24 UTC",
+  "checked": "2026-10-14 17:37 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "total": 3,
-      "failing": 0,
-      "up": true
+      "failing": 1,
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -16,7 +16,7 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 4,
+      "failing": 2,
       "up": false
     },
     {
@@ -50,22 +50,22 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.cirs.cube_equi_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_equi_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.cirs.cube_point_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.cirs.cube_ring_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_ring_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -99,8 +99,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.ring_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_ring_summary.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -127,8 +127,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -155,8 +155,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.ring_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_ring_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
@@ -400,8 +400,8 @@
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.edr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "hirise-pds.lpl.arizona.edu",
