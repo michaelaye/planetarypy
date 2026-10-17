@@ -1,11 +1,11 @@
 {
-  "checked": "2026-10-17 11:11 UTC",
+  "checked": "2026-10-17 15:57 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "total": 3,
-      "failing": 0,
-      "up": true
+      "failing": 1,
+      "up": false
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -16,8 +16,8 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 2,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -106,15 +106,15 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.iss.saturn_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_saturn_summary.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.rss.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -400,8 +400,8 @@
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.edr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL",
-      "status": "200",
-      "up": true
+      "status": "ReadTimeout",
+      "up": false
     },
     {
       "host": "hirise-pds.lpl.arizona.edu",
