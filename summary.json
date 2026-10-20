@@ -1,11 +1,11 @@
 {
-  "checked": "2026-10-20 12:14 UTC",
+  "checked": "2026-10-20 17:32 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "total": 3,
-      "failing": 2,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -400,15 +400,15 @@
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.edr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL",
-      "status": "ReadTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.rdr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/RDRCUMINDEX.LBL",
-      "status": "ReadTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
