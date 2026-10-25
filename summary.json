@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-25 12:00 UTC",
+  "checked": "2026-10-25 16:50 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -16,8 +16,8 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 1,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -183,8 +183,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.vims.index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COVIMS_0xxx/COVIMS_0999/COVIMS_0999_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
