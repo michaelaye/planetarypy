@@ -1,12 +1,12 @@
 # PDS archive reachability
 
-Last checked: 2026-10-25 21:15 UTC
+Last checked: 2026-10-26 05:19 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
-| HiRISE (LPL) | 3 | up |
+| HiRISE (LPL) | 3 | **2 failing** |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **3 failing** |
+| PDS Rings (SETI) | 42 | **1 failing** |
 | LROC (ASU) | 1 | up |
 | PDS Imaging (JPL) | 8 | up |
 | SBN (PSI) | 1 | up |
@@ -15,8 +15,8 @@ Last checked: 2026-10-25 21:15 UTC
 
 | index key | status | url |
 | --- | --- | --- |
-| `cassini.vims.occ_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COVIMS_8xxx/COVIMS_8001/COVIMS_8001_index.lbl |
-| `cassini.vims.occ_profile_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COVIMS_8xxx/COVIMS_8001/COVIMS_8001_profile_index.lbl |
-| `cassini.vims.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COVIMS_0xxx/COVIMS_0999/COVIMS_0999_supplemental_index.lbl |
+| `cassini.cirs.cube_point_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl |
+| `mro.hirise.edr` | **ReadTimeout** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL |
+| `mro.hirise.rdr` | **ReadTimeout** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/RDRCUMINDEX.LBL |
 
 74/77 index URLs reachable across 6 hosts.
