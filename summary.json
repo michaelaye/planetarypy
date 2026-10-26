@@ -1,11 +1,11 @@
 {
-  "checked": "2026-10-26 05:19 UTC",
+  "checked": "2026-10-26 13:36 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "total": 3,
-      "failing": 2,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
@@ -16,8 +16,8 @@
     {
       "host": "pds-rings.seti.org",
       "total": 42,
-      "failing": 1,
-      "up": false
+      "failing": 0,
+      "up": true
     },
     {
       "host": "pds.lroc.asu.edu",
@@ -57,8 +57,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.cirs.cube_point_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -400,15 +400,15 @@
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.edr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL",
-      "status": "ReadTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "hirise-pds.lpl.arizona.edu",
       "index_key": "mro.hirise.rdr",
       "url": "https://hirise-pds.lpl.arizona.edu/PDS/INDEX/RDRCUMINDEX.LBL",
-      "status": "ReadTimeout",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-geosciences.wustl.edu",
