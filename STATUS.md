@@ -1,12 +1,12 @@
 # PDS archive reachability
 
-Last checked: 2026-10-28 06:19 UTC
+Last checked: 2026-10-28 13:33 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
 | HiRISE (LPL) | 3 | up |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **2 failing** |
+| PDS Rings (SETI) | 42 | **1 failing** |
 | LROC (ASU) | 1 | up |
 | PDS Imaging (JPL) | 8 | up |
 | SBN (PSI) | 1 | up |
@@ -15,7 +15,6 @@ Last checked: 2026-10-28 06:19 UTC
 
 | index key | status | url |
 | --- | --- | --- |
-| `cassini.uvis.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_supplemental_index.lbl |
-| `cassini.uvis.versions` | **503** | https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_versions.lbl |
+| `cassini.cirs.cube_point_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl |
 
-75/77 index URLs reachable across 6 hosts.
+76/77 index URLs reachable across 6 hosts.
