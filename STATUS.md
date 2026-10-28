@@ -1,6 +1,6 @@
 # PDS archive reachability
 
-Last checked: 2026-10-28 13:33 UTC
+Last checked: 2026-10-28 22:52 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
@@ -15,6 +15,6 @@ Last checked: 2026-10-28 13:33 UTC
 
 | index key | status | url |
 | --- | --- | --- |
-| `cassini.cirs.cube_point_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl |
+| `cassini.uvis.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_supplemental_index.lbl |
 
 76/77 index URLs reachable across 6 hosts.
