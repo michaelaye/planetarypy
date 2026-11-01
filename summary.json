@@ -1,5 +1,5 @@
 {
-  "checked": "2026-11-01 06:52 UTC",
+  "checked": "2026-11-01 18:07 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -57,15 +57,15 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.cirs.cube_point_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_point_index.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
       "index_key": "cassini.cirs.cube_ring_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/COCIRS_1xxx/COCIRS_9999/COCIRS_9999_cube_ring_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
