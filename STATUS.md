@@ -1,12 +1,12 @@
 # PDS archive reachability
 
-Last checked: 2026-11-04 20:02 UTC
+Last checked: 2026-11-05 07:25 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
 | HiRISE (LPL) | 3 | up |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **30 failing** |
+| PDS Rings (SETI) | 42 | **34 failing** |
 | LROC (ASU) | 1 | up |
 | PDS Imaging (JPL) | 8 | up |
 | SBN (PSI) | 1 | up |
@@ -41,9 +41,13 @@ Last checked: 2026-11-04 20:02 UTC
 | `go.ssi.index` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_index.lbl |
 | `go.ssi.ring_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_ring_summary.lbl |
 | `go.ssi.sky_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_sky_summary.lbl |
+| `go.ssi.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/GO_0xxx/GO_0999/GO_0999_supplemental_index.lbl |
+| `voyager1.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_index.lbl |
+| `voyager1.iss.jupiter_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_jupiter_summary.lbl |
 | `voyager1.iss.moon_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_moon_summary.lbl |
+| `voyager1.iss.raw_image_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_raw_image_index.lbl |
 | `voyager1.iss.ring_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_ring_summary.lbl |
 | `voyager1.iss.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_5xxx/VGISS_5999/VGISS_5999_supplemental_index.lbl |
-| `voyager2.iss.supplemental_index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_supplemental_index.lbl |
+| `voyager2.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/VGISS_6xxx/VGISS_6999/VGISS_6999_index.lbl |
 
-47/77 index URLs reachable across 6 hosts.
+43/77 index URLs reachable across 6 hosts.
