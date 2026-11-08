@@ -1,5 +1,5 @@
 {
-  "checked": "2026-11-08 06:43 UTC",
+  "checked": "2026-11-08 13:53 UTC",
   "hosts": [
     {
       "host": "hirise-pds.lpl.arizona.edu",
@@ -120,8 +120,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.rss.profile_index",
       "url": "https://pds-rings.seti.org/holdings/metadata/CORSS_8xxx/CORSS_8001/CORSS_8001_profile_index.lbl",
-      "status": "503",
-      "up": false
+      "status": "200",
+      "up": true
     },
     {
       "host": "pds-rings.seti.org",
@@ -134,8 +134,8 @@
       "host": "pds-rings.seti.org",
       "index_key": "cassini.uvis.moon_summary",
       "url": "https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_moon_summary.lbl",
-      "status": "200",
-      "up": true
+      "status": "503",
+      "up": false
     },
     {
       "host": "pds-rings.seti.org",
