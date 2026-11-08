@@ -1,6 +1,6 @@
 # PDS archive reachability
 
-Last checked: 2026-11-08 13:53 UTC
+Last checked: 2026-11-08 22:30 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
@@ -15,6 +15,6 @@ Last checked: 2026-11-08 13:53 UTC
 
 | index key | status | url |
 | --- | --- | --- |
-| `cassini.uvis.moon_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_moon_summary.lbl |
+| `cassini.iss.index` | **503** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_index.lbl |
 
 76/77 index URLs reachable across 6 hosts.
