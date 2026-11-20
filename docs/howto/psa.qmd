@@ -180,7 +180,11 @@ plp psa fetch IMA_AZ1120140041730C_ACCS01 --zip --no-extract --dest ./here
 
 ## Scope
 
-This targets the **ESA PSA** (`psa.esa.int`). For NASA-archived products use the
-catalog/index fetchers or `planetarypy.search` (the NASA PDS registry). The two
-archives are complementary — PSA holds the ESA missions, the PDS holds the NASA
-ones — and both resolve products behind the same `access_url` idea.
+This targets the **ESA PSA** directly (`psa.esa.int`) and is the only route to
+PSA's PDS3-era missions: Mars Express, Venus Express, Rosetta, Giotto, Huygens.
+The PSA's **PDS4 missions** (ExoMars TGO, BepiColombo, JUICE) are also federated
+into the NASA PDS registry, so `planetarypy.search` finds and downloads them too
+([HOWTO search the PDS for products](pds_search.qmd)); use whichever filter style
+suits. For NASA-archived products use the catalog/index fetchers or
+`planetarypy.search`. All routes resolve products behind the same `access_url`
+idea.

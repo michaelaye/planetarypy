@@ -9,10 +9,14 @@ Requires the optional ``[search]`` extra::
 
     pip install "planetarypy[search]"
 
-Scope: this is the **NASA** PDS4 registry. It covers Cassini, Voyager,
-Magellan, MRO, LRO, … (including products planetarypy's catalog can't
-otherwise resolve), but **not** non-NASA national archives such as Chang'e
-(CNSA) or Chandrayaan-2/3 (ISRO).
+Scope: the NASA PDS4 registry. It covers Cassini, Voyager, Magellan, MRO,
+LRO, … (including products planetarypy's catalog can't otherwise resolve) and,
+through IPDA federation, the PDS4 holdings of ESA's PSA (ExoMars TGO,
+BepiColombo, JUICE; ``urn:esa:psa:`` identifiers, files served from
+``archives.esac.esa.int``). PSA's PDS3-era missions (Mars Express, Venus
+Express, Rosetta) are present only as context products; use
+:mod:`planetarypy.psa` for their data. Other national archives such as
+Chang'e (CNSA) or Chandrayaan-2/3 (ISRO) are **not** covered.
 """
 
 from __future__ import annotations
