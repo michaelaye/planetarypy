@@ -1,12 +1,12 @@
 # PDS archive reachability
 
-Last checked: 2026-11-21 07:43 UTC
+Last checked: 2026-11-21 19:48 UTC
 
 | host | indexes | status |
 | --- | --- | --- |
 | HiRISE (LPL) | 3 | **3 failing** |
 | PDS Geosciences (WUSTL) | 22 | up |
-| PDS Rings (SETI) | 42 | **2 failing** |
+| PDS Rings (SETI) | 42 | up |
 | LROC (ASU) | 1 | up |
 | PDS Imaging (JPL) | 8 | **8 failing** |
 | SBN (PSI) | 1 | up |
@@ -15,8 +15,6 @@ Last checked: 2026-11-21 07:43 UTC
 
 | index key | status | url |
 | --- | --- | --- |
-| `cassini.iss.saturn_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/COISS_2xxx/COISS_2999/COISS_2999_saturn_summary.lbl |
-| `cassini.uvis.moon_summary` | **503** | https://pds-rings.seti.org/holdings/metadata/COUVIS_0xxx/COUVIS_0999/COUVIS_0999_moon_summary.lbl |
 | `lro.lamp.edr` | **403** | https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/edr/LROLAM_0062/INDEX/CUMINDEX.LBL |
 | `lro.lamp.rdr` | **403** | https://planetarydata.jpl.nasa.gov/img/data/lro/lamp/rdr/LROLAM_1062/INDEX/CUMINDEX.LBL |
 | `messenger.mdis.cdr` | **403** | https://planetarydata.jpl.nasa.gov/img/data/messenger/MSGRMDS_2001/INDEX/CUMINDEX.LBL |
@@ -24,9 +22,9 @@ Last checked: 2026-11-21 07:43 UTC
 | `mgs.moc.edr` | **403** | https://planetarydata.jpl.nasa.gov/img/data/mgs/moc/mgsc_1578/index/cumindex.lbl |
 | `mgs.moc.rdr` | **403** | https://planetarydata.jpl.nasa.gov/img/data/mgs/moc/rdr/mgscim_1578/index/cumindex.lbl |
 | `mro.ctx.edr` | **403** | https://planetarydata.jpl.nasa.gov/img/data/mro/ctx/mrox_5010/index/cumindex.lbl |
-| `mro.hirise.dtm` | **502** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/DTMCUMINDEX.LBL |
-| `mro.hirise.edr` | **502** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL |
-| `mro.hirise.rdr` | **502** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/RDRCUMINDEX.LBL |
+| `mro.hirise.dtm` | **ConnectionError** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/DTMCUMINDEX.LBL |
+| `mro.hirise.edr` | **ConnectionError** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/EDRCUMINDEX.LBL |
+| `mro.hirise.rdr` | **ConnectionError** | https://hirise-pds.lpl.arizona.edu/PDS/INDEX/RDRCUMINDEX.LBL |
 | `viking.vis.edr` | **403** | https://planetarydata.jpl.nasa.gov/img/data/viking/viking_orbiter/vo_1064/index/cumindex.lbl |
 
-64/77 index URLs reachable across 6 hosts.
+66/77 index URLs reachable across 6 hosts.
