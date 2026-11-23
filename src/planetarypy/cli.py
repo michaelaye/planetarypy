@@ -11,8 +11,9 @@ through the ``planetarypy.cli_plugins`` entry point.
 """
 
 import re
+import sys
 import textwrap
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 import click
@@ -2415,7 +2416,7 @@ def _spicer_list(Spicer, mission_kernels):
         spacecraft = mission_kernels.tracked_spacecraft()
     except ImportError:
         typer.echo("\nSpacecraft: install spice-kernel-db to use mission kernels "
-                   "(pip install 'planetarypy[skd]').")
+                   "(pip install 'planetarypy[spice]').")
         return
     except LookupError as e:
         typer.echo(f"\nSpacecraft: {e}")
@@ -2587,14 +2588,62 @@ def spicer(
 #       `bodies()` or `crs_for(body)` lookup likely needs adding.
 
 
-# ── spice: kernel discovery + fetch ──────────────────────────────────
+# ── spice: spice-kernel-db's command tree, plus the NAIF archive verbs ──
 
-spice_app = typer.Typer(
-    help="SPICE kernel discovery and date-scoped fetching across NAIF "
-         "mission archives.",
-    no_args_is_help=True,
-)
+try:
+    from spice_kernel_db import cli as _skd_cli
+except ModuleNotFoundError as _exc:
+    if _exc.name != "spice_kernel_db":  # skd is there but one of its imports is broken
+        raise
+    _skd_cli = None  # the [spice] extra is not installed
+
+_PANEL_NAIF = "naif archives (planetarypy)"
+
+
+def _spice_group() -> typer.Typer:
+    """``plp spice``: spice-kernel-db's own Typer app, mounted verbatim (#51).
+
+    Without skd the group carries only planetarypy's NAIF verbs (conda ships
+    spiceypy but not skd); bare ``plp spice`` then says how to install it.
+    """
+    if _skd_cli is not None:
+        return _skd_cli.app
+    from planetarypy.spice._hints import SKD_INSTALL_HINT
+
+    group = typer.Typer(
+        # the backslashes keep rich markup from eating the brackets
+        help="SPICE kernels. The kernel store's verbs (get, ls, check, ...) need "
+             "the \\[spice] extra: pip install 'planetarypy\\[spice]'",
+        invoke_without_command=True,
+    )
+
+    @group.callback()
+    def _missing(ctx: typer.Context) -> None:
+        if ctx.invoked_subcommand is None:
+            typer.echo(SKD_INSTALL_HINT, err=True)
+            raise typer.Exit(1)
+
+    return group
+
+
+def _spice_exit_code(exc: BaseException) -> int | None:
+    """skd's exit code for one of its exceptions, or None (the mapping is skd's)."""
+    return _skd_cli.exit_code(exc) if _skd_cli is not None else None
+
+
+spice_app = _spice_group()
 app.add_typer(spice_app, name="spice", rich_help_panel=_PANEL_DISCOVERY)
+
+
+def _naif_verb(name: str):
+    """Register a planetarypy verb on the spice group, under the NAIF panel, once.
+
+    The group is skd's shared app object, so a second import or a reload of
+    this module must not add the verb a second time.
+    """
+    if any(c.name == name for c in spice_app.registered_commands):
+        return lambda fn: fn
+    return spice_app.command(name, rich_help_panel=_PANEL_NAIF)
 
 
 @contextmanager
@@ -2622,7 +2671,7 @@ def _complete_spice_mission(incomplete: str) -> list[str]:
                   if m.lower().startswith(incomplete.lower()))
 
 
-@spice_app.command("missions")
+@_naif_verb("missions")
 def spice_missions():
     """List every mission archive NAIF publishes (~39 entries).
 
@@ -2664,7 +2713,7 @@ def spice_missions():
     Console().print(table)
 
 
-@spice_app.command("info")
+@_naif_verb("info")
 def spice_info(
     ctx: typer.Context,
     mission: str = typer.Argument(
@@ -2730,7 +2779,7 @@ def spice_info(
     Console().print(table)
 
 
-@spice_app.command("fetch")
+@_naif_verb("fetch")
 def spice_fetch(
     ctx: typer.Context,
     mission: str = typer.Argument(
@@ -2795,76 +2844,6 @@ def spice_fetch(
     typer.echo(metakernel)
 
 
-@spice_app.command("cached")
-def spice_cached(
-    bytes_total: bool = typer.Option(
-        False, "--total", "-T",
-        help="Also print cumulative on-disk size at the bottom.",
-    ),
-):
-    """Show every SPICE kernel currently cached under storage_root.
-
-    Walks ``{storage_root}/spice_kernels/`` and groups by top-level
-    directory: ``generic`` (LSK/PCK/DE-series/satellites) and per-mission
-    subsets (cassini, mro, …). Useful before kicking off a `plp spice
-    fetch` to check whether kernels are already on disk.
-
-    \b
-    Examples:
-        plp spice cached
-        plp spice cached --total
-    """
-    from rich.console import Console
-    from rich.table import Table
-
-    with _spice_deps():
-        from planetarypy.spice.archived_kernels import list_cached_kernels
-        from planetarypy.spice.config import KERNEL_STORAGE
-
-    cached = list_cached_kernels()
-    if not cached:
-        typer.echo(
-            f"No SPICE kernels cached under {KERNEL_STORAGE}.", err=True,
-        )
-        typer.echo(
-            "Use `plp spice fetch` or `plp spice generic <type>` to "
-            "populate it.", err=True,
-        )
-        raise typer.Exit()
-
-    table = Table(
-        title=f"Cached SPICE kernels under {KERNEL_STORAGE}",
-        title_style="bold",
-        header_style="bold magenta",
-        pad_edge=False,
-    )
-    table.add_column("group", style="cyan", no_wrap=True)
-    table.add_column("files", justify="right")
-    table.add_column("size", justify="right", style="dim")
-    table.add_column("sample", overflow="fold")
-
-    grand_total = 0
-    for group, files in cached.items():
-        size = sum(p.stat().st_size for p in files)
-        grand_total += size
-        sample = ", ".join(p.name for p in files[:3])
-        if len(files) > 3:
-            sample += f", … (+{len(files) - 3} more)"
-        table.add_row(group, str(len(files)),
-                      _humanize_bytes(size), sample)
-    Console().print(table)
-    if bytes_total:
-        typer.echo(f"\ntotal: {_humanize_bytes(grand_total)}", err=True)
-
-
-def _humanize_bytes(n: int) -> str:
-    """Convert a raw byte count to a human-readable string."""
-    for unit in ("B", "KB", "MB", "GB"):
-        if n < 1024 or unit == "GB":
-            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
-        n /= 1024
-
-
 def _complete_generic_alias(incomplete: str) -> list[str]:
     """Tab completion for the generic-kernel alias argument."""
     try:
@@ -2875,7 +2854,7 @@ def _complete_generic_alias(incomplete: str) -> list[str]:
                   if a.startswith(incomplete.lower()))
 
 
-@spice_app.command("spk")
+@_naif_verb("spk")
 def spice_spk(
     ctx: typer.Context,
     mission: str = typer.Argument(
@@ -2920,7 +2899,7 @@ def spice_spk(
     typer.echo(str(path))
 
 
-@spice_app.command("generic")
+@_naif_verb("generic")
 def spice_generic(
     ctx: typer.Context,
     name: str = typer.Argument(
@@ -3489,4 +3468,16 @@ def _load_cli_plugins(target: typer.Typer) -> None:
 
 def main():
     _load_cli_plugins(app)
-    app()
+    # skd's warnings on stderr for this run, as under `skd` itself (-v turns on INFO)
+    logging = _skd_cli.logging_to_stderr() if _skd_cli is not None else nullcontext()
+    try:
+        with logging:
+            app()
+    except Exception as exc:
+        # spice-kernel-db's own exceptions leave its mounted commands the way
+        # they leave `skd`: the message on stderr and skd's exit code (#51).
+        code = _spice_exit_code(exc)
+        if code is None:
+            raise
+        typer.echo(str(exc), err=True)
+        sys.exit(code)

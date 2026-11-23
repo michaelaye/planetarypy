@@ -29,7 +29,8 @@ logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 # Define packages that should be installed via pip instead of conda
-PIP_PACKAGES = {"build", "pip-tools", "planets"}
+# spice-kernel-db is on PyPI and anaconda.org/michaelaye, not on conda-forge.
+PIP_PACKAGES = {"build", "pip-tools", "planets", "spice-kernel-db"}
 
 # Define packages that should NEVER be installed via pip
 CONDA_ONLY_PACKAGES = {"gdal"}

@@ -59,12 +59,15 @@ Repository = "https://github.com/planetarypy/planetarypy"
 spice = [
     "spiceypy",       # For SPICE kernel handling
     "scipy",          # For scipy.spatial.transform.Rotation in spicer.py
+    # The kernel store: `plp spice` is its command tree, and spacecraft
+    # positions come from the metakernels it tracks (#51). Pinned to the
+    # public API it declares for a major version.
+    "spice-kernel-db>=0.23,<1",
 ]
-# Spacecraft positions for `Spicer.light_time(observer=<spacecraft>)` and
-# `plp spicer --observer`, from mission metakernels spice-kernel-db has on disk.
-# Use together with [spice].
+# Alias of [spice] for one release: spice-kernel-db moved into [spice] in
+# 0.85 (#51). Goes away in 0.86.
 skd = [
-    "spice-kernel-db>=0.19",
+    "planetarypy[spice]",
 ]
 # Optional dependencies for ISIS3-pipeline workflows (CTX calibration,
 # projected cubes, footprint geometry, interactive raster display).

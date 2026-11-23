@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`plp spice` is spice-kernel-db's command tree** (planetarypy/planetarypy#51). Every verb `skd` has (browse, get, update, ls, show, check, doctor, coverage, which, stats, scan, import, rewrite, rm, clean, dedup, reset, config, mission) runs under `plp spice` as the same code, with skd's help panels, and skd's exit codes (1 untracked, 2 ambiguous, 78 config error) come out of `plp` unchanged, from any verb that reaches skd (`plp spicer` included), with skd's warnings on stderr as under `skd` itself. planetarypy's own verbs for NAIF's subsetter and operational server (`missions`, `info`, `fetch`, `spk`, `generic`) sit in the same group under their own panel. `plp spice cached` is gone: the kernels planetarypy downloads live in skd's store, and `plp spice ls`, `which` and `stats` answer from the index (`list_cached_kernels()` stays in the API).
+- **The `[spice]` extra brings spice-kernel-db** (`>=0.23,<1`, the public API it declares for a major version). `[skd]` is an alias of `[spice]` for this release and goes away in 0.86. Without the extra, `plp spice` prints one install line and exits 1; `plp` itself imports as before.
+
 ## [0.84.2] - 2026-10-09
 
 A robustness fix for index downloads: a slow PDS server no longer makes

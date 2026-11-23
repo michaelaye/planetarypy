@@ -79,7 +79,7 @@ class TestFindMetakernel:
 class TestDatabaseAccess:
     def test_missing_package_gives_install_hint(self, monkeypatch):
         monkeypatch.setitem(sys.modules, "spice_kernel_db", None)
-        with pytest.raises(ImportError, match=r"planetarypy\[skd\]"):
+        with pytest.raises(ImportError, match=r"planetarypy\[spice\]"):
             mission_kernels.tracked_metakernels()
 
     def test_locked_database_is_explained(self, monkeypatch):

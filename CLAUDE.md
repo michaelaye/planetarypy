@@ -95,6 +95,8 @@ Supporting files: `_mission_map.py`, `_parser.py`, `_repo.py`, `_schema.py`, `_u
 
 ## SPICE (`spice/`) — optional `[spice]` extra
 
+The extra brings `spice-kernel-db` (`>=0.23,<1`): the kernel store. `plp spice` is skd's Typer app mounted under `plp` (`cli._spice_group`); `plp`'s `main()` uses skd's host contract (`spice_kernel_db.cli.exit_code`, `logging_to_stderr`). Without skd (conda ships spiceypy but not skd, which is not on conda-forge; CI pip-installs it via `install_dev_deps.py`) the group keeps the NAIF verbs and bare `plp spice` prints the install hint, exit 1. The one hint string lives in `spice/_hints.py`.
+
 - `generic_kernels.py` — LSK, PCK
 - `archived_kernels.py` — mission-specific kernels
 - `pckernels.py` — planetary constants kernels
@@ -102,7 +104,7 @@ Supporting files: `_mission_map.py`, `_parser.py`, `_repo.py`, `_schema.py`, `_u
   - `Spicer(body).illumination(lon, lat, time)` — full illumination angles
   - `Spicer(body).solar_azimuth_at(lon, lat, time)` — CW-from-north sun azimuth
   - `Spicer(body).north_azimuth_at(lon, lat, time)` — image-plane north arrow
-- `mission_kernels.py` — spacecraft ephemerides via the optional `[skd]` extra (`spice-kernel-db`): `find_metakernel(spacecraft, time)` picks the tracked metakernel whose SPKs cover that time (`*_ops` > `*_plan` > scenarios). Read-only and never downloads; failures raise `LookupError` naming the `spice-kernel-db` command to run. The lookup is spice-kernel-db's quiet `KernelDB.metakernels_covering` (skd ≥ 0.19).
+- `mission_kernels.py` — spacecraft ephemerides via `spice-kernel-db` (in the `[spice]` extra since 0.85; `[skd]` is an alias for one release): `find_metakernel(spacecraft, time)` picks the tracked metakernel whose SPKs cover that time (`*_ops` > `*_plan` > scenarios). Read-only and never downloads; failures raise `LookupError` naming the `spice-kernel-db` command to run. The lookup is spice-kernel-db's quiet `KernelDB.metakernels_covering` (skd ≥ 0.19).
 - `operational_kernels.py` — current spacecraft trajectories from NAIF's operational server (`https://naif.jpl.nasa.gov/pub/naif/<MISSION>/kernels/spk/`), where only 8 of 77 missions publish a metakernel. `fetch_spk(mission, time)` downloads the newest SPK covering the time (skips files over 200 MB, deletes misses) into `{storage_root}/spice_kernels/operational/`; `find_local_spk` finds it again offline. The listing is preformatted text, not an HTML table, so `pd.read_html` can't parse it. `mission_kernels.find_spacecraft_kernel` tries spice-kernel-db metakernels first, then these.
 - `config.py` — SPICE-specific paths
 - Kernels cached under `{storage_root}/spice_kernels/`
@@ -140,7 +142,7 @@ Typer app with sub-apps grouped by Rich help panel:
 **Verb inventory** (one line per sub-app — names drift rarely, so they live here to save a grep; the *implementation* still lives in code, read it before editing):
 - `plp catalog`: build, list, show, search, samples, summary, ambiguous
 - `plp indexes`: list, peek, last, counts, select, info, refresh, prune
-- `plp spice`: missions, info, fetch, cached, generic, spk
+- `plp spice`: spice-kernel-db's command tree, mounted verbatim (its verbs are skd's to list), plus planetarypy's NAIF-archive verbs in their own panel: missions, info, fetch, spk, generic (#51)
 
 **Design philosophy: API first, CLI wraps thin.** Every `plp` verb is a thin wrapper over a public Python API. Build and test the library function first; the CLI command then forwards arguments and formats output. Useful logic — parsing PID lists, building catalogs, batching downloads, filtering indexes by PIDs, parallel execution — lives in `planetarypy.*` modules, not under `cli.py`. The reason is reuse: notebooks and downstream tooling should pick up new capabilities without screen-scraping or shelling out to `plp`. If you find substantial logic inside `cli.py`, that's a bug — factor it down to the API layer.
 

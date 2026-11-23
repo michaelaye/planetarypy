@@ -14,6 +14,7 @@ Tests use Typer's ``CliRunner`` to capture stdout + stderr per stream.
 
 import re
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -28,18 +29,93 @@ from planetarypy.spice._deps import SPICE_INSTALL_HINT
 runner = CliRunner()
 
 
-class TestBareInvocation:
-    def test_spice_bare_prints_help(self):
-        """``plp spice`` (no subcommand) should show the sub-app help,
-        same UX as ``plp catalog`` / ``plp indexes``. Typer's
-        ``no_args_is_help`` on a sub-app exits 2 (treats "missing
-        subcommand" as user error), but the help text is still shown —
-        same convention all our sub-apps follow."""
+def _help_sections(text: str) -> tuple[set[str], set[str]]:
+    """(command names, panel titles) from a rich help listing."""
+    commands = set(re.findall(r"^│ ([a-z][\w-]*)\s", text, flags=re.MULTILINE))
+    panels = set(re.findall(r"^╭─ ([^─]+?) ─", text, flags=re.MULTILINE))
+    return commands, panels
+
+
+class TestMount:
+    """#51: plp spice is spice-kernel-db's Typer app, mounted verbatim."""
+
+    @pytest.fixture(autouse=True)
+    def _skd(self, monkeypatch, tmp_path):
+        """skd's own code reads skd's config and database: keep both in tmp_path."""
+        skd_config = pytest.importorskip("spice_kernel_db.config")
+        home = tmp_path / "home"
+        (home / ".config" / "spice-kernel-db").mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setattr(skd_config, "CONFIG_DIR", home / ".config" / "spice-kernel-db")
+        monkeypatch.setattr(skd_config, "CONFIG_FILE", skd_config.CONFIG_DIR / "config.toml")
+
+    def test_help_is_skds_plus_the_naif_verbs(self):
+        from spice_kernel_db.cli import app as skd_app
+
+        skd_commands, skd_panels = _help_sections(runner.invoke(skd_app, ["--help"]).stdout)
+        result = runner.invoke(app, ["spice", "--help"])
+        assert result.exit_code == 0
+        commands, panels = _help_sections(result.stdout)
+        assert skd_commands and skd_commands <= commands
+        assert skd_panels - {"Options"} <= panels
+        assert {"missions", "info", "fetch", "spk", "generic"} <= commands
+        assert "naif archives (planetarypy)" in panels
+        assert "cached" not in commands
+        assert cli.spice_app is skd_app  # one group, one object
+
+    def test_registration_is_idempotent(self):
+        """A reload of planetarypy.cli must not put the verbs on skd's shared app twice."""
+        before = [c.name for c in cli.spice_app.registered_commands]
+        assert cli._naif_verb("missions")(lambda: None) is not None
+        assert [c.name for c in cli.spice_app.registered_commands] == before
+        assert before.count("missions") == 1
+
+    def test_bare_invocation_is_skds_summary(self):
+        """``plp spice`` alone does what ``skd`` alone does: the summary."""
         result = runner.invoke(app, ["spice"])
-        assert "Usage:" in result.stdout
-        assert "missions" in result.stdout
-        assert "info" in result.stdout
-        assert "fetch" in result.stdout
+        assert result.exit_code == 0
+        assert "spice-kernel-db" in result.stdout
+
+    def test_without_skd_naif_verbs_stay_and_bare_call_hints(self, monkeypatch):
+        monkeypatch.setattr(cli, "_skd_cli", None)
+        group = cli._spice_group()
+
+        @group.command("ping")
+        def ping() -> None:
+            typer.echo("pong")
+
+        assert runner.invoke(group, ["ping"]).stdout.strip() == "pong"
+        result = runner.invoke(group, [])
+        assert result.exit_code == 1
+        assert "planetarypy[spice]" in result.stderr and "Traceback" not in result.stderr
+        # the group's help names the extra, brackets intact (rich markup would eat them)
+        help_text = " ".join(runner.invoke(group, ["--help"]).stdout.split())
+        assert "the [spice] extra" in help_text and "\\" not in help_text
+        assert cli._spice_exit_code(ValueError("x")) is None
+        assert runner.invoke(app, ["--help"]).exit_code == 0
+
+    def test_skd_exceptions_exit_like_skd(self, monkeypatch, capsys):
+        from spice_kernel_db.db import MetakernelNotTracked
+
+        assert cli._spice_exit_code(ValueError("not skd's")) is None
+
+        def untracked():
+            raise MetakernelNotTracked("x.tm")
+
+        monkeypatch.setattr(cli, "app", untracked)
+        monkeypatch.setattr(cli, "_load_cli_plugins", lambda target: None)
+        with pytest.raises(SystemExit) as exc_info:
+            cli.main()
+        assert exc_info.value.code == 1
+        assert "x.tm" in capsys.readouterr().err
+
+    def test_extras(self):
+        import tomllib
+
+        with open(Path(cli.__file__).parents[2] / "pyproject.toml", "rb") as f:
+            extras = tomllib.load(f)["project"]["optional-dependencies"]
+        assert any(d.startswith("spice-kernel-db") for d in extras["spice"])
+        assert extras["skd"] == ["planetarypy[spice]"]
 
 
 class TestMissions:
@@ -121,46 +197,6 @@ class TestFetch:
         mock_fetch.assert_called_once_with(
             "cassini", "2006-06-01", "2006-06-30", save_location=None,
         )
-
-
-class TestCached:
-    """`plp spice cached` walks {storage_root}/spice_kernels/ and groups
-    by top-level directory. Mocked here so the test doesn't depend on
-    what kernels the dev happens to have on disk."""
-
-    def test_empty_cache_prints_hint_and_exits_zero(self):
-        with patch(
-            "planetarypy.spice.archived_kernels.list_cached_kernels",
-            return_value={},
-        ):
-            result = runner.invoke(app, ["spice", "cached"])
-        assert result.exit_code == 0
-        assert "No SPICE kernels cached" in result.stderr
-
-    def test_populated_cache_renders_rich_table(self, tmp_path):
-        # Build a synthetic cache view: two groups, a few files each.
-        fake_files = {
-            "generic": [
-                tmp_path / "naif0012.tls",
-                tmp_path / "pck00010.tpc",
-            ],
-            "cassini": [tmp_path / "metakernel.tm"],
-        }
-        for files in fake_files.values():
-            for f in files:
-                f.write_bytes(b"x" * 100)
-
-        with patch(
-            "planetarypy.spice.archived_kernels.list_cached_kernels",
-            return_value=fake_files,
-        ):
-            result = runner.invoke(app, ["spice", "cached"])
-
-        assert result.exit_code == 0
-        for kernel in ("naif0012.tls", "pck00010.tpc", "metakernel.tm"):
-            assert kernel in result.stdout
-        assert "generic" in result.stdout
-        assert "cassini" in result.stdout
 
 
 class TestGeneric:
@@ -404,7 +440,7 @@ class TestSpicerObserver:
         result = runner.invoke(app, ["spicer", "--list"])
         assert result.exit_code == 0
         self.row(result.stdout, "Mars")
-        assert "planetarypy[skd]" in result.stdout
+        assert "planetarypy[spice]" in result.stdout
 
     def test_unknown_body_errors_like_an_unknown_observer(self, fake_spicer):
         result = runner.invoke(app, ["spicer", "Notabody"])
@@ -491,7 +527,6 @@ class TestSpiceExtraMissing:
         [
             ["spice", "missions"],
             ["spice", "info", "cassini"],
-            ["spice", "cached"],
             ["spice", "generic", "lsk"],
             ["spice", "spk", "psyche"],
             ["spice", "fetch", "cassini", "--start", "2006-06-01",

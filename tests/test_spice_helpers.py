@@ -1,5 +1,5 @@
-"""Unit tests for the SPICE helper functions added for the
-``plp spice cached`` / ``plp spice generic`` CLI verbs:
+"""Unit tests for the SPICE helper functions behind the
+``plp spice generic`` CLI verb and the ``list_cached_kernels`` API:
 
   - :func:`planetarypy.spice.archived_kernels.list_cached_kernels`
   - :func:`planetarypy.spice.generic_kernels.download_generic_kernel`

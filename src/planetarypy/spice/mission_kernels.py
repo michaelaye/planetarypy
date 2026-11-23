@@ -19,12 +19,7 @@ import contextlib
 from pathlib import Path
 
 from ._deps import spice
-
-SKD_INSTALL_HINT = (
-    "Spacecraft positions come from mission metakernels managed by "
-    "spice-kernel-db, which is not installed. Install it with:\n\n"
-    "    pip install 'planetarypy[skd]'"
-)
+from ._hints import SKD_INSTALL_HINT
 
 # Reconstructed ("ops") trajectories beat planned ones when both cover a time;
 # scenario metakernels (e.g. juice_crema_5_2.tm) come last.
