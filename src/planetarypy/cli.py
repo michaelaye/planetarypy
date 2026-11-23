@@ -2608,7 +2608,7 @@ def _spice_group() -> typer.Typer:
     """
     if _skd_cli is not None:
         return _skd_cli.app
-    from planetarypy.spice._hints import SKD_INSTALL_HINT
+    from planetarypy._install_hints import SKD_INSTALL_HINT
 
     group = typer.Typer(
         # the backslashes keep rich markup from eating the brackets

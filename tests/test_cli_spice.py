@@ -29,11 +29,11 @@ from planetarypy.spice._deps import SPICE_INSTALL_HINT
 runner = CliRunner()
 
 
-def _help_sections(text: str) -> tuple[set[str], set[str]]:
-    """(command names, panel titles) from a rich help listing."""
-    commands = set(re.findall(r"^│ ([a-z][\w-]*)\s", text, flags=re.MULTILINE))
-    panels = set(re.findall(r"^╭─ ([^─]+?) ─", text, flags=re.MULTILINE))
-    return commands, panels
+def _command_names(typer_app) -> set[str]:
+    """The command names Click sees for a Typer app (renderer-independent)."""
+    import typer.main
+
+    return set(typer.main.get_command(typer_app).commands)
 
 
 class TestMount:
@@ -52,16 +52,31 @@ class TestMount:
     def test_help_is_skds_plus_the_naif_verbs(self):
         from spice_kernel_db.cli import app as skd_app
 
-        skd_commands, skd_panels = _help_sections(runner.invoke(skd_app, ["--help"]).stdout)
-        result = runner.invoke(app, ["spice", "--help"])
-        assert result.exit_code == 0
-        commands, panels = _help_sections(result.stdout)
-        assert skd_commands and skd_commands <= commands
-        assert skd_panels - {"Options"} <= panels
-        assert {"missions", "info", "fetch", "spk", "generic"} <= commands
-        assert "naif archives (planetarypy)" in panels
-        assert "cached" not in commands
         assert cli.spice_app is skd_app  # one group, one object
+        commands = _command_names(cli.spice_app)
+        assert len(commands) >= 20 and "get" in commands and "check" in commands
+        assert {"missions", "info", "fetch", "spk", "generic"} <= commands
+        assert "cached" not in commands
+        # skd's panels travel with its commands; planetarypy's verbs sit in their own
+        panels = {c.rich_help_panel for c in cli.spice_app.registered_commands}
+        expected = {"acquire", "inspect", "maintain", "configure", "naif archives (planetarypy)"}
+        assert expected <= panels
+        result = runner.invoke(app, ["spice", "--help"])
+        assert result.exit_code == 0 and "missions" in result.stdout and "get" in result.stdout
+
+    def test_plp_imports_without_spiceypy_or_skd(self):
+        """The minimal-install smoke test: `plp --help` with neither optional package."""
+        import subprocess
+
+        code = (
+            "import sys; sys.modules['spiceypy'] = None; sys.modules['spice_kernel_db'] = None; "
+            "from planetarypy.cli import app; import typer.main; "
+            "print(sorted(typer.main.get_command(app).commands['spice'].commands))"
+        )
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                             timeout=120)
+        assert out.returncode == 0, out.stderr[-2000:]
+        assert "'missions'" in out.stdout and "'get'" not in out.stdout
 
     def test_registration_is_idempotent(self):
         """A reload of planetarypy.cli must not put the verbs on skd's shared app twice."""

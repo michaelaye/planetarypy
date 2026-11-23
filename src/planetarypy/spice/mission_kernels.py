@@ -19,7 +19,7 @@ import contextlib
 from pathlib import Path
 
 from ._deps import spice
-from ._hints import SKD_INSTALL_HINT
+from planetarypy._install_hints import SKD_INSTALL_HINT
 
 # Reconstructed ("ops") trajectories beat planned ones when both cover a time;
 # scenario metakernels (e.g. juice_crema_5_2.tm) come last.
