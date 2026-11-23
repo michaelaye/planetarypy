@@ -95,7 +95,7 @@ Supporting files: `_mission_map.py`, `_parser.py`, `_repo.py`, `_schema.py`, `_u
 
 ## SPICE (`spice/`) — optional `[spice]` extra
 
-The extra brings `spice-kernel-db` (`>=0.23,<1`): the kernel store. `plp spice` is skd's Typer app mounted under `plp` (`cli._spice_group`); `plp`'s `main()` uses skd's host contract (`spice_kernel_db.cli.exit_code`, `logging_to_stderr`). Without skd (conda ships spiceypy but not skd, which is not on conda-forge; CI pip-installs it via `install_dev_deps.py`) the group keeps the NAIF verbs and bare `plp spice` prints the install hint, exit 1. The one hint string lives in `spice/_hints.py`.
+The extra brings `spice-kernel-db` (`>=0.30,<1`): the kernel store. `plp spice` is skd's Typer app mounted under `plp` (`cli._spice_group`); `plp`'s `main()` uses skd's host contract (`spice_kernel_db.cli.exit_code`, `logging_to_stderr`). Without skd (conda ships spiceypy but not skd, which is not on conda-forge; CI pip-installs it via `install_dev_deps.py`) the group keeps the NAIF verbs and bare `plp spice` prints the install hint, exit 1. The one hint string lives in `spice/_hints.py`.
 
 - `generic_kernels.py` — LSK, PCK
 - `archived_kernels.py` — mission-specific kernels

@@ -62,7 +62,7 @@ spice = [
     # The kernel store: `plp spice` is its command tree, and spacecraft
     # positions come from the metakernels it tracks (#51). Pinned to the
     # public API it declares for a major version.
-    "spice-kernel-db>=0.23,<1",
+    "spice-kernel-db>=0.30,<1",
 ]
 # Alias of [spice] for one release: spice-kernel-db moved into [spice] in
 # 0.85 (#51). Goes away in 0.86.
