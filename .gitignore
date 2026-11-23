@@ -185,3 +185,6 @@ docs/tutorials/*_files/
 
 # Work notes written by an AI assistant session; they belong in its own archive.
 /MEMORY/
+
+# The project's ideal-state record, kept by an AI assistant session.
+/ISA.md
